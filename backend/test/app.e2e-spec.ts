@@ -33,6 +33,10 @@ describe('AppController (e2e)', () => {
       status: 'ok',
       service: 'salon-facil-api',
       version: '0.1.0',
+      database: {
+        status: 'ok',
+      },
     });
+    expect(response.body.database.latency).toMatch(/^\d+ms$/);
   });
 });
