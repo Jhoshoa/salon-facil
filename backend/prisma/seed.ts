@@ -16,6 +16,7 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function cleanDatabase(): Promise<void> {
+  await prisma.refreshToken.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.review.deleteMany();
   await prisma.payment.deleteMany();

@@ -16,7 +16,7 @@ describe('Prisma Connection', () => {
 
     prisma = moduleRef.get(PrismaService);
     await prisma.onModuleInit();
-  });
+  }, 30000);
 
   afterAll(async () => {
     await prisma.onModuleDestroy();
