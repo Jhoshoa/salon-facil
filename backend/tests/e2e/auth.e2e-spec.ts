@@ -5,6 +5,11 @@ import { AppModule } from '../../src/app.module';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
+  const uniqueId = Date.now();
+  const phoneFor = (offset: number) =>
+    `+5917${String(uniqueId + offset)
+      .padStart(7, '0')
+      .slice(-7)}`;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -29,8 +34,8 @@ describe('Auth (e2e)', () => {
   });
 
   describe('POST /api/v1/auth/register', () => {
-    const uniqueEmail = `test-${Date.now()}@email.com`;
-    const uniquePhone = `+5917${String(Date.now()).slice(-7)}`;
+    const uniqueEmail = `test-${uniqueId}@email.com`;
+    const uniquePhone = phoneFor(0);
 
     it('should register a new user', () => {
       return request(app.getHttpServer())
@@ -107,8 +112,8 @@ describe('Auth (e2e)', () => {
   });
 
   describe('POST /api/v1/auth/login', () => {
-    const loginEmail = `login-test-${Date.now()}@email.com`;
-    const loginPhone = `+5917${String(Date.now()).slice(-7)}`;
+    const loginEmail = `login-test-${uniqueId}@email.com`;
+    const loginPhone = phoneFor(1);
 
     beforeAll(async () => {
       await request(app.getHttpServer()).post('/api/v1/auth/register').send({
@@ -151,8 +156,8 @@ describe('Auth (e2e)', () => {
     let accessToken: string;
 
     beforeAll(async () => {
-      const meEmail = `me-test-${Date.now()}@email.com`;
-      const mePhone = `+5917${String(Date.now()).slice(-7)}`;
+      const meEmail = `me-test-${uniqueId}@email.com`;
+      const mePhone = phoneFor(2);
       const res = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
         email: meEmail,
         password: 'Password123!',
@@ -193,8 +198,8 @@ describe('Auth (e2e)', () => {
     let refreshToken: string;
 
     beforeAll(async () => {
-      const refreshEmail = `refresh-test-${Date.now()}@email.com`;
-      const refreshPhone = `+5917${String(Date.now()).slice(-7)}`;
+      const refreshEmail = `refresh-test-${uniqueId}@email.com`;
+      const refreshPhone = phoneFor(3);
       const res = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
         email: refreshEmail,
         password: 'Password123!',
