@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/interface/auth.module';
 import { VenueModule } from './modules/venue/interface/venue.module';
+import { BookingModule } from './modules/booking/interface/booking.module';
 import { JwtAuthGuard } from './shared/guards/jwt-auth.guard';
 import { OwnershipGuard } from './shared/guards/ownership.guard';
 import { RolesGuard } from './shared/guards/roles.guard';
@@ -28,6 +29,7 @@ import { validationSchema } from './config/validation.schema';
     PrismaModule,
     AuthModule,
     VenueModule,
+    BookingModule,
   ],
   controllers: [AppController],
   providers: [

@@ -30,24 +30,24 @@ export class VenuePriceEntity {
     if (!this.isActive) return false;
 
     const checkDate = new Date(date);
-    checkDate.setHours(0, 0, 0, 0);
+    checkDate.setUTCHours(0, 0, 0, 0);
 
     if (this.specificDate) {
       const specific = new Date(this.specificDate);
-      specific.setHours(0, 0, 0, 0);
+      specific.setUTCHours(0, 0, 0, 0);
       return checkDate.getTime() === specific.getTime();
     }
 
     if (this.startDate && this.endDate) {
       const start = new Date(this.startDate);
       const end = new Date(this.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
+      start.setUTCHours(0, 0, 0, 0);
+      end.setUTCHours(0, 0, 0, 0);
       return checkDate >= start && checkDate <= end;
     }
 
     if (this.dayOfWeek !== null) {
-      return checkDate.getDay() === this.dayOfWeek;
+      return checkDate.getUTCDay() === this.dayOfWeek;
     }
 
     return true;
