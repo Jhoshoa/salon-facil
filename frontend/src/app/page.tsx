@@ -1,41 +1,58 @@
-async function BackendStatus() {
-  try {
-    const apiUrl =
-      process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-    const res = await fetch(`${apiUrl}/api/v1/health`, {
-      next: { revalidate: 30 },
-    });
-
-    if (!res.ok) {
-      return <span className="text-red-600">No disponible</span>;
-    }
-
-    const data = (await res.json()) as { status?: string };
-
-    return (
-      <span className={data.status === 'ok' ? 'text-emerald-600' : 'text-red-600'}>
-        {data.status === 'ok' ? 'Conectado' : 'Error'}
-      </span>
-    );
-  } catch {
-    return <span className="text-red-600">No disponible</span>;
-  }
-}
+import Link from 'next/link';
+import { CalendarDays, Search, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6">
-      <section className="w-full max-w-2xl text-center">
-        <p className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Plataforma para eventos
-        </p>
-        <h1 className="text-4xl font-bold text-foreground sm:text-5xl">SalonFacil</h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
-          Encuentra el local perfecto para tu evento en El Alto.
-        </p>
-        <div className="mt-8 inline-flex items-center gap-2 rounded-md border bg-card px-4 py-2 text-sm text-card-foreground shadow-sm">
-          <span className="font-medium">Backend status:</span>
-          <BackendStatus />
+    <main className="min-h-screen bg-background">
+      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center px-4 py-10">
+        <div className="max-w-3xl">
+          <p className="mb-3 text-sm font-medium uppercase text-muted-foreground">
+            El Alto, Bolivia
+          </p>
+          <h1 className="text-4xl font-bold text-foreground sm:text-5xl">
+            Encuentra el local correcto para tu evento
+          </h1>
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">
+            Busca salones con disponibilidad, precios claros y servicios incluidos antes de visitar.
+          </p>
+        </div>
+
+        <form
+          action="/venues"
+          className="mt-8 grid gap-3 rounded-md border bg-card p-4 shadow-sm md:grid-cols-[1fr_180px_160px_auto]"
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input name="query" placeholder="Salon, zona o servicio" className="h-11 pl-9" />
+          </div>
+          <div className="relative">
+            <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input name="date" type="date" className="h-11 pl-9" />
+          </div>
+          <div className="relative">
+            <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              name="capacity"
+              type="number"
+              min="1"
+              placeholder="Invitados"
+              className="h-11 pl-9"
+            />
+          </div>
+          <Button type="submit" className="h-11">
+            Buscar
+          </Button>
+        </form>
+
+        <div className="mt-6 flex flex-wrap gap-3 text-sm">
+          <Button asChild variant="outline">
+            <Link href="/login">Iniciar sesion</Link>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href="/register">Crear cuenta</Link>
+          </Button>
         </div>
       </section>
     </main>

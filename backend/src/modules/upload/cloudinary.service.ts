@@ -66,6 +66,32 @@ export class CloudinaryService implements OnModuleInit {
     });
   }
 
+  async uploadFile(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<{ url: string; publicId: string }> {
+    this.ensureConfigured();
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: `salon-facil/${folder}`,
+          resource_type: 'auto',
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          if (!result) return reject(new Error('No result from Cloudinary'));
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+          });
+        },
+      );
+
+      uploadStream.end(file.buffer);
+    });
+  }
+
   async uploadMultiple(files: Express.Multer.File[], folder: string): Promise<string[]> {
     this.ensureConfigured();
 

@@ -88,7 +88,7 @@ export class PaymentService {
       throw new BadRequestException('Solo se puede subir comprobante a pagos pendientes');
     }
 
-    const upload = await this.cloudinaryService.uploadImage(file, `payments/${payment.bookingId}`);
+    const upload = await this.cloudinaryService.uploadFile(file, `payments/${payment.bookingId}`);
     return this.paymentRepository.uploadProof(paymentId, upload.url);
   }
 
