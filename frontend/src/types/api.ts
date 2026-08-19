@@ -105,7 +105,12 @@ export interface VenueSearchParams {
   district?: string;
   minCapacity?: number;
   maxCapacity?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  services?: string;
   date?: string;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
 }

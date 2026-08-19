@@ -84,7 +84,24 @@ export class VenueRepository implements IVenueRepository {
       where.OR = [
         { name: { contains: filters.query, mode: 'insensitive' } },
         { description: { contains: filters.query, mode: 'insensitive' } },
+        { services: { some: { name: { contains: filters.query, mode: 'insensitive' } } } },
       ];
+    }
+    if (filters.services) {
+      const serviceNames = filters.services
+        .split(',')
+        .map((service) => service.trim())
+        .filter(Boolean);
+
+      if (serviceNames.length > 0) {
+        where.services = {
+          some: {
+            OR: serviceNames.map((service) => ({
+              name: { contains: service, mode: 'insensitive' },
+            })),
+          },
+        };
+      }
     }
     if (filters.minCapacity != null) {
       where.capacityMax = { gte: filters.minCapacity };
@@ -111,14 +128,20 @@ export class VenueRepository implements IVenueRepository {
       where.prices = { some: priceFilter };
     }
 
-    // Availability filter: exclude venues with active bookings or calendar blocks
-    if (filters.date) {
-      const targetDate = new Date(filters.date);
+    // Availability filter: exclude venues with active bookings or calendar blocks.
+    // `date` is kept for backwards compatibility; new UI sends startDate/endDate.
+    const requestedStartDate = filters.startDate ?? filters.date;
+    if (requestedStartDate) {
+      const startDate = new Date(requestedStartDate);
+      const endDate = filters.endDate ? new Date(filters.endDate) : startDate;
       where.AND = [
         {
           bookings: {
             none: {
-              eventDate: targetDate,
+              eventDate: {
+                gte: startDate,
+                lte: endDate,
+              },
               status: {
                 in: ['PENDING', 'APPROVED', 'DEPOSIT_PAID', 'FULLY_PAID'],
               },
@@ -127,7 +150,12 @@ export class VenueRepository implements IVenueRepository {
         },
         {
           calendarBlocks: {
-            none: { date: targetDate },
+            none: {
+              date: {
+                gte: startDate,
+                lte: endDate,
+              },
+            },
           },
         },
       ];

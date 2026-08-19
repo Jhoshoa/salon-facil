@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { CalendarDays, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { HomeSearchForm } from '@/components/venues/home-search-form';
 
 export default function HomePage() {
   return (
@@ -19,32 +18,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <form
-          action="/venues"
-          className="mt-8 grid gap-3 rounded-md border bg-card p-4 shadow-sm md:grid-cols-[1fr_180px_160px_auto]"
-        >
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input name="query" placeholder="Salon, zona o servicio" className="h-11 pl-9" />
-          </div>
-          <div className="relative">
-            <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input name="date" type="date" className="h-11 pl-9" />
-          </div>
-          <div className="relative">
-            <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              name="capacity"
-              type="number"
-              min="1"
-              placeholder="Invitados"
-              className="h-11 pl-9"
-            />
-          </div>
-          <Button type="submit" className="h-11">
-            Buscar
-          </Button>
-        </form>
+        <HomeSearchForm />
 
         <div className="mt-6 flex flex-wrap gap-3 text-sm">
           <Button asChild variant="outline">

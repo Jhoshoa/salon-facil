@@ -3,7 +3,8 @@ import { VenueSearch } from '@/components/venues/venue-search';
 interface VenuesPageProps {
   searchParams: {
     query?: string;
-    date?: string;
+    startDate?: string;
+    endDate?: string;
     capacity?: string;
   };
 }
@@ -11,7 +12,7 @@ interface VenuesPageProps {
 export default function VenuesPage({ searchParams }: VenuesPageProps) {
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
           <p className="text-sm font-medium uppercase text-muted-foreground">Busqueda</p>
           <h1 className="mt-2 text-3xl font-bold text-foreground">Locales disponibles</h1>
@@ -21,7 +22,8 @@ export default function VenuesPage({ searchParams }: VenuesPageProps) {
         </div>
         <VenueSearch
           initialQuery={searchParams.query}
-          initialDate={searchParams.date}
+          initialStartDate={searchParams.startDate}
+          initialEndDate={searchParams.endDate}
           initialCapacity={searchParams.capacity}
         />
       </div>

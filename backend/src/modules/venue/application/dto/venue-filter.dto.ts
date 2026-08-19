@@ -27,6 +27,10 @@ export class VenueFilterDto {
   query?: string;
 
   @IsOptional()
+  @IsString()
+  services?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(1)
   @Max(5000)
@@ -55,6 +59,14 @@ export class VenueFilterDto {
   @IsOptional()
   @IsString()
   date?: string;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 
   @IsOptional()
   @IsEnum(SortField)

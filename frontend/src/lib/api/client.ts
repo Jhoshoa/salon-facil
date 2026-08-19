@@ -72,7 +72,7 @@ export const buildQueryString = <TParams extends QueryParams>(params: TParams) =
   const searchParams = new URLSearchParams();
 
   Object.entries(params as Record<string, string | number | undefined>).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') {
+    if (value !== undefined) {
       searchParams.set(key, String(value));
     }
   });
