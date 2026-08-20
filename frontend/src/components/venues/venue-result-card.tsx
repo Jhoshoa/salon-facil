@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Check, MapPin, Users } from 'lucide-react';
+import { ArrowRight, Check, Clock, MapPin, Sparkles, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/formatters';
@@ -14,10 +14,27 @@ const getBasePrice = (venue: Venue) => {
   return venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
 };
 
+const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
+  EVENT: 'evento',
+  HOUR: 'hora',
+  DAY: 'dia',
+};
+
+const spaceTypeLabel: Partial<Record<NonNullable<Venue['spaceType']>, string>> = {
+  EVENT_HALL: 'Salon de eventos',
+  GARDEN: 'Jardin',
+  TERRACE: 'Terraza',
+  PHOTO_STUDIO: 'Estudio',
+  MULTIPURPOSE: 'Multiproposito',
+  OUTDOOR_SPACE: 'Exterior',
+};
+
 export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
-  const photo = venue.photos?.[0];
+  const photo =
+    venue.media?.find((item) => item.isCover)?.url ?? venue.media?.[0]?.url ?? venue.photos?.[0];
   const basePrice = getBasePrice(venue);
-  const services = venue.services?.slice(0, 3) ?? [];
+  const amenities = venue.amenities?.slice(0, 4) ?? [];
+  const services = amenities.length ? [] : (venue.services?.slice(0, 3) ?? []);
 
   return (
     <article className="grid gap-4 rounded-md border bg-card p-3 shadow-sm transition-colors hover:border-emerald-500/60 md:grid-cols-[260px_1fr_190px]">
@@ -64,9 +81,22 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             {venue.capacityMin}-{venue.capacityMax} personas
           </Badge>
           {venue.isVerified ? <Badge variant="outline">Verificado</Badge> : null}
+          {venue.instantBooking ? <Badge variant="outline">Reserva inmediata</Badge> : null}
+          {venue.spaceType ? (
+            <Badge variant="outline">{spaceTypeLabel[venue.spaceType] ?? venue.spaceType}</Badge>
+          ) : null}
         </div>
 
-        {services.length ? (
+        {amenities.length ? (
+          <div className="grid gap-1 text-sm text-emerald-700 sm:grid-cols-2">
+            {amenities.map((item) => (
+              <span key={item.id} className="inline-flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                {item.amenity.name}
+              </span>
+            ))}
+          </div>
+        ) : services.length ? (
           <div className="grid gap-1 text-sm text-emerald-700 sm:grid-cols-2">
             {services.map((service) => (
               <span key={service.id} className="inline-flex items-center gap-2">
@@ -84,7 +114,13 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
           <p className="text-2xl font-semibold">
             {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
           </p>
-          <p className="text-xs text-muted-foreground">precio base del evento</p>
+          <p className="text-xs text-muted-foreground">
+            por {priceUnitLabel[venue.priceUnit] ?? 'evento'}
+          </p>
+          <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            Min. {venue.minimumHours} h
+          </p>
         </div>
         <Button asChild className="w-full">
           <Link href={`/venues/${venue.slug}`}>

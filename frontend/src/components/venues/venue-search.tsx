@@ -3,7 +3,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 import { CalendarDays, Search, SlidersHorizontal, Users } from 'lucide-react';
-import { searchVenues } from '@/lib/api/venues.api';
+import {
+  getAmenitiesCatalog,
+  getSpaceTypesCatalog,
+  getUseTypesCatalog,
+  searchVenues,
+} from '@/lib/api/venues.api';
 import type { VenueSearchParams } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +44,11 @@ export const VenueSearch = ({
     maxPrice: '',
     minCapacity: initialCapacity,
     services: [],
+    amenities: [],
+    spaceTypes: [],
+    useTypes: [],
+    priceUnit: '',
+    instantBooking: false,
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [errors, setErrors] = useState<{ startDate?: string; endDate?: string; capacity?: string }>(
@@ -60,8 +70,22 @@ export const VenueSearch = ({
     queryFn: () => searchVenues(submittedParams!),
     enabled: Boolean(submittedParams),
   });
+  const amenitiesQuery = useQuery({
+    queryKey: ['venue-catalog', 'amenities'],
+    queryFn: getAmenitiesCatalog,
+  });
+  const spaceTypesQuery = useQuery({
+    queryKey: ['venue-catalog', 'space-types'],
+    queryFn: getSpaceTypesCatalog,
+  });
+  const useTypesQuery = useQuery({
+    queryKey: ['venue-catalog', 'use-types'],
+    queryFn: getUseTypesCatalog,
+  });
 
   const venues = query.data?.venues ?? query.data?.data ?? [];
+  const isCatalogLoading =
+    amenitiesQuery.isLoading || spaceTypesQuery.isLoading || useTypesQuery.isLoading;
 
   const validate = () => {
     const nextErrors: { startDate?: string; endDate?: string; capacity?: string } = {};
@@ -84,17 +108,7 @@ export const VenueSearch = ({
     event.preventDefault();
     if (!validate()) return;
 
-    setSubmittedParams({
-      query: queryText,
-      district: filters.district || undefined,
-      startDate,
-      endDate: rangeEnabled ? endDate : '',
-      minCapacity: Number(filters.minCapacity || capacity),
-      minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
-      maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
-      services: filters.services.length ? filters.services.join(',') : undefined,
-      limit: 12,
-    });
+    setSubmittedParams(buildSearchParams());
   };
 
   const handleRangeChange = (checked: boolean) => {
@@ -107,6 +121,24 @@ export const VenueSearch = ({
     Boolean(capacity) &&
     Number(capacity) > 0 &&
     (!rangeEnabled || (Boolean(endDate) && endDate >= startDate));
+
+  const buildSearchParams = (): VenueSearchParams => ({
+    query: queryText,
+    district: filters.district || undefined,
+    startDate,
+    endDate: rangeEnabled ? endDate : '',
+    guestCount: Number(capacity),
+    minCapacity: filters.minCapacity ? Number(filters.minCapacity) : undefined,
+    minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
+    maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
+    services: filters.services.length ? filters.services.join(',') : undefined,
+    amenities: filters.amenities.length ? filters.amenities : undefined,
+    spaceTypes: filters.spaceTypes.length ? filters.spaceTypes : undefined,
+    useTypes: filters.useTypes.length ? filters.useTypes : undefined,
+    priceUnit: filters.priceUnit || undefined,
+    instantBooking: filters.instantBooking || undefined,
+    limit: 12,
+  });
 
   return (
     <div className="space-y-6">
@@ -225,7 +257,14 @@ export const VenueSearch = ({
 
       <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
         <div className="hidden lg:block">
-          <VenueFilterSidebar values={filters} onChange={setFilters} />
+          <VenueFilterSidebar
+            values={filters}
+            onChange={setFilters}
+            amenityCatalog={amenitiesQuery.data}
+            spaceTypes={spaceTypesQuery.data}
+            useTypes={useTypesQuery.data}
+            isCatalogLoading={isCatalogLoading}
+          />
         </div>
 
         <section className="space-y-4">
@@ -290,23 +329,20 @@ export const VenueSearch = ({
 
       <AppDrawer open={filtersOpen} title="Filtros" onOpenChange={setFiltersOpen}>
         <div className="space-y-4 pb-4">
-          <VenueFilterSidebar values={filters} onChange={setFilters} />
+          <VenueFilterSidebar
+            values={filters}
+            onChange={setFilters}
+            amenityCatalog={amenitiesQuery.data}
+            spaceTypes={spaceTypesQuery.data}
+            useTypes={useTypesQuery.data}
+            isCatalogLoading={isCatalogLoading}
+          />
           <Button
             className="w-full"
             onClick={() => {
               setFiltersOpen(false);
               if (canSearch) {
-                setSubmittedParams({
-                  query: queryText,
-                  district: filters.district || undefined,
-                  startDate,
-                  endDate: rangeEnabled ? endDate : '',
-                  minCapacity: Number(filters.minCapacity || capacity),
-                  minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
-                  maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
-                  services: filters.services.length ? filters.services.join(',') : undefined,
-                  limit: 12,
-                });
+                setSubmittedParams(buildSearchParams());
               }
             }}
           >
