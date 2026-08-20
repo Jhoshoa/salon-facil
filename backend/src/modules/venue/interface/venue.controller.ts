@@ -85,6 +85,30 @@ export class VenueController {
     return this.venueService.getMyVenues(user.id);
   }
 
+  @Get('catalog/amenities')
+  @Public()
+  @ApiOperation({ summary: 'Obtener catalogo de comodidades para filtros' })
+  @ApiResponse({ status: 200, description: 'Catalogo de comodidades agrupado por categoria' })
+  async getAmenitiesCatalog() {
+    return this.venueService.getAmenitiesCatalog();
+  }
+
+  @Get('catalog/space-types')
+  @Public()
+  @ApiOperation({ summary: 'Obtener tipos de espacio disponibles' })
+  @ApiResponse({ status: 200, description: 'Tipos de espacio disponibles' })
+  getSpaceTypesCatalog() {
+    return this.venueService.getSpaceTypesCatalog();
+  }
+
+  @Get('catalog/use-types')
+  @Public()
+  @ApiOperation({ summary: 'Obtener tipos de evento disponibles' })
+  @ApiResponse({ status: 200, description: 'Tipos de evento disponibles' })
+  getUseTypesCatalog() {
+    return this.venueService.getUseTypesCatalog();
+  }
+
   @Get(':slug')
   @Public()
   @ApiOperation({ summary: 'Obtener local por slug' })

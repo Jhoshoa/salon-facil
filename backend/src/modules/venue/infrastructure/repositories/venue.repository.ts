@@ -5,28 +5,82 @@ import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
-import { Prisma, PriceType } from '@prisma/client';
+import {
+  AmenityCategory,
+  Prisma,
+  PriceType,
+  VenueMediaType,
+  VenueSpaceType,
+  VenueUseType,
+} from '@prisma/client';
+
+interface RawVenueAmenity {
+  id: string;
+  isIncluded: boolean;
+  extraCost: Prisma.Decimal | number | null;
+  notes: string | null;
+  amenity: {
+    id: string;
+    key: string;
+    name: string;
+    category: AmenityCategory;
+    icon: string | null;
+  };
+}
+
+interface RawVenueUse {
+  id: string;
+  useType: VenueUseType;
+  isPrimary: boolean;
+}
+
+interface RawVenueOpeningHour {
+  id: string;
+  dayOfWeek: number;
+  opensAt: Date | string;
+  closesAt: Date | string;
+  isClosed: boolean;
+}
+
+interface RawVenueMedia {
+  id: string;
+  type: VenueMediaType;
+  url: string;
+  alt: string | null;
+  sortOrder: number;
+  isCover: boolean;
+}
 
 @Injectable()
 export class VenueRepository implements IVenueRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly venueInclude = {
+    services: { orderBy: { sortOrder: 'asc' as const } },
+    prices: { where: { isActive: true } },
+    amenities: {
+      where: { isIncluded: true },
+      include: { amenity: true },
+      orderBy: { amenity: { sortOrder: 'asc' as const } },
+    },
+    uses: { orderBy: [{ isPrimary: 'desc' as const }, { useType: 'asc' as const }] },
+    openingHours: { orderBy: { dayOfWeek: 'asc' as const } },
+    media: { orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }] },
+    owner: {
+      select: {
+        id: true,
+        fullName: true,
+        phone: true,
+        avatarUrl: true,
+      },
+    },
+    _count: { select: { reviews: true } },
+  };
+
   async findById(id: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
       where: { id },
-      include: {
-        services: { orderBy: { sortOrder: 'asc' } },
-        prices: { where: { isActive: true } },
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            avatarUrl: true,
-          },
-        },
-        _count: { select: { reviews: true } },
-      },
+      include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
   }
@@ -34,19 +88,7 @@ export class VenueRepository implements IVenueRepository {
   async findBySlug(slug: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
       where: { slug },
-      include: {
-        services: { orderBy: { sortOrder: 'asc' } },
-        prices: { where: { isActive: true } },
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            avatarUrl: true,
-          },
-        },
-        _count: { select: { reviews: true } },
-      },
+      include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
   }
@@ -54,11 +96,7 @@ export class VenueRepository implements IVenueRepository {
   async findByOwner(ownerId: string): Promise<VenueEntity[]> {
     const venues = await this.prisma.venue.findMany({
       where: { ownerId },
-      include: {
-        services: { orderBy: { sortOrder: 'asc' } },
-        prices: { where: { isActive: true } },
-        _count: { select: { reviews: true } },
-      },
+      include: this.venueInclude,
       orderBy: { createdAt: 'desc' },
     });
     return venues.map((v) => this.toEntity(v));
@@ -73,6 +111,7 @@ export class VenueRepository implements IVenueRepository {
       status: VenueStatus.ACTIVE,
       isVerified: true,
     };
+    const andFilters: Prisma.VenueWhereInput[] = [];
 
     if (filters.city) {
       where.city = { contains: filters.city, mode: 'insensitive' };
@@ -84,7 +123,14 @@ export class VenueRepository implements IVenueRepository {
       where.OR = [
         { name: { contains: filters.query, mode: 'insensitive' } },
         { description: { contains: filters.query, mode: 'insensitive' } },
+        { district: { contains: filters.query, mode: 'insensitive' } },
+        { city: { contains: filters.query, mode: 'insensitive' } },
         { services: { some: { name: { contains: filters.query, mode: 'insensitive' } } } },
+        {
+          amenities: {
+            some: { amenity: { name: { contains: filters.query, mode: 'insensitive' } } },
+          },
+        },
       ];
     }
     if (filters.services) {
@@ -106,8 +152,89 @@ export class VenueRepository implements IVenueRepository {
     if (filters.minCapacity != null) {
       where.capacityMax = { gte: filters.minCapacity };
     }
+    if (filters.guestCount != null) {
+      where.capacityMax = {
+        ...((where.capacityMax as Record<string, unknown>) ?? {}),
+        gte: filters.guestCount,
+      };
+    }
     if (filters.maxCapacity != null) {
       where.capacityMin = { lte: filters.maxCapacity };
+    }
+
+    if (filters.spaceTypes?.length) {
+      where.spaceType = { in: filters.spaceTypes };
+    }
+
+    if (filters.useTypes?.length) {
+      where.uses = { some: { useType: { in: filters.useTypes } } };
+    }
+
+    if (filters.amenities?.length) {
+      andFilters.push(
+        ...filters.amenities.map((key) => ({
+          amenities: {
+            some: {
+              isIncluded: true,
+              amenity: { key },
+            },
+          },
+        })),
+      );
+    }
+
+    if (filters.hasParking === true || filters.parkingCapacity != null) {
+      andFilters.push({
+        amenities: {
+          some: {
+            isIncluded: true,
+            amenity: { category: AmenityCategory.PARKING },
+          },
+        },
+      });
+    }
+
+    if (filters.hasCatering === true) {
+      andFilters.push({
+        amenities: {
+          some: {
+            isIncluded: true,
+            amenity: { category: AmenityCategory.CATERING_DRINKS },
+          },
+        },
+      });
+    }
+
+    if (filters.allowsAlcohol === true) {
+      andFilters.push(this.hasAmenityKey('alcohol-allowed'));
+    }
+
+    if (filters.allowsExternalCatering === true) {
+      andFilters.push(this.hasAmenityKey('external-catering'));
+    }
+
+    if (filters.instantBooking != null) {
+      where.instantBooking = filters.instantBooking;
+    }
+
+    if (filters.priceUnit) {
+      where.priceUnit = filters.priceUnit;
+    }
+
+    if (
+      filters.north != null &&
+      filters.south != null &&
+      filters.east != null &&
+      filters.west != null
+    ) {
+      where.latitude = {
+        gte: new Prisma.Decimal(filters.south),
+        lte: new Prisma.Decimal(filters.north),
+      };
+      where.longitude = {
+        gte: new Prisma.Decimal(filters.west),
+        lte: new Prisma.Decimal(filters.east),
+      };
     }
 
     // Price filters: venues with at least one BASE price in range
@@ -134,18 +261,25 @@ export class VenueRepository implements IVenueRepository {
     if (requestedStartDate) {
       const startDate = new Date(requestedStartDate);
       const endDate = filters.endDate ? new Date(filters.endDate) : startDate;
-      where.AND = [
+      const bookingFilter: Prisma.BookingWhereInput = {
+        eventDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+        status: {
+          in: ['PENDING', 'APPROVED', 'DEPOSIT_PAID', 'FULLY_PAID'],
+        },
+      };
+
+      if (filters.startTime && filters.endTime) {
+        bookingFilter.startTime = { lt: this.timeToDate(filters.endTime) };
+        bookingFilter.endTime = { gt: this.timeToDate(filters.startTime) };
+      }
+
+      andFilters.push(
         {
           bookings: {
-            none: {
-              eventDate: {
-                gte: startDate,
-                lte: endDate,
-              },
-              status: {
-                in: ['PENDING', 'APPROVED', 'DEPOSIT_PAID', 'FULLY_PAID'],
-              },
-            },
+            none: bookingFilter,
           },
         },
         {
@@ -158,28 +292,38 @@ export class VenueRepository implements IVenueRepository {
             },
           },
         },
-      ];
+      );
+    }
+
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
     }
 
     // For price/rating sort, we can't sort directly in Prisma.
     // Fetch with a reasonable sort then sort in-memory.
-    const needsPostSort = filters.sortBy === SortField.PRICE || filters.sortBy === SortField.RATING;
+    const needsPostSort = [
+      SortField.PRICE,
+      SortField.PRICE_ASC,
+      SortField.PRICE_DESC,
+      SortField.RATING,
+      SortField.RATING_DESC,
+    ].includes(filters.sortBy as SortField);
 
     const prismaSortBy = needsPostSort
       ? 'createdAt'
-      : filters.sortBy === SortField.CAPACITY
+      : filters.sortBy === SortField.CAPACITY || filters.sortBy === SortField.CAPACITY_DESC
         ? 'capacityMax'
-        : (filters.sortBy ?? 'createdAt');
-    const prismaSortDir = (filters.sortOrder ?? 'desc') as Prisma.SortOrder;
+        : filters.sortBy === SortField.FEATURED
+          ? 'isFeatured'
+          : 'createdAt';
+    const prismaSortDir = this.resolveSortDirection(filters.sortBy, filters.sortOrder);
 
     const [venues, total] = await Promise.all([
       this.prisma.venue.findMany({
         where,
         include: {
-          services: { orderBy: { sortOrder: 'asc' } },
-          prices: { where: { isActive: true } },
+          ...this.venueInclude,
           reviews: { select: { rating: true } },
-          _count: { select: { reviews: true } },
         },
         orderBy: { [prismaSortBy]: prismaSortDir },
         skip: needsPostSort ? 0 : skip,
@@ -197,6 +341,29 @@ export class VenueRepository implements IVenueRepository {
     }
 
     return { venues: entities, total };
+  }
+
+  async findAmenities() {
+    return this.prisma.amenity.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+        category: true,
+        icon: true,
+        sortOrder: true,
+      },
+      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  getSpaceTypes(): VenueSpaceType[] {
+    return Object.values(VenueSpaceType);
+  }
+
+  getUseTypes(): VenueUseType[] {
+    return Object.values(VenueUseType);
   }
 
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {
@@ -257,19 +424,7 @@ export class VenueRepository implements IVenueRepository {
 
     const venue = await this.prisma.venue.create({
       data: createData,
-      include: {
-        services: { orderBy: { sortOrder: 'asc' } },
-        prices: { where: { isActive: true } },
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            avatarUrl: true,
-          },
-        },
-        _count: { select: { reviews: true } },
-      },
+      include: this.venueInclude,
     });
 
     return this.toEntity(venue);
@@ -337,19 +492,7 @@ export class VenueRepository implements IVenueRepository {
     const venue = await this.prisma.venue.update({
       where: { id },
       data: updateInput,
-      include: {
-        services: { orderBy: { sortOrder: 'asc' } },
-        prices: { where: { isActive: true } },
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            avatarUrl: true,
-          },
-        },
-        _count: { select: { reviews: true } },
-      },
+      include: this.venueInclude,
     });
 
     return this.toEntity(venue);
@@ -373,19 +516,7 @@ export class VenueRepository implements IVenueRepository {
     const venue = await this.prisma.venue.update({
       where: { id },
       data: updateData,
-      include: {
-        services: { orderBy: { sortOrder: 'asc' } },
-        prices: { where: { isActive: true } },
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-            phone: true,
-            avatarUrl: true,
-          },
-        },
-        _count: { select: { reviews: true } },
-      },
+      include: this.venueInclude,
     });
 
     return this.toEntity(venue);
@@ -419,19 +550,30 @@ export class VenueRepository implements IVenueRepository {
     sortBy: SortField,
     sortOrder: string,
   ): VenueEntity[] {
-    const dir = sortOrder === 'asc' ? 1 : -1;
+    const dir =
+      sortBy === SortField.PRICE_ASC
+        ? 1
+        : sortBy === SortField.PRICE_DESC || sortBy === SortField.RATING_DESC
+          ? -1
+          : sortOrder === 'asc'
+            ? 1
+            : -1;
 
     return entities
       .map((entity, i) => {
         const raw = rawVenues[i];
         let sortValue: number;
 
-        if (sortBy === SortField.PRICE) {
+        if (
+          sortBy === SortField.PRICE ||
+          sortBy === SortField.PRICE_ASC ||
+          sortBy === SortField.PRICE_DESC
+        ) {
           const prices = (raw as Record<string, unknown>).prices as
             | Record<string, unknown>[]
             | undefined;
           sortValue = prices && prices.length > 0 ? Number(prices[0].price ?? 0) : 0;
-        } else if (sortBy === SortField.RATING) {
+        } else if (sortBy === SortField.RATING || sortBy === SortField.RATING_DESC) {
           const reviews = (raw as Record<string, unknown>).reviews as
             | Record<string, unknown>[]
             | undefined;
@@ -454,6 +596,33 @@ export class VenueRepository implements IVenueRepository {
       .map((item) => item.entity);
   }
 
+  private hasAmenityKey(key: string): Prisma.VenueWhereInput {
+    return {
+      amenities: {
+        some: {
+          isIncluded: true,
+          amenity: { key },
+        },
+      },
+    };
+  }
+
+  private timeToDate(value: string): Date {
+    return new Date(`1970-01-01T${value}:00.000Z`);
+  }
+
+  private resolveSortDirection(sortBy?: SortField, sortOrder?: string): Prisma.SortOrder {
+    if (
+      sortBy === SortField.CAPACITY_DESC ||
+      sortBy === SortField.FEATURED ||
+      sortBy === SortField.NEWEST
+    ) {
+      return 'desc';
+    }
+
+    return (sortOrder ?? 'desc') as Prisma.SortOrder;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private toEntity(raw: any): VenueEntity {
     const photos = raw.photos;
@@ -473,6 +642,11 @@ export class VenueRepository implements IVenueRepository {
       longitude: raw.longitude != null ? Number(raw.longitude) : null,
       capacityMin: raw.capacityMin,
       capacityMax: raw.capacityMax,
+      spaceType: raw.spaceType,
+      minimumHours: raw.minimumHours,
+      priceUnit: raw.priceUnit,
+      instantBooking: raw.instantBooking,
+      allowsMultipleDays: raw.allowsMultipleDays,
       squareMeters: raw.squareMeters,
       photos: Array.isArray(photos)
         ? (photos as string[])
@@ -510,8 +684,49 @@ export class VenueRepository implements IVenueRepository {
             price: Number(p.price),
           }),
       ),
+      amenities: raw.amenities?.map((item: RawVenueAmenity) => ({
+        id: item.id,
+        isIncluded: item.isIncluded,
+        extraCost: item.extraCost != null ? Number(item.extraCost) : null,
+        notes: item.notes,
+        amenity: {
+          id: item.amenity.id,
+          key: item.amenity.key,
+          name: item.amenity.name,
+          category: item.amenity.category,
+          icon: item.amenity.icon,
+        },
+      })),
+      uses: raw.uses?.map((item: RawVenueUse) => ({
+        id: item.id,
+        useType: item.useType,
+        isPrimary: item.isPrimary,
+      })),
+      openingHours: raw.openingHours?.map((item: RawVenueOpeningHour) => ({
+        id: item.id,
+        dayOfWeek: item.dayOfWeek,
+        opensAt: this.formatTime(item.opensAt),
+        closesAt: this.formatTime(item.closesAt),
+        isClosed: item.isClosed,
+      })),
+      media: raw.media?.map((item: RawVenueMedia) => ({
+        id: item.id,
+        type: item.type,
+        url: item.url,
+        alt: item.alt,
+        sortOrder: item.sortOrder,
+        isCover: item.isCover,
+      })),
       owner: raw.owner,
       reviewCount: raw._count?.reviews ?? 0,
     });
+  }
+
+  private formatTime(value: Date | string): string {
+    if (typeof value === 'string') {
+      return value.slice(0, 5);
+    }
+
+    return value.toISOString().slice(11, 16);
   }
 }

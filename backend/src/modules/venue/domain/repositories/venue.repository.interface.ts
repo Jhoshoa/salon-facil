@@ -1,5 +1,6 @@
 import { VenueEntity } from '../entities/venue.entity';
 import { VenueFilterDto } from '../../application/dto/venue-filter.dto';
+import { AmenityCategory, VenueSpaceType, VenueUseType } from '@prisma/client';
 
 export const VENUE_REPOSITORY = Symbol('VENUE_REPOSITORY');
 
@@ -8,6 +9,18 @@ export interface IVenueRepository {
   findBySlug(slug: string): Promise<VenueEntity | null>;
   findByOwner(ownerId: string): Promise<VenueEntity[]>;
   search(filters: VenueFilterDto): Promise<{ venues: VenueEntity[]; total: number }>;
+  findAmenities(): Promise<
+    Array<{
+      id: string;
+      key: string;
+      name: string;
+      category: AmenityCategory;
+      icon: string | null;
+      sortOrder: number;
+    }>
+  >;
+  getSpaceTypes(): VenueSpaceType[];
+  getUseTypes(): VenueUseType[];
   create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity>;
   update(id: string, data: Record<string, unknown>): Promise<VenueEntity>;
   updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity>;

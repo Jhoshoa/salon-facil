@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { VenueService } from '../../../src/modules/venue/application/services/venue.service';
 import { SlugService } from '../../../src/modules/venue/application/services/slug.service';
 import { VENUE_REPOSITORY } from '../../../src/modules/venue/domain/repositories/venue.repository.interface';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
 
@@ -37,6 +37,9 @@ describe('VenueService', () => {
       findBySlug: jest.fn(),
       findByOwner: jest.fn(),
       search: jest.fn(),
+      findAmenities: jest.fn(),
+      getSpaceTypes: jest.fn(),
+      getUseTypes: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateStatus: jest.fn(),
@@ -206,6 +209,78 @@ describe('VenueService', () => {
       expect(result.venues).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(result.totalPages).toBe(1);
+    });
+
+    it('should reject invalid date ranges', async () => {
+      await expect(
+        service.searchVenues({
+          startDate: '2026-09-20',
+          endDate: '2026-09-19',
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepository.search).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid price ranges', async () => {
+      await expect(
+        service.searchVenues({
+          minPrice: 1000,
+          maxPrice: 500,
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepository.search).not.toHaveBeenCalled();
+    });
+
+    it('should reject incomplete map bounds', async () => {
+      await expect(
+        service.searchVenues({
+          north: -16.4,
+          south: -16.6,
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepository.search).not.toHaveBeenCalled();
+    });
+
+    it('should reject incomplete time ranges', async () => {
+      await expect(
+        service.searchVenues({
+          startDate: '2026-09-20',
+          startTime: '18:00',
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepository.search).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('catalogs', () => {
+    it('should group amenities by category', async () => {
+      mockRepository.findAmenities.mockResolvedValue([
+        {
+          id: 'amenity-1',
+          key: 'private-parking',
+          name: 'Parqueo privado',
+          category: 'PARKING',
+          icon: 'parking-circle',
+          sortOrder: 1,
+        },
+      ]);
+
+      const result = await service.getAmenitiesCatalog();
+
+      expect(result.PARKING).toHaveLength(1);
+      expect(result.PARKING[0].key).toBe('private-parking');
+    });
+
+    it('should return space and use type catalogs', () => {
+      mockRepository.getSpaceTypes.mockReturnValue(['EVENT_HALL']);
+      mockRepository.getUseTypes.mockReturnValue(['WEDDING']);
+
+      expect(service.getSpaceTypesCatalog()).toEqual(['EVENT_HALL']);
+      expect(service.getUseTypesCatalog()).toEqual(['WEDDING']);
     });
   });
 

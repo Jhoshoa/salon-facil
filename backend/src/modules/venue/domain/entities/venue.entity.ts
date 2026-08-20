@@ -1,5 +1,12 @@
 import { VenueServiceEntity } from './venue-service.entity';
 import { VenuePriceEntity } from './venue-price.entity';
+import {
+  AmenityCategory,
+  PriceUnit,
+  VenueMediaType,
+  VenueSpaceType,
+  VenueUseType,
+} from '@prisma/client';
 
 export enum VenueStatus {
   DRAFT = 'DRAFT',
@@ -25,6 +32,11 @@ export class VenueEntity {
   longitude: number | null = null;
   capacityMin: number = 0;
   capacityMax!: number;
+  spaceType: VenueSpaceType | null = null;
+  minimumHours: number = 4;
+  priceUnit: PriceUnit = PriceUnit.EVENT;
+  instantBooking: boolean = false;
+  allowsMultipleDays: boolean = false;
   squareMeters: number | null = null;
   photos: string[] = [];
   videoUrl: string | null = null;
@@ -43,6 +55,10 @@ export class VenueEntity {
 
   services?: VenueServiceEntity[];
   prices?: VenuePriceEntity[];
+  amenities?: VenueAmenityEntity[];
+  uses?: VenueUseEntity[];
+  openingHours?: VenueOpeningHourEntity[];
+  media?: VenueMediaEntity[];
   owner?: { id: string; fullName: string; phone: string; avatarUrl: string | null };
   reviewCount?: number;
   averageRating?: number;
@@ -66,4 +82,41 @@ export class VenueEntity {
   getMainPhoto(): string | null {
     return this.photos.length > 0 ? this.photos[0] : null;
   }
+}
+
+export interface VenueAmenityEntity {
+  id: string;
+  isIncluded: boolean;
+  extraCost: number | null;
+  notes: string | null;
+  amenity: {
+    id: string;
+    key: string;
+    name: string;
+    category: AmenityCategory;
+    icon: string | null;
+  };
+}
+
+export interface VenueUseEntity {
+  id: string;
+  useType: VenueUseType;
+  isPrimary: boolean;
+}
+
+export interface VenueOpeningHourEntity {
+  id: string;
+  dayOfWeek: number;
+  opensAt: string;
+  closesAt: string;
+  isClosed: boolean;
+}
+
+export interface VenueMediaEntity {
+  id: string;
+  type: VenueMediaType;
+  url: string;
+  alt: string | null;
+  sortOrder: number;
+  isCover: boolean;
 }
