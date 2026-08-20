@@ -1144,7 +1144,7 @@ services:
       POSTGRES_PASSWORD: salonfacil_dev_password
       POSTGRES_DB: salonfacil_dev
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
@@ -1266,7 +1266,7 @@ PORT=3001
 # BASE DE DATOS
 # ============================================
 # Local (Docker)
-DATABASE_URL=postgresql://salonfacil:salonfacil_dev_password@localhost:5432/salonfacil_dev
+DATABASE_URL=postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev
 
 # Produccion (Supabase) - descomentar en produccion
 # DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
@@ -1376,7 +1376,7 @@ npm run dev
 # App disponible en:
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:3001
-# PostgreSQL: localhost:5432
+# PostgreSQL: localhost:5434
 # Redis: localhost:6379
 ```
 
@@ -2190,7 +2190,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5434:5432
       redis:
         image: redis:7-alpine
         ports:
@@ -2217,7 +2217,7 @@ jobs:
       - name: Run tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/salonfacil_test
+          DATABASE_URL: postgresql://test:test@localhost:5434/salonfacil_test
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test-secret
         run: npm run test:cov

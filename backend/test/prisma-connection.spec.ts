@@ -8,7 +8,7 @@ describe('Prisma Connection', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??=
-      'postgresql://salonfacil:salonfacil_dev_password@localhost:5432/salonfacil_dev';
+      'postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev';
 
     moduleRef = await Test.createTestingModule({
       providers: [PrismaService],

@@ -762,7 +762,7 @@ services:
       POSTGRES_PASSWORD: salonfacil_dev_password
       POSTGRES_DB: salonfacil_dev
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -854,7 +854,7 @@ PORT=3001
 # ============================================
 # BASE DE DATOS (Local Docker)
 # ============================================
-DATABASE_URL=postgresql://salonfacil:salonfacil_dev_password@localhost:5432/salonfacil_dev
+DATABASE_URL=postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev
 
 # Producción (Supabase) - descomentar en prod
 # DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
@@ -1044,7 +1044,7 @@ docker-compose up -d
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:3001/api/v1 |
 | Health Check | http://localhost:3001/api/v1/health |
-| PostgreSQL | localhost:5432 |
+| PostgreSQL | localhost:5434 |
 | Redis | localhost:6379 |
 
 ### 4. Comandos útiles

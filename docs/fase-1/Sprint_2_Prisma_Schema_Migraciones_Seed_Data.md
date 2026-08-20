@@ -41,7 +41,7 @@ Crear el modelo de datos completo con:
 ## 2. Prerrequisitos
 
 - Sprint 1 completado (NestJS + Docker + PostgreSQL corriendo)
-- PostgreSQL accesible en `localhost:5432` o via Docker
+- PostgreSQL accesible en `localhost:5434` o via Docker
 - Prisma CLI instalado: `npm install -D prisma` (hecho en Sprint 1)
 
 ---

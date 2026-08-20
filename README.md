@@ -36,7 +36,7 @@ docker compose up -d
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:3001/api/v1 |
 | Health Check | http://localhost:3001/api/v1/health |
-| PostgreSQL | localhost:5432 |
+| PostgreSQL | localhost:5434 |
 | Redis | localhost:6379 |
 
 ### Comandos utiles

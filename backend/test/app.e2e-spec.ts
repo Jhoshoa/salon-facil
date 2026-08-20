@@ -8,7 +8,7 @@ describe('AppController (e2e)', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??=
-      'postgresql://salonfacil:salonfacil_dev_password@localhost:5432/salonfacil_dev';
+      'postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev';
     process.env.REDIS_URL ??= 'redis://localhost:6379';
     process.env.JWT_SECRET ??= 'test_jwt_secret_change_in_production_min_32_chars';
     process.env.JWT_REFRESH_SECRET ??= 'test_refresh_secret_change_in_production_min_32_chars';
