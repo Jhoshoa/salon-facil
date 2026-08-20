@@ -66,15 +66,27 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}):
   return response.json() as Promise<T>;
 };
 
+type QueryParamValue =
+  string | number | boolean | Array<string | number | boolean> | undefined | null;
 type QueryParams = object;
 
 export const buildQueryString = <TParams extends QueryParams>(params: TParams) => {
   const searchParams = new URLSearchParams();
 
-  Object.entries(params as Record<string, string | number | undefined>).forEach(([key, value]) => {
-    if (value !== undefined) {
-      searchParams.set(key, String(value));
+  Object.entries(params as Record<string, QueryParamValue>).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
     }
+
+    if (Array.isArray(value)) {
+      const normalizedValue = value.filter((item) => item !== '').join(',');
+      if (normalizedValue) {
+        searchParams.set(key, normalizedValue);
+      }
+      return;
+    }
+
+    searchParams.set(key, String(value));
   });
 
   const query = searchParams.toString();

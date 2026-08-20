@@ -75,6 +75,86 @@ export interface VenuePrice {
   isActive: boolean;
 }
 
+export type VenueSpaceType =
+  | 'EVENT_HALL'
+  | 'GARDEN'
+  | 'TERRACE'
+  | 'RESTAURANT'
+  | 'BAR'
+  | 'AUDITORIUM'
+  | 'CONFERENCE_ROOM'
+  | 'PHOTO_STUDIO'
+  | 'MULTIPURPOSE'
+  | 'OUTDOOR_SPACE';
+
+export type VenueUseType =
+  | 'WEDDING'
+  | 'BIRTHDAY'
+  | 'CORPORATE_EVENT'
+  | 'PRIVATE_PARTY'
+  | 'GRADUATION'
+  | 'CONFERENCE'
+  | 'WORKSHOP'
+  | 'PHOTO_SHOOT'
+  | 'FILMING'
+  | 'POP_UP'
+  | 'TEAM_BUILDING';
+
+export type AmenityCategory =
+  | 'FACILITY'
+  | 'COMFORT'
+  | 'AUDIO_VISUAL'
+  | 'CATERING_DRINKS'
+  | 'PARKING'
+  | 'ACCESSIBILITY'
+  | 'SAFETY'
+  | 'SERVICES';
+
+export type VenueMediaType = 'IMAGE' | 'VIDEO' | 'VIRTUAL_TOUR';
+export type PriceUnit = 'EVENT' | 'HOUR' | 'DAY';
+
+export interface Amenity {
+  id: string;
+  key: string;
+  name: string;
+  category: AmenityCategory;
+  icon: string | null;
+  sortOrder?: number;
+}
+
+export type AmenityCatalog = Partial<Record<AmenityCategory, Amenity[]>>;
+
+export interface VenueAmenity {
+  id: string;
+  amenity: Amenity;
+  isIncluded: boolean;
+  extraCost: number | null;
+  notes: string | null;
+}
+
+export interface VenueUse {
+  id: string;
+  useType: VenueUseType;
+  isPrimary: boolean;
+}
+
+export interface VenueOpeningHour {
+  id: string;
+  dayOfWeek: number;
+  opensAt: string;
+  closesAt: string;
+  isClosed: boolean;
+}
+
+export interface VenueMedia {
+  id: string;
+  type: VenueMediaType;
+  url: string;
+  alt: string | null;
+  sortOrder: number;
+  isCover: boolean;
+}
+
 export interface Venue {
   id: string;
   ownerId: string;
@@ -85,9 +165,17 @@ export interface Venue {
   address: string;
   district: string;
   city: string;
+  latitude: number | null;
+  longitude: number | null;
   capacityMin: number;
   capacityMax: number;
+  spaceType: VenueSpaceType | null;
+  minimumHours: number;
+  priceUnit: PriceUnit;
+  instantBooking: boolean;
+  allowsMultipleDays: boolean;
   photos: string[];
+  media?: VenueMedia[];
   rules: string | null;
   cancellationPolicy: string | null;
   status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
@@ -96,21 +184,55 @@ export interface Venue {
   bookingCount: number;
   services?: VenueService[];
   prices?: VenuePrice[];
+  amenities?: VenueAmenity[];
+  uses?: VenueUse[];
+  openingHours?: VenueOpeningHour[];
   owner?: { id: string; fullName: string; phone?: string; avatarUrl: string | null };
+  reviewCount?: number;
+  averageRating?: number;
 }
 
 export interface VenueSearchParams {
   query?: string;
   city?: string;
   district?: string;
+  guestCount?: number;
   minCapacity?: number;
   maxCapacity?: number;
   minPrice?: number;
   maxPrice?: number;
+  priceUnit?: PriceUnit;
   services?: string;
   date?: string;
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  amenities?: string[];
+  spaceTypes?: VenueSpaceType[];
+  useTypes?: VenueUseType[];
+  hasParking?: boolean;
+  parkingCapacity?: number;
+  hasCatering?: boolean;
+  allowsAlcohol?: boolean;
+  allowsExternalCatering?: boolean;
+  instantBooking?: boolean;
+  north?: number;
+  south?: number;
+  east?: number;
+  west?: number;
+  sortBy?:
+    | 'featured'
+    | 'price'
+    | 'priceAsc'
+    | 'priceDesc'
+    | 'capacity'
+    | 'capacityDesc'
+    | 'rating'
+    | 'ratingDesc'
+    | 'createdAt'
+    | 'newest';
+  sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }
