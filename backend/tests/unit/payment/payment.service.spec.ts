@@ -15,7 +15,10 @@ import {
   BOOKING_REPOSITORY,
   IBookingRepository,
 } from '../../../src/modules/booking/domain/repositories/booking.repository.interface';
-import { BookingEntity, BookingStatus } from '../../../src/modules/booking/domain/entities/booking.entity';
+import {
+  BookingEntity,
+  BookingStatus,
+} from '../../../src/modules/booking/domain/entities/booking.entity';
 import { VenueService } from '../../../src/modules/venue/application/services/venue.service';
 import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
@@ -218,12 +221,7 @@ describe('PaymentService', () => {
         makePayment({ status: PaymentStatus.COMPLETED, confirmedByOwnerId: 'owner-1' }),
       );
 
-      const result = await service.confirmPayment(
-        'payment-1',
-        'owner-1',
-        UserRole.OWNER,
-        'ok',
-      );
+      const result = await service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER, 'ok');
 
       expect(result.status).toBe(PaymentStatus.COMPLETED);
       expect(paymentRepository.confirm).toHaveBeenCalledWith('payment-1', 'owner-1', 'ok');
@@ -233,17 +231,17 @@ describe('PaymentService', () => {
       paymentRepository.findById.mockResolvedValue(makePayment());
       venueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'other-owner' }));
 
-      await expect(
-        service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('requires proof before confirmation', async () => {
       paymentRepository.findById.mockResolvedValue(makePayment({ comprobanteUrl: null }));
 
-      await expect(
-        service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

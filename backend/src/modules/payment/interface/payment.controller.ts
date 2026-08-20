@@ -15,7 +15,11 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { Roles } from '../../../shared/decorators/roles.decorator';
 import { UserRole } from '../../auth/domain/entities/user.entity';
-import { ConfirmPaymentDto, CreatePaymentDto, RejectPaymentDto } from '../application/dto/payment.dto';
+import {
+  ConfirmPaymentDto,
+  CreatePaymentDto,
+  RejectPaymentDto,
+} from '../application/dto/payment.dto';
 import { PaymentService } from '../application/services/payment.service';
 
 @ApiTags('Payments')

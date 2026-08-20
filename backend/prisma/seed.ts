@@ -1,4 +1,5 @@
 import {
+  AmenityCategory,
   BookingStatus,
   NotificationChannel,
   NotificationType,
@@ -6,10 +7,14 @@ import {
   PaymentStatus,
   PaymentType,
   PrismaClient,
+  PriceUnit,
   PriceType,
   UserRole,
   UserStatus,
+  VenueMediaType,
+  VenueSpaceType,
   VenueStatus,
+  VenueUseType,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
@@ -22,11 +27,28 @@ async function cleanDatabase(): Promise<void> {
   await prisma.payment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.calendarBlock.deleteMany();
+  await prisma.venueMedia.deleteMany();
+  await prisma.venueOpeningHour.deleteMany();
+  await prisma.venueUse.deleteMany();
+  await prisma.venueAmenity.deleteMany();
+  await prisma.amenity.deleteMany();
   await prisma.venuePrice.deleteMany();
   await prisma.venueService.deleteMany();
   await prisma.venue.deleteMany();
   await prisma.user.deleteMany();
 }
+
+const time = (value: string) => new Date(`1970-01-01T${value}:00.000Z`);
+
+const createWeeklyHours = (venueId: string, opensAt = '08:00', closesAt = '02:00') => {
+  return Array.from({ length: 7 }).map((_, dayOfWeek) => ({
+    venueId,
+    dayOfWeek,
+    opensAt: time(opensAt),
+    closesAt: time(closesAt),
+    isClosed: false,
+  }));
+};
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
@@ -131,6 +153,91 @@ async function main(): Promise<void> {
 
   console.log('Created users');
 
+  const amenitySeed = [
+    { key: 'kitchen', name: 'Cocina equipada', category: AmenityCategory.FACILITY, icon: 'ChefHat', sortOrder: 1 },
+    { key: 'bathrooms', name: 'Banos', category: AmenityCategory.FACILITY, icon: 'Bath', sortOrder: 2 },
+    { key: 'stage', name: 'Escenario', category: AmenityCategory.FACILITY, icon: 'Mic2', sortOrder: 3 },
+    { key: 'garden', name: 'Jardin', category: AmenityCategory.FACILITY, icon: 'Trees', sortOrder: 4 },
+    { key: 'terrace', name: 'Terraza', category: AmenityCategory.FACILITY, icon: 'Sun', sortOrder: 5 },
+    { key: 'wifi', name: 'Wi-Fi', category: AmenityCategory.COMFORT, icon: 'Wifi', sortOrder: 10 },
+    {
+      key: 'air-conditioning',
+      name: 'Aire acondicionado',
+      category: AmenityCategory.COMFORT,
+      icon: 'Snowflake',
+      sortOrder: 11,
+    },
+    { key: 'furniture', name: 'Mobiliario', category: AmenityCategory.COMFORT, icon: 'Armchair', sortOrder: 12 },
+    { key: 'natural-light', name: 'Luz natural', category: AmenityCategory.COMFORT, icon: 'SunMedium', sortOrder: 13 },
+    {
+      key: 'sound-system',
+      name: 'Equipo de sonido',
+      category: AmenityCategory.AUDIO_VISUAL,
+      icon: 'Speaker',
+      sortOrder: 20,
+    },
+    { key: 'microphones', name: 'Microfonos', category: AmenityCategory.AUDIO_VISUAL, icon: 'Mic', sortOrder: 21 },
+    { key: 'projector', name: 'Proyector', category: AmenityCategory.AUDIO_VISUAL, icon: 'Projector', sortOrder: 22 },
+    {
+      key: 'professional-lighting',
+      name: 'Iluminacion profesional',
+      category: AmenityCategory.AUDIO_VISUAL,
+      icon: 'Lightbulb',
+      sortOrder: 23,
+    },
+    {
+      key: 'in-house-catering',
+      name: 'Catering propio',
+      category: AmenityCategory.CATERING_DRINKS,
+      icon: 'Utensils',
+      sortOrder: 30,
+    },
+    {
+      key: 'external-catering',
+      name: 'Permite catering externo',
+      category: AmenityCategory.CATERING_DRINKS,
+      icon: 'Truck',
+      sortOrder: 31,
+    },
+    {
+      key: 'alcohol-allowed',
+      name: 'Permite bebidas alcoholicas',
+      category: AmenityCategory.CATERING_DRINKS,
+      icon: 'Wine',
+      sortOrder: 32,
+    },
+    { key: 'bar', name: 'Barra incluida', category: AmenityCategory.CATERING_DRINKS, icon: 'Wine', sortOrder: 33 },
+    { key: 'private-parking', name: 'Parqueo privado', category: AmenityCategory.PARKING, icon: 'Car', sortOrder: 40 },
+    {
+      key: 'car-parking',
+      name: 'Parqueo para autos',
+      category: AmenityCategory.PARKING,
+      icon: 'ParkingCircle',
+      sortOrder: 41,
+    },
+    {
+      key: 'wheelchair-access',
+      name: 'Acceso silla de ruedas',
+      category: AmenityCategory.ACCESSIBILITY,
+      icon: 'Accessibility',
+      sortOrder: 50,
+    },
+    {
+      key: 'independent-entry',
+      name: 'Entrada independiente',
+      category: AmenityCategory.ACCESSIBILITY,
+      icon: 'DoorOpen',
+      sortOrder: 51,
+    },
+    { key: 'security', name: 'Seguridad', category: AmenityCategory.SAFETY, icon: 'ShieldCheck', sortOrder: 60 },
+  ];
+
+  await prisma.amenity.createMany({ data: amenitySeed });
+  const amenities = await prisma.amenity.findMany();
+  const amenityByKey = new Map(amenities.map((amenity) => [amenity.key, amenity.id]));
+
+  console.log('Created amenity catalog');
+
   const venueImperial = await prisma.venue.create({
     data: {
       ownerId: ownerMario.id,
@@ -146,6 +253,11 @@ async function main(): Promise<void> {
       capacityMin: 80,
       capacityMax: 250,
       squareMeters: 480,
+      spaceType: VenueSpaceType.EVENT_HALL,
+      minimumHours: 6,
+      priceUnit: PriceUnit.EVENT,
+      instantBooking: false,
+      allowsMultipleDays: false,
       photos: [
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-1.jpg',
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-2.jpg',
@@ -179,6 +291,11 @@ async function main(): Promise<void> {
       capacityMin: 40,
       capacityMax: 120,
       squareMeters: 260,
+      spaceType: VenueSpaceType.MULTIPURPOSE,
+      minimumHours: 4,
+      priceUnit: PriceUnit.EVENT,
+      instantBooking: false,
+      allowsMultipleDays: false,
       photos: [
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-1.jpg',
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-2.jpg',
@@ -210,6 +327,11 @@ async function main(): Promise<void> {
       capacityMin: 100,
       capacityMax: 300,
       squareMeters: 720,
+      spaceType: VenueSpaceType.GARDEN,
+      minimumHours: 8,
+      priceUnit: PriceUnit.EVENT,
+      instantBooking: false,
+      allowsMultipleDays: true,
       photos: [
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-1.jpg',
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-2.jpg',
@@ -224,6 +346,82 @@ async function main(): Promise<void> {
       verifiedById: admin.id,
       viewCount: 610,
       bookingCount: 21,
+    },
+  });
+
+  const venueMirador = await prisma.venue.create({
+    data: {
+      ownerId: ownerLuis.id,
+      name: 'Terraza Mirador Andino',
+      slug: 'terraza-mirador-andino-sopocachi',
+      description:
+        'Terraza panoramica para cocteles, eventos corporativos, lanzamientos de marca y celebraciones privadas con vista a la ciudad.',
+      shortDescription: 'Terraza panoramica para eventos sociales y corporativos.',
+      address: 'Av. 20 de Octubre 2040',
+      district: 'Sopocachi',
+      city: 'La Paz',
+      latitude: -16.508154,
+      longitude: -68.126745,
+      capacityMin: 30,
+      capacityMax: 140,
+      squareMeters: 320,
+      spaceType: VenueSpaceType.TERRACE,
+      minimumHours: 4,
+      priceUnit: PriceUnit.HOUR,
+      instantBooking: true,
+      allowsMultipleDays: false,
+      photos: [
+        'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-1.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-2.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-3.jpg',
+      ],
+      rules: 'Volumen moderado desde las 23:00. No se permite pirotecnia ni humo artificial.',
+      cancellationPolicy: 'Cancelacion sin penalidad hasta 10 dias antes del evento.',
+      status: VenueStatus.ACTIVE,
+      isVerified: true,
+      verifiedAt: new Date(),
+      verifiedById: admin.id,
+      isFeatured: true,
+      featuredUntil: new Date('2026-11-30'),
+      viewCount: 285,
+      bookingCount: 9,
+    },
+  });
+
+  const venueEstudio = await prisma.venue.create({
+    data: {
+      ownerId: ownerMario.id,
+      name: 'Estudio Creativo Calacoto',
+      slug: 'estudio-creativo-calacoto',
+      description:
+        'Estudio luminoso para sesiones de fotos, workshops, pop ups, grabaciones y reuniones creativas con luz natural y mobiliario flexible.',
+      shortDescription: 'Estudio luminoso para producciones y workshops.',
+      address: 'Calle 21 de Calacoto 812',
+      district: 'Calacoto',
+      city: 'La Paz',
+      latitude: -16.541204,
+      longitude: -68.081982,
+      capacityMin: 10,
+      capacityMax: 70,
+      squareMeters: 180,
+      spaceType: VenueSpaceType.PHOTO_STUDIO,
+      minimumHours: 3,
+      priceUnit: PriceUnit.HOUR,
+      instantBooking: true,
+      allowsMultipleDays: true,
+      photos: [
+        'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-1.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-2.jpg',
+        'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-3.jpg',
+      ],
+      rules: 'Se permite mover mobiliario con supervision. No se permite pintar paredes sin autorizacion.',
+      cancellationPolicy: 'Reprogramacion gratuita con 72 horas de anticipacion.',
+      status: VenueStatus.ACTIVE,
+      isVerified: true,
+      verifiedAt: new Date(),
+      verifiedById: admin.id,
+      viewCount: 198,
+      bookingCount: 7,
     },
   });
 
@@ -261,6 +459,14 @@ async function main(): Promise<void> {
         extraCost: 500,
         sortOrder: 6,
       },
+      { venueId: venueMirador.id, name: 'Terraza panoramica', icon: 'Sun', sortOrder: 1 },
+      { venueId: venueMirador.id, name: 'Barra movil', icon: 'Wine', sortOrder: 2 },
+      { venueId: venueMirador.id, name: 'Iluminacion ambiental', icon: 'Lightbulb', sortOrder: 3 },
+      { venueId: venueMirador.id, name: 'Parqueo cercano', icon: 'Car', sortOrder: 4 },
+      { venueId: venueEstudio.id, name: 'Luz natural', icon: 'SunMedium', sortOrder: 1 },
+      { venueId: venueEstudio.id, name: 'Mobiliario flexible', icon: 'Armchair', sortOrder: 2 },
+      { venueId: venueEstudio.id, name: 'Wifi', icon: 'Wifi', sortOrder: 3 },
+      { venueId: venueEstudio.id, name: 'Equipo de sonido', icon: 'Speaker', sortOrder: 4 },
     ],
   });
 
@@ -304,10 +510,159 @@ async function main(): Promise<void> {
         endDate: new Date('2027-01-05'),
         price: 3200,
       },
+      { venueId: venueMirador.id, priceType: PriceType.BASE, price: 450 },
+      { venueId: venueMirador.id, priceType: PriceType.WEEKEND, dayOfWeek: 5, price: 560 },
+      { venueId: venueMirador.id, priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 560 },
+      { venueId: venueEstudio.id, priceType: PriceType.BASE, price: 280 },
+      { venueId: venueEstudio.id, priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 },
     ],
   });
 
   console.log('Created services and prices');
+
+  const getAmenityId = (key: string) => {
+    const id = amenityByKey.get(key);
+    if (!id) throw new Error(`Missing amenity '${key}'`);
+    return id;
+  };
+
+  await prisma.venueAmenity.createMany({
+    data: [
+      ...['kitchen', 'bathrooms', 'stage', 'furniture', 'sound-system', 'private-parking', 'security'].map((key) => ({
+        venueId: venueImperial.id,
+        amenityId: getAmenityId(key),
+      })),
+      {
+        venueId: venueImperial.id,
+        amenityId: getAmenityId('professional-lighting'),
+        isIncluded: false,
+        extraCost: 250,
+      },
+      ...['kitchen', 'bathrooms', 'wifi', 'furniture', 'external-catering'].map((key) => ({
+        venueId: venueFiesta.id,
+        amenityId: getAmenityId(key),
+      })),
+      ...[
+        'kitchen',
+        'bathrooms',
+        'garden',
+        'bar',
+        'sound-system',
+        'microphones',
+        'private-parking',
+        'alcohol-allowed',
+        'security',
+      ].map((key) => ({
+        venueId: venuePinos.id,
+        amenityId: getAmenityId(key),
+      })),
+      ...['terrace', 'bar', 'professional-lighting', 'sound-system', 'external-catering', 'alcohol-allowed'].map((key) => ({
+        venueId: venueMirador.id,
+        amenityId: getAmenityId(key),
+      })),
+      ...['natural-light', 'wifi', 'furniture', 'projector', 'sound-system', 'independent-entry'].map((key) => ({
+        venueId: venueEstudio.id,
+        amenityId: getAmenityId(key),
+      })),
+    ],
+  });
+
+  await prisma.venueUse.createMany({
+    data: [
+      { venueId: venueImperial.id, useType: VenueUseType.WEDDING, isPrimary: true },
+      { venueId: venueImperial.id, useType: VenueUseType.BIRTHDAY },
+      { venueId: venueImperial.id, useType: VenueUseType.GRADUATION },
+      { venueId: venueFiesta.id, useType: VenueUseType.BIRTHDAY, isPrimary: true },
+      { venueId: venueFiesta.id, useType: VenueUseType.PRIVATE_PARTY },
+      { venueId: venuePinos.id, useType: VenueUseType.WEDDING, isPrimary: true },
+      { venueId: venuePinos.id, useType: VenueUseType.CORPORATE_EVENT },
+      { venueId: venuePinos.id, useType: VenueUseType.PRIVATE_PARTY },
+      { venueId: venueMirador.id, useType: VenueUseType.CORPORATE_EVENT, isPrimary: true },
+      { venueId: venueMirador.id, useType: VenueUseType.PRIVATE_PARTY },
+      { venueId: venueMirador.id, useType: VenueUseType.POP_UP },
+      { venueId: venueEstudio.id, useType: VenueUseType.PHOTO_SHOOT, isPrimary: true },
+      { venueId: venueEstudio.id, useType: VenueUseType.FILMING },
+      { venueId: venueEstudio.id, useType: VenueUseType.WORKSHOP },
+      { venueId: venueEstudio.id, useType: VenueUseType.POP_UP },
+    ],
+  });
+
+  await prisma.venueOpeningHour.createMany({
+    data: [
+      ...createWeeklyHours(venueImperial.id, '09:00', '02:00'),
+      ...createWeeklyHours(venueFiesta.id, '10:00', '01:00'),
+      ...createWeeklyHours(venuePinos.id, '08:00', '03:00'),
+      ...createWeeklyHours(venueMirador.id, '10:00', '00:00'),
+      ...createWeeklyHours(venueEstudio.id, '08:00', '22:00'),
+    ],
+  });
+
+  await prisma.venueMedia.createMany({
+    data: [
+      ...[
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-1.jpg', 'Salon Imperial principal'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-2.jpg', 'Salon Imperial escenario'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-3.jpg', 'Salon Imperial montaje'],
+      ].map(([url, alt], index) => ({
+        venueId: venueImperial.id,
+        type: VenueMediaType.IMAGE,
+        url,
+        alt,
+        sortOrder: index,
+        isCover: index === 0,
+      })),
+      ...[
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-1.jpg', 'Espacio Fiesta salon'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-2.jpg', 'Espacio Fiesta mesas'],
+      ].map(([url, alt], index) => ({
+        venueId: venueFiesta.id,
+        type: VenueMediaType.IMAGE,
+        url,
+        alt,
+        sortOrder: index,
+        isCover: index === 0,
+      })),
+      ...[
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-1.jpg', 'Jardin Los Pinos exterior'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-2.jpg', 'Jardin Los Pinos salon'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-3.jpg', 'Jardin Los Pinos barra'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-4.jpg', 'Jardin Los Pinos montaje'],
+      ].map(([url, alt], index) => ({
+        venueId: venuePinos.id,
+        type: VenueMediaType.IMAGE,
+        url,
+        alt,
+        sortOrder: index,
+        isCover: index === 0,
+      })),
+      ...[
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-1.jpg', 'Terraza Mirador vista'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-2.jpg', 'Terraza Mirador barra'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-3.jpg', 'Terraza Mirador evento'],
+      ].map(([url, alt], index) => ({
+        venueId: venueMirador.id,
+        type: VenueMediaType.IMAGE,
+        url,
+        alt,
+        sortOrder: index,
+        isCover: index === 0,
+      })),
+      ...[
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-1.jpg', 'Estudio Creativo luz natural'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-2.jpg', 'Estudio Creativo workshop'],
+        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-3.jpg', 'Estudio Creativo montaje'],
+      ].map(([url, alt], index) => ({
+        venueId: venueEstudio.id,
+        type: VenueMediaType.IMAGE,
+        url,
+        alt,
+        sortOrder: index,
+        isCover: index === 0,
+      })),
+    ],
+  });
+
+  console.log('Created advanced catalog data');
 
   const bookingQuince = await prisma.booking.create({
     data: {

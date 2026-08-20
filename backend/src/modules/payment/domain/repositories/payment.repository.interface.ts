@@ -1,4 +1,9 @@
-import { PaymentEntity, PaymentMethod, PaymentStatus, PaymentType } from '../entities/payment.entity';
+import {
+  PaymentEntity,
+  PaymentMethod,
+  PaymentStatus,
+  PaymentType,
+} from '../entities/payment.entity';
 
 export const PAYMENT_REPOSITORY = Symbol('PAYMENT_REPOSITORY');
 
