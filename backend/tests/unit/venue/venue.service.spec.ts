@@ -202,6 +202,8 @@ describe('VenueService', () => {
       });
 
       const result = await service.searchVenues({
+        startDate: '2026-09-20',
+        guestCount: 100,
         page: 1,
         limit: 20,
       } as never);
@@ -211,11 +213,32 @@ describe('VenueService', () => {
       expect(result.totalPages).toBe(1);
     });
 
+    it('should reject search without start date', async () => {
+      await expect(
+        service.searchVenues({
+          guestCount: 100,
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepository.search).not.toHaveBeenCalled();
+    });
+
+    it('should reject search without guest count', async () => {
+      await expect(
+        service.searchVenues({
+          startDate: '2026-09-20',
+        } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepository.search).not.toHaveBeenCalled();
+    });
+
     it('should reject invalid date ranges', async () => {
       await expect(
         service.searchVenues({
           startDate: '2026-09-20',
           endDate: '2026-09-19',
+          guestCount: 100,
         } as never),
       ).rejects.toThrow(BadRequestException);
 
@@ -225,6 +248,8 @@ describe('VenueService', () => {
     it('should reject invalid price ranges', async () => {
       await expect(
         service.searchVenues({
+          startDate: '2026-09-20',
+          guestCount: 100,
           minPrice: 1000,
           maxPrice: 500,
         } as never),
@@ -236,6 +261,8 @@ describe('VenueService', () => {
     it('should reject incomplete map bounds', async () => {
       await expect(
         service.searchVenues({
+          startDate: '2026-09-20',
+          guestCount: 100,
           north: -16.4,
           south: -16.6,
         } as never),
@@ -248,6 +275,7 @@ describe('VenueService', () => {
       await expect(
         service.searchVenues({
           startDate: '2026-09-20',
+          guestCount: 100,
           startTime: '18:00',
         } as never),
       ).rejects.toThrow(BadRequestException);

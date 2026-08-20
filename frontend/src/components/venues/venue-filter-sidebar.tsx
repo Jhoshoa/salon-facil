@@ -77,16 +77,19 @@ export const VenueFilterSidebar = ({
   return (
     <aside className="space-y-4">
       <div className="overflow-hidden rounded-md border bg-card shadow-sm">
-        <div className="flex h-36 items-center justify-center bg-emerald-50 text-emerald-900">
+        <div className="sf-soft-gradient flex h-40 items-center justify-center">
           <div className="text-center">
             <Map className="mx-auto h-8 w-8" />
-            <p className="mt-2 text-sm font-medium">Ver en mapa</p>
+            <p className="mt-2 text-sm font-semibold">Mapa de zonas</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Vista interactiva en siguiente paso
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-md border bg-card shadow-sm">
-        <div className="flex items-center gap-2 border-b p-4">
+      <div className="rounded-md border bg-white shadow-sm">
+        <div className="sf-surface flex items-center gap-2 border-b p-4">
           <SlidersHorizontal className="h-4 w-4" />
           <h2 className="font-semibold">Filtrar por</h2>
         </div>
@@ -111,7 +114,7 @@ export const VenueFilterSidebar = ({
                   type="button"
                   className={`rounded-md border px-2 py-2 text-sm ${
                     values.priceUnit === unit
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900'
+                      ? 'border-primary bg-primary text-primary-foreground'
                       : 'bg-background text-muted-foreground'
                   }`}
                   onClick={() =>

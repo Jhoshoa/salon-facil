@@ -65,9 +65,9 @@ export const AvailabilityCalendar = ({
   });
 
   return (
-    <div className="rounded-md border bg-card p-4">
+    <div className="sf-card p-5">
       <div className="mb-4 flex items-center gap-2">
-        <CalendarDays className="h-5 w-5 text-emerald-600" />
+        <CalendarDays className="h-5 w-5 text-primary" />
         <h2 className="font-semibold">Disponibilidad</h2>
       </div>
       <div className="grid grid-cols-7 gap-2 text-center text-xs">
@@ -76,8 +76,8 @@ export const AvailabilityCalendar = ({
             key={day.date}
             className={
               day.label
-                ? 'min-h-16 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900'
-                : 'min-h-16 rounded-md border bg-background p-2 text-muted-foreground'
+                ? 'sf-warning min-h-16 rounded-md border p-2'
+                : 'sf-surface min-h-16 rounded-md border p-2 text-muted-foreground'
             }
           >
             <div className="font-semibold">{day.day}</div>

@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 import { CalendarDays, Search, SlidersHorizontal, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   getAmenitiesCatalog,
   getSpaceTypesCatalog,
@@ -36,7 +37,6 @@ export const VenueSearch = ({
   const [queryText, setQueryText] = useState(initialQuery);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
-  const [rangeEnabled, setRangeEnabled] = useState(Boolean(initialEndDate));
   const [capacity, setCapacity] = useState(initialCapacity);
   const [filters, setFilters] = useState<VenueFilterValues>({
     district: '',
@@ -60,7 +60,7 @@ export const VenueSearch = ({
       query: initialQuery,
       startDate: initialStartDate,
       endDate: initialEndDate,
-      minCapacity: Number(initialCapacity),
+      guestCount: Number(initialCapacity),
       limit: 12,
     };
   });
@@ -95,38 +95,38 @@ export const VenueSearch = ({
     if (!capacity || Number.isNaN(parsedCapacity) || parsedCapacity < 1) {
       nextErrors.capacity = 'La cantidad de personas es obligatoria.';
     }
-    if (rangeEnabled && !endDate) nextErrors.endDate = 'La fecha final es obligatoria.';
-    if (rangeEnabled && startDate && endDate && endDate < startDate) {
+    if (startDate && endDate && endDate < startDate) {
       nextErrors.endDate = 'La fecha final no puede ser anterior a la inicial.';
     }
 
     setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    const isValid = Object.keys(nextErrors).length === 0;
+
+    if (!isValid) {
+      toast.warning('Completa los datos requeridos', {
+        description: 'Necesitamos fecha de inicio y cantidad de invitados para buscar.',
+      });
+    }
+
+    return isValid;
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!validate()) return;
+    submitSearch();
+  };
 
+  const submitSearch = () => {
+    if (!validate()) return false;
     setSubmittedParams(buildSearchParams());
+    return true;
   };
-
-  const handleRangeChange = (checked: boolean) => {
-    setRangeEnabled(checked);
-    if (!checked) setEndDate('');
-  };
-
-  const canSearch =
-    Boolean(startDate) &&
-    Boolean(capacity) &&
-    Number(capacity) > 0 &&
-    (!rangeEnabled || (Boolean(endDate) && endDate >= startDate));
 
   const buildSearchParams = (): VenueSearchParams => ({
     query: queryText,
     district: filters.district || undefined,
     startDate,
-    endDate: rangeEnabled ? endDate : '',
+    endDate,
     guestCount: Number(capacity),
     minCapacity: filters.minCapacity ? Number(filters.minCapacity) : undefined,
     minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
@@ -142,13 +142,10 @@ export const VenueSearch = ({
 
   return (
     <div className="space-y-6">
-      <form
-        className="rounded-md border bg-card p-2 shadow-sm ring-1 ring-emerald-500/10"
-        onSubmit={handleSubmit}
-      >
+      <form className="sf-card-strong sticky top-20 z-30 p-3" onSubmit={handleSubmit}>
         <div className="grid gap-2 lg:grid-cols-[1fr_190px_190px_170px_150px]">
           <div className="space-y-2">
-            <div className="rounded-md border bg-background px-3 py-2">
+            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
               <Label htmlFor="query" className="text-xs text-muted-foreground">
                 Indica destino o salon
               </Label>
@@ -162,7 +159,7 @@ export const VenueSearch = ({
             </div>
           </div>
           <div className="space-y-2">
-            <div className="rounded-md border bg-background px-3 py-2">
+            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
               <Label
                 htmlFor="startDate"
                 className="flex items-center gap-2 text-xs text-muted-foreground"
@@ -175,6 +172,7 @@ export const VenueSearch = ({
                 type="date"
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
+                aria-invalid={Boolean(errors.startDate)}
                 className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
               />
             </div>
@@ -183,34 +181,23 @@ export const VenueSearch = ({
             ) : null}
           </div>
           <div className="space-y-2">
-            <div className="rounded-md border bg-background px-3 py-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="endDate" className="text-xs text-muted-foreground">
-                  Fecha fin
-                </Label>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={rangeEnabled}
-                    onChange={(event) => handleRangeChange(event.target.checked)}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  Rango
-                </label>
-              </div>
+            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
+              <Label htmlFor="endDate" className="text-xs text-muted-foreground">
+                Fecha fin opcional
+              </Label>
               <Input
                 id="endDate"
                 type="date"
                 value={endDate}
-                disabled={!rangeEnabled}
                 onChange={(event) => setEndDate(event.target.value)}
+                aria-invalid={Boolean(errors.endDate)}
                 className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
               />
             </div>
             {errors.endDate ? <p className="text-sm text-destructive">{errors.endDate}</p> : null}
           </div>
           <div className="space-y-2">
-            <div className="rounded-md border bg-background px-3 py-2">
+            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
               <Label
                 htmlFor="capacity"
                 className="flex items-center gap-2 text-xs text-muted-foreground"
@@ -228,17 +215,14 @@ export const VenueSearch = ({
                   setFilters((current) => ({ ...current, minCapacity: event.target.value }));
                 }}
                 placeholder="Personas"
+                aria-invalid={Boolean(errors.capacity)}
                 className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
               />
             </div>
             {errors.capacity ? <p className="text-sm text-destructive">{errors.capacity}</p> : null}
           </div>
           <div className="flex items-end gap-2">
-            <Button
-              type="submit"
-              className="h-[58px] w-full"
-              disabled={!canSearch || query.isFetching}
-            >
+            <Button type="submit" className="sf-action h-[58px] w-full" disabled={query.isFetching}>
               <Search className="h-4 w-4" />
               Buscar
             </Button>
@@ -256,7 +240,7 @@ export const VenueSearch = ({
       </form>
 
       <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
-        <div className="hidden lg:block">
+        <div className="hidden lg:sticky lg:top-44 lg:block lg:self-start">
           <VenueFilterSidebar
             values={filters}
             onChange={setFilters}
@@ -271,14 +255,14 @@ export const VenueSearch = ({
           {submittedParams ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold">
+                <h2 className="text-2xl font-semibold tracking-normal">
                   {venues.length
                     ? `${query.data?.total ?? venues.length} locales encontrados`
                     : 'Locales disponibles'}
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Resultados para {capacity} personas desde {startDate}
-                  {rangeEnabled && endDate ? ` hasta ${endDate}` : ''}
+                  {endDate ? ` hasta ${endDate}` : ''}
                 </p>
               </div>
               <Button
@@ -340,9 +324,8 @@ export const VenueSearch = ({
           <Button
             className="w-full"
             onClick={() => {
-              setFiltersOpen(false);
-              if (canSearch) {
-                setSubmittedParams(buildSearchParams());
+              if (submitSearch()) {
+                setFiltersOpen(false);
               }
             }}
           >

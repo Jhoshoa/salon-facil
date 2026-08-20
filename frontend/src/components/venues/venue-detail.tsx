@@ -82,14 +82,14 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
   const secondaryUses = venue.uses?.filter((item) => !item.isPrimary).slice(0, 6) ?? [];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
         <section className="grid gap-2 md:grid-cols-[2fr_1fr]">
-          <div className="relative aspect-[16/10] overflow-hidden rounded-md bg-muted">
+          <div className="relative aspect-[16/10] overflow-hidden rounded-md bg-muted shadow-sm">
             {mainPhoto ? (
               <Image src={mainPhoto} alt={venue.name} fill className="object-cover" priority />
             ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
+              <div className="sf-empty-gradient flex h-full items-center justify-center text-muted-foreground">
                 Sin foto
               </div>
             )}
@@ -98,7 +98,7 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
             {photos.slice(1, 3).map((photo, index) => (
               <div
                 key={`${photo}-${index}`}
-                className="relative min-h-32 overflow-hidden rounded-md bg-muted"
+                className="relative min-h-32 overflow-hidden rounded-md bg-muted shadow-sm"
               >
                 <Image
                   src={photo}
@@ -116,25 +116,33 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section className="sf-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex flex-wrap gap-2">
                 {venue.spaceType ? (
-                  <Badge variant="secondary">{spaceTypeLabels[venue.spaceType]}</Badge>
+                  <Badge className="sf-badge-muted">{spaceTypeLabels[venue.spaceType]}</Badge>
                 ) : null}
-                {venue.instantBooking ? <Badge variant="outline">Reserva inmediata</Badge> : null}
-                {venue.isVerified ? <Badge variant="outline">Verificado</Badge> : null}
+                {venue.instantBooking ? (
+                  <Badge className="sf-badge-action">Reserva inmediata</Badge>
+                ) : null}
+                {venue.isVerified ? (
+                  <Badge variant="outline" className="border-primary/30 text-primary">
+                    Verificado
+                  </Badge>
+                ) : null}
               </div>
-              <h1 className="mt-3 text-3xl font-bold text-foreground">{venue.name}</h1>
+              <h1 className="mt-3 text-3xl font-bold tracking-normal text-foreground">
+                {venue.name}
+              </h1>
               <p className="mt-2 flex items-center gap-1 text-muted-foreground">
                 <MapPin className="h-4 w-4" />
                 {venue.district}, {venue.city}
               </p>
             </div>
-            <div className="rounded-md border bg-card p-4 text-right shadow-sm">
+            <div className="sf-surface min-w-44 rounded-md border p-4 text-right shadow-sm">
               <p className="text-sm text-muted-foreground">Desde</p>
-              <p className="text-2xl font-semibold">
+              <p className="text-2xl font-bold tracking-normal">
                 {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -145,18 +153,18 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
           <p className="mt-4 leading-7 text-muted-foreground">{venue.description}</p>
         </section>
 
-        <section className="rounded-md border bg-card p-4">
+        <section className="sf-card p-5">
           <h2 className="font-semibold">Resumen del espacio</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <Badge variant="secondary" className="justify-center gap-1 py-2">
+            <Badge variant="secondary" className="sf-badge-muted justify-center gap-1 py-2">
               <Users className="h-3.5 w-3.5" />
               {venue.capacityMin}-{venue.capacityMax} personas
             </Badge>
-            <Badge variant="secondary" className="justify-center gap-1 py-2">
+            <Badge variant="secondary" className="sf-badge-info justify-center gap-1 py-2">
               <Clock className="h-3.5 w-3.5" />
               Min. {venue.minimumHours} horas
             </Badge>
-            <Badge variant="secondary" className="justify-center gap-1 py-2">
+            <Badge variant="secondary" className="sf-badge-warm justify-center gap-1 py-2">
               <CalendarClock className="h-3.5 w-3.5" />
               {venue.allowsMultipleDays ? 'Multi-dia' : 'Un dia'}
             </Badge>
@@ -164,11 +172,15 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         </section>
 
         {primaryUses.length || secondaryUses.length ? (
-          <section className="rounded-md border bg-card p-4">
+          <section className="sf-card p-5">
             <h2 className="font-semibold">Ideal para</h2>
             <div className="mt-3 flex flex-wrap gap-2">
               {[...primaryUses, ...secondaryUses].map((item) => (
-                <Badge key={item.id} variant={item.isPrimary ? 'secondary' : 'outline'}>
+                <Badge
+                  key={item.id}
+                  variant={item.isPrimary ? 'secondary' : 'outline'}
+                  className={item.isPrimary ? 'sf-badge-muted' : ''}
+                >
                   {useTypeLabels[item.useType]}
                 </Badge>
               ))}
@@ -177,7 +189,7 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         ) : null}
 
         {amenityGroups.length ? (
-          <section className="rounded-md border bg-card p-4">
+          <section className="sf-card p-5">
             <h2 className="font-semibold">Comodidades y servicios</h2>
             <div className="mt-4 grid gap-5 md:grid-cols-2">
               {amenityGroups.map(([category, amenities]) => (
@@ -187,8 +199,11 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
                   </h3>
                   <div className="space-y-2">
                     {amenities.map((item) => (
-                      <div key={item.id} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-emerald-700" />
+                      <div
+                        key={item.id}
+                        className="sf-surface flex items-center gap-2 rounded-md px-3 py-2 text-sm"
+                      >
+                        <Check className="h-4 w-4 text-primary" />
                         <span>{item.amenity.name}</span>
                         {item.extraCost ? (
                           <span className="text-muted-foreground">
@@ -205,13 +220,13 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         ) : null}
 
         {venue.openingHours?.length ? (
-          <section className="rounded-md border bg-card p-4">
+          <section className="sf-card p-5">
             <h2 className="font-semibold">Horarios</h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {venue.openingHours.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-md border p-3 text-sm"
+                  className="sf-surface flex items-center justify-between rounded-md border p-3 text-sm"
                 >
                   <span>{dayLabels[item.dayOfWeek]}</span>
                   <span className="font-medium">
@@ -226,13 +241,13 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         {venue.rules || venue.cancellationPolicy ? (
           <section className="grid gap-4 md:grid-cols-2">
             {venue.rules ? (
-              <div className="rounded-md border bg-card p-4">
+              <div className="sf-card p-5">
                 <h2 className="font-semibold">Reglas del espacio</h2>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">{venue.rules}</p>
               </div>
             ) : null}
             {venue.cancellationPolicy ? (
-              <div className="rounded-md border bg-card p-4">
+              <div className="sf-card p-5">
                 <h2 className="font-semibold">Politica de cancelacion</h2>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
                   {venue.cancellationPolicy}
@@ -243,9 +258,9 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         ) : null}
 
         {venue.latitude && venue.longitude ? (
-          <section className="rounded-md border bg-card p-4">
+          <section className="sf-card p-5">
             <h2 className="font-semibold">Ubicacion</h2>
-            <div className="mt-3 flex min-h-52 items-center justify-center rounded-md bg-muted text-center text-sm text-muted-foreground">
+            <div className="sf-soft-gradient mt-3 flex min-h-52 items-center justify-center rounded-md text-center text-sm">
               <div>
                 <Sparkles className="mx-auto mb-2 h-5 w-5" />
                 Mapa interactivo pendiente. Coordenadas: {venue.latitude}, {venue.longitude}
@@ -257,7 +272,7 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         <AvailabilityCalendar venueId={venue.id} />
       </div>
 
-      <aside className="lg:sticky lg:top-6 lg:self-start">
+      <aside className="lg:sticky lg:top-24 lg:self-start">
         <BookingForm venue={venue} />
       </aside>
     </div>

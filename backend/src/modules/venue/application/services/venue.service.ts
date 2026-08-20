@@ -140,11 +140,23 @@ export class VenueService {
   private validateSearchFilters(filters: VenueFilterDto): void {
     const startDateValue = filters.startDate ?? filters.date;
 
+    if (!startDateValue) {
+      throw new BadRequestException('startDate es obligatorio para buscar disponibilidad');
+    }
+
+    if (filters.guestCount == null || filters.guestCount < 1) {
+      throw new BadRequestException('guestCount es obligatorio para buscar disponibilidad');
+    }
+
+    const startDate = new Date(startDateValue);
+    if (Number.isNaN(startDate.getTime())) {
+      throw new BadRequestException('La fecha de busqueda no es valida');
+    }
+
     if (startDateValue && filters.endDate) {
-      const startDate = new Date(startDateValue);
       const endDate = new Date(filters.endDate);
 
-      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      if (Number.isNaN(endDate.getTime())) {
         throw new BadRequestException('Las fechas de busqueda no son validas');
       }
 

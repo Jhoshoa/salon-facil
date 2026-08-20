@@ -57,30 +57,40 @@ export const BookingForm = ({ venue }: BookingFormProps) => {
 
   const values = form.watch();
   const canSubmit = form.formState.isValid && !mutation.isPending;
+  const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
 
   const handleConfirm = () => {
     mutation.mutate(form.getValues());
   };
 
   return (
-    <div className="rounded-md border bg-card p-4 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <CalendarCheck className="h-5 w-5 text-emerald-600" />
-        <h2 className="text-lg font-semibold">Solicitar reserva</h2>
+    <div className="sf-card-strong overflow-hidden">
+      <div className="sf-booking-header p-5">
+        <div className="flex items-center gap-2">
+          <CalendarCheck className="h-5 w-5 text-accent" />
+          <h2 className="text-lg font-semibold">Solicitar reserva</h2>
+        </div>
+        <div className="sf-glass mt-4 rounded-md border p-3">
+          <p className="sf-glass-muted text-xs">Precio base</p>
+          <p className="text-2xl font-bold tracking-normal">
+            {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
+          </p>
+        </div>
       </div>
 
       {!isAuthenticated ? (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="sf-warning m-4 rounded-md border p-3 text-sm">
           Inicia sesion como cliente para solicitar una reserva.
         </div>
       ) : null}
 
-      <form className="space-y-4" onSubmit={form.handleSubmit(() => setConfirmOpen(true))}>
+      <form className="space-y-4 p-4" onSubmit={form.handleSubmit(() => setConfirmOpen(true))}>
         <div className="space-y-2">
           <Label htmlFor="eventType">Tipo de evento</Label>
           <Input
             id="eventType"
             placeholder="Boda, cumpleanos, graduacion"
+            className="sf-surface"
             {...form.register('eventType')}
           />
           {form.formState.errors.eventType ? (
@@ -91,7 +101,12 @@ export const BookingForm = ({ venue }: BookingFormProps) => {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="eventDate">Fecha</Label>
-            <Input id="eventDate" type="date" {...form.register('eventDate')} />
+            <Input
+              id="eventDate"
+              type="date"
+              className="sf-surface"
+              {...form.register('eventDate')}
+            />
             {form.formState.errors.eventDate ? (
               <p className="text-sm text-destructive">{form.formState.errors.eventDate.message}</p>
             ) : null}
@@ -103,6 +118,7 @@ export const BookingForm = ({ venue }: BookingFormProps) => {
               type="number"
               min={1}
               max={venue.capacityMax}
+              className="sf-surface"
               {...form.register('guestCount')}
             />
             {form.formState.errors.guestCount ? (
@@ -114,14 +130,19 @@ export const BookingForm = ({ venue }: BookingFormProps) => {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="startTime">Inicio</Label>
-            <Input id="startTime" type="time" {...form.register('startTime')} />
+            <Input
+              id="startTime"
+              type="time"
+              className="sf-surface"
+              {...form.register('startTime')}
+            />
             {form.formState.errors.startTime ? (
               <p className="text-sm text-destructive">{form.formState.errors.startTime.message}</p>
             ) : null}
           </div>
           <div className="space-y-2">
             <Label htmlFor="endTime">Fin</Label>
-            <Input id="endTime" type="time" {...form.register('endTime')} />
+            <Input id="endTime" type="time" className="sf-surface" {...form.register('endTime')} />
             {form.formState.errors.endTime ? (
               <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
             ) : null}
@@ -133,6 +154,7 @@ export const BookingForm = ({ venue }: BookingFormProps) => {
           <Input
             id="specialRequests"
             placeholder="Opcional"
+            className="sf-surface"
             {...form.register('specialRequests')}
           />
           {form.formState.errors.specialRequests ? (
@@ -143,7 +165,7 @@ export const BookingForm = ({ venue }: BookingFormProps) => {
         </div>
 
         <SubmitButton
-          className="w-full"
+          className="sf-action h-11 w-full"
           type="submit"
           disabled={!canSubmit || !isAuthenticated}
           isLoading={mutation.isPending}

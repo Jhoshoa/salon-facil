@@ -37,7 +37,7 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
   const services = amenities.length ? [] : (venue.services?.slice(0, 3) ?? []);
 
   return (
-    <article className="grid gap-4 rounded-md border bg-card p-3 shadow-sm transition-colors hover:border-emerald-500/60 md:grid-cols-[260px_1fr_190px]">
+    <article className="sf-card grid gap-4 overflow-hidden p-3 transition-all hover:-translate-y-0.5 hover:shadow-md md:grid-cols-[280px_1fr_200px]">
       <Link
         href={`/venues/${venue.slug}`}
         className="relative aspect-[4/3] overflow-hidden rounded-md bg-muted focus:outline-none focus:ring-2 focus:ring-ring md:aspect-auto"
@@ -51,17 +51,25 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             sizes="(min-width: 1024px) 260px, 100vw"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Sin foto
+          <div className="sf-empty-gradient flex h-full items-center justify-center text-sm text-muted-foreground">
+            Foto pendiente
           </div>
         )}
+        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+          {venue.instantBooking ? (
+            <Badge className="sf-badge-action">Reserva inmediata</Badge>
+          ) : null}
+          {venue.isVerified ? (
+            <Badge className="border-0 bg-card/90 text-primary">Verificado</Badge>
+          ) : null}
+        </div>
       </Link>
 
       <div className="space-y-3 py-1">
         <div>
           <Link
             href={`/venues/${venue.slug}`}
-            className="text-xl font-semibold text-foreground hover:underline"
+            className="text-xl font-semibold tracking-normal text-foreground hover:text-primary"
           >
             {venue.name}
           </Link>
@@ -76,19 +84,19 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
         </p>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="secondary" className="sf-badge-muted gap-1">
             <Users className="h-3.5 w-3.5" />
             {venue.capacityMin}-{venue.capacityMax} personas
           </Badge>
-          {venue.isVerified ? <Badge variant="outline">Verificado</Badge> : null}
-          {venue.instantBooking ? <Badge variant="outline">Reserva inmediata</Badge> : null}
           {venue.spaceType ? (
-            <Badge variant="outline">{spaceTypeLabel[venue.spaceType] ?? venue.spaceType}</Badge>
+            <Badge variant="outline" className="sf-badge-info">
+              {spaceTypeLabel[venue.spaceType] ?? venue.spaceType}
+            </Badge>
           ) : null}
         </div>
 
         {amenities.length ? (
-          <div className="grid gap-1 text-sm text-emerald-700 sm:grid-cols-2">
+          <div className="sf-text-action grid gap-1 text-sm sm:grid-cols-2">
             {amenities.map((item) => (
               <span key={item.id} className="inline-flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
@@ -97,7 +105,7 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             ))}
           </div>
         ) : services.length ? (
-          <div className="grid gap-1 text-sm text-emerald-700 sm:grid-cols-2">
+          <div className="sf-text-action grid gap-1 text-sm sm:grid-cols-2">
             {services.map((service) => (
               <span key={service.id} className="inline-flex items-center gap-2">
                 <Check className="h-4 w-4" />
@@ -108,10 +116,10 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
         ) : null}
       </div>
 
-      <div className="flex flex-col justify-between gap-4 border-t pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-1">
-        <div className="md:text-right">
+      <div className="sf-surface flex flex-col justify-between gap-4 rounded-md border p-4 md:text-right">
+        <div>
           <p className="text-sm text-muted-foreground">Desde</p>
-          <p className="text-2xl font-semibold">
+          <p className="text-2xl font-bold tracking-normal">
             {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
           </p>
           <p className="text-xs text-muted-foreground">

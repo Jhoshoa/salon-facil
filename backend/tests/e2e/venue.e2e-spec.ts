@@ -81,7 +81,7 @@ describe('Venues (e2e)', () => {
   describe('GET /api/v1/venues (public)', () => {
     it('should search venues without authentication', () => {
       return request(app.getHttpServer())
-        .get('/api/v1/venues')
+        .get('/api/v1/venues?startDate=2026-09-20&guestCount=50')
         .expect(200)
         .then((res) => {
           expect(res.body).toHaveProperty('venues');
@@ -92,9 +92,13 @@ describe('Venues (e2e)', () => {
         });
     });
 
+    it('should reject public search without required availability params', () => {
+      return request(app.getHttpServer()).get('/api/v1/venues').expect(400);
+    });
+
     it('should support pagination params', () => {
       return request(app.getHttpServer())
-        .get('/api/v1/venues?page=1&limit=5')
+        .get('/api/v1/venues?page=1&limit=5&startDate=2026-09-20&guestCount=50')
         .expect(200)
         .then((res) => {
           expect(res.body.venues.length).toBeLessThanOrEqual(5);
@@ -413,7 +417,7 @@ describe('Venues (e2e)', () => {
 
     it('should filter by district', () => {
       return request(app.getHttpServer())
-        .get('/api/v1/venues?district=Distrito+Filter')
+        .get('/api/v1/venues?district=Distrito+Filter&startDate=2026-09-20&guestCount=50')
         .expect(200)
         .then((res) => {
           expect(Array.isArray(res.body.venues)).toBe(true);
@@ -422,7 +426,7 @@ describe('Venues (e2e)', () => {
 
     it('should filter by minCapacity', () => {
       return request(app.getHttpServer())
-        .get('/api/v1/venues?minCapacity=400')
+        .get('/api/v1/venues?minCapacity=400&startDate=2026-09-20&guestCount=400')
         .expect(200)
         .then((res) => {
           expect(Array.isArray(res.body.venues)).toBe(true);

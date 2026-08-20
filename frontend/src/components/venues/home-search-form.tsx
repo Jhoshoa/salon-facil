@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Search, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +20,6 @@ export const HomeSearchForm = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [capacity, setCapacity] = useState('');
-  const [rangeEnabled, setRangeEnabled] = useState(false);
   const [errors, setErrors] = useState<SearchErrors>({});
 
   const validate = () => {
@@ -30,13 +30,20 @@ export const HomeSearchForm = () => {
     if (!capacity || Number.isNaN(parsedCapacity) || parsedCapacity < 1) {
       nextErrors.capacity = 'La cantidad de personas es obligatoria.';
     }
-    if (rangeEnabled && !endDate) nextErrors.endDate = 'La fecha final es obligatoria.';
-    if (rangeEnabled && startDate && endDate && endDate < startDate) {
+    if (startDate && endDate && endDate < startDate) {
       nextErrors.endDate = 'La fecha final no puede ser anterior a la inicial.';
     }
 
     setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    const isValid = Object.keys(nextErrors).length === 0;
+
+    if (!isValid) {
+      toast.warning('Completa los datos requeridos', {
+        description: 'Necesitamos fecha de inicio y cantidad de invitados para buscar.',
+      });
+    }
+
+    return isValid;
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -46,86 +53,73 @@ export const HomeSearchForm = () => {
     const params = new URLSearchParams({
       query,
       startDate,
-      endDate: rangeEnabled ? endDate : '',
+      endDate,
       capacity,
     });
 
     router.push(`/venues?${params.toString()}`);
   };
 
-  const handleRangeChange = (checked: boolean) => {
-    setRangeEnabled(checked);
-    if (!checked) setEndDate('');
-  };
-
-  const canSearch =
-    Boolean(startDate) &&
-    Boolean(capacity) &&
-    Number(capacity) > 0 &&
-    (!rangeEnabled || (Boolean(endDate) && endDate >= startDate));
-
   return (
     <form
-      className="mt-8 grid gap-3 rounded-md border bg-card p-4 shadow-sm lg:grid-cols-[1fr_180px_180px_160px_auto]"
+      className="grid items-start gap-3 lg:grid-cols-[minmax(360px,2fr)_190px_190px_150px_140px]"
       onSubmit={handleSubmit}
     >
-      <div className="space-y-2">
-        <Label htmlFor="homeQuery">Buscar</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="homeQuery" className="flex h-5 items-center">
+          Buscar
+        </Label>
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="homeQuery"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Salon, zona o servicio"
-            className="h-11 pl-9"
+            className="sf-search-field pl-10 text-base"
           />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="homeStartDate">Fecha inicio</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="homeStartDate" className="flex h-5 items-center">
+          Fecha inicio
+        </Label>
         <div className="relative">
-          <CalendarDays className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="homeStartDate"
             type="date"
             value={startDate}
             onChange={(event) => setStartDate(event.target.value)}
-            className="h-11 pl-9"
+            aria-invalid={Boolean(errors.startDate)}
+            className="sf-search-field pl-10"
           />
         </div>
         {errors.startDate ? <p className="text-sm text-destructive">{errors.startDate}</p> : null}
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="homeEndDate">Fecha fin</Label>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={rangeEnabled}
-              onChange={(event) => handleRangeChange(event.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            Rango
-          </label>
-        </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="homeEndDate" className="flex h-5 items-center">
+          Fecha fin opcional
+        </Label>
         <Input
           id="homeEndDate"
           type="date"
           value={endDate}
-          disabled={!rangeEnabled}
           onChange={(event) => setEndDate(event.target.value)}
-          className="h-11"
+          aria-invalid={Boolean(errors.endDate)}
+          className="sf-search-field"
         />
         {errors.endDate ? <p className="text-sm text-destructive">{errors.endDate}</p> : null}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="homeCapacity">Invitados</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="homeCapacity" className="flex h-5 items-center">
+          Invitados
+        </Label>
         <div className="relative">
-          <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="homeCapacity"
             value={capacity}
@@ -133,14 +127,16 @@ export const HomeSearchForm = () => {
             type="number"
             min="1"
             placeholder="100"
-            className="h-11 pl-9"
+            aria-invalid={Boolean(errors.capacity)}
+            className="sf-search-field pl-10"
           />
         </div>
         {errors.capacity ? <p className="text-sm text-destructive">{errors.capacity}</p> : null}
       </div>
 
-      <div className="flex items-end">
-        <Button type="submit" className="h-11 w-full" disabled={!canSearch}>
+      <div className="space-y-1.5">
+        <span className="flex h-5 items-center text-sm font-medium text-transparent">Buscar</span>
+        <Button type="submit" className="sf-action h-14 w-full px-5">
           <Search className="h-4 w-4" />
           Buscar
         </Button>
