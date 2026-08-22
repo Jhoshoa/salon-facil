@@ -9,6 +9,7 @@ export interface IVenueRepository {
   findBySlug(slug: string): Promise<VenueEntity | null>;
   findByOwner(ownerId: string): Promise<VenueEntity[]>;
   search(filters: VenueFilterDto): Promise<{ venues: VenueEntity[]; total: number }>;
+  findSimilar(venue: VenueEntity, limit: number): Promise<VenueEntity[]>;
   findAmenities(): Promise<
     Array<{
       id: string;

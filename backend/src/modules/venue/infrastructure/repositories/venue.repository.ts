@@ -75,6 +75,7 @@ export class VenueRepository implements IVenueRepository {
       },
     },
     _count: { select: { reviews: true } },
+    reviews: { select: { rating: true } },
   };
 
   async findById(id: string): Promise<VenueEntity | null> {
@@ -321,10 +322,7 @@ export class VenueRepository implements IVenueRepository {
     const [venues, total] = await Promise.all([
       this.prisma.venue.findMany({
         where,
-        include: {
-          ...this.venueInclude,
-          reviews: { select: { rating: true } },
-        },
+        include: this.venueInclude,
         orderBy: { [prismaSortBy]: prismaSortDir },
         skip: needsPostSort ? 0 : skip,
         take: needsPostSort ? 1000 : limit,
@@ -341,6 +339,26 @@ export class VenueRepository implements IVenueRepository {
     }
 
     return { venues: entities, total };
+  }
+
+  async findSimilar(venue: VenueEntity, limit: number): Promise<VenueEntity[]> {
+    const venues = await this.prisma.venue.findMany({
+      where: {
+        id: { not: venue.id },
+        status: VenueStatus.ACTIVE,
+        isVerified: true,
+        OR: [
+          { spaceType: venue.spaceType },
+          { district: venue.district },
+          { city: venue.city },
+        ],
+      },
+      include: this.venueInclude,
+      orderBy: [{ isFeatured: 'desc' }, { viewCount: 'desc' }],
+      take: limit,
+    });
+
+    return venues.map((v) => this.toEntity(v));
   }
 
   async findAmenities() {
@@ -719,7 +737,14 @@ export class VenueRepository implements IVenueRepository {
       })),
       owner: raw.owner,
       reviewCount: raw._count?.reviews ?? 0,
+      averageRating: this.computeAverageRating(raw.reviews),
     });
+  }
+
+  private computeAverageRating(reviews?: { rating: number }[]): number | undefined {
+    if (!reviews?.length) return undefined;
+    const sum = reviews.reduce((total, review) => total + review.rating, 0);
+    return Math.round((sum / reviews.length) * 10) / 10;
   }
 
   private formatTime(value: Date | string): string {

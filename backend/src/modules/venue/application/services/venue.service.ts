@@ -53,6 +53,14 @@ export class VenueService {
     return venue;
   }
 
+  async getSimilarVenues(slug: string, limit = 4): Promise<VenueEntity[]> {
+    const venue = await this.venueRepository.findBySlug(slug);
+    if (!venue) {
+      throw new NotFoundException(`Local con slug '${slug}' no encontrado`);
+    }
+    return this.venueRepository.findSimilar(venue, limit);
+  }
+
   async getMyVenues(ownerId: string): Promise<VenueEntity[]> {
     return this.venueRepository.findByOwner(ownerId);
   }

@@ -3,8 +3,8 @@
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Check, Clock, Map, MapPin, Users } from 'lucide-react';
-import { getVenueBySlug } from '@/lib/api/venues.api';
+import { CalendarClock, Check, Clock, Map, MapPin, Star, Users } from 'lucide-react';
+import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AmenityCategory, Venue } from '@/types/api';
 import { priceUnitLabels, spaceTypeLabels, useTypeLabels } from './venue-filter-labels';
+import { VenueSimilarCard } from './venue-similar-card';
 
 interface VenueDetailProps {
   slug: string;
@@ -71,6 +72,11 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
   const query = useQuery({
     queryKey: ['venue', slug],
     queryFn: () => getVenueBySlug(slug),
+  });
+
+  const similarQuery = useQuery({
+    queryKey: ['venue', slug, 'similar'],
+    queryFn: () => getSimilarVenues(slug),
   });
 
   if (query.isLoading) return <VenueDetailSkeleton />;
@@ -139,10 +145,21 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
                 ) : null}
               </div>
               <h1 className="mt-4 text-3xl font-bold">{venue.name}</h1>
-              <p className="mt-2 flex items-center gap-1.5 text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                {venue.district}, {venue.city}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+                <p className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4" />
+                  {venue.district}, {venue.city}
+                </p>
+                {venue.averageRating ? (
+                  <p className="flex items-center gap-1 font-medium text-foreground">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    {venue.averageRating.toFixed(1)}
+                    <span className="font-normal text-muted-foreground">
+                      ({venue.reviewCount} {venue.reviewCount === 1 ? 'resena' : 'resenas'})
+                    </span>
+                  </p>
+                ) : null}
+              </div>
             </div>
             <div className="sf-surface min-w-44 border p-4 text-right shadow-sm">
               <p className="sf-price-label">Desde</p>
@@ -290,6 +307,17 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <BookingForm venue={venue} />
       </aside>
+
+      {similarQuery.data?.length ? (
+        <section className="sf-detail-section lg:col-span-2">
+          <h2 className="sf-detail-title">Espacios similares</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {similarQuery.data.map((similarVenue) => (
+              <VenueSimilarCard key={similarVenue.id} venue={similarVenue} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 };

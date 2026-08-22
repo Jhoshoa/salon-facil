@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Check, Clock, MapPin, Sparkles, Users } from 'lucide-react';
+import { ArrowRight, Check, Clock, MapPin, Sparkles, Star, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/formatters';
@@ -70,10 +70,21 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
           >
             {venue.name}
           </Link>
-          <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            {venue.district}, {venue.city}
-          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <p className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" />
+              {venue.district}, {venue.city}
+            </p>
+            {venue.averageRating ? (
+              <p className="flex items-center gap-1 font-medium text-foreground">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                {venue.averageRating.toFixed(1)}
+                <span className="font-normal text-muted-foreground">
+                  ({venue.reviewCount})
+                </span>
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">

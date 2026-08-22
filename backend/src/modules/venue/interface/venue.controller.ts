@@ -25,6 +25,7 @@ import { VenueFilterDto } from '../application/dto/venue-filter.dto';
 import { VenueService } from '../application/services/venue.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
 import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slug.use-case';
+import { GetSimilarVenuesUseCase } from '../application/use-cases/get-similar-venues.use-case';
 import { SearchVenuesUseCase } from '../application/use-cases/search-venues.use-case';
 import { CloudinaryService } from '../../upload/cloudinary.service';
 
@@ -62,6 +63,7 @@ export class VenueController {
     private readonly venueService: VenueService,
     private readonly createVenueUseCase: CreateVenueUseCase,
     private readonly getVenueBySlugUseCase: GetVenueBySlugUseCase,
+    private readonly getSimilarVenuesUseCase: GetSimilarVenuesUseCase,
     private readonly searchVenuesUseCase: SearchVenuesUseCase,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
@@ -107,6 +109,15 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Tipos de evento disponibles' })
   getUseTypesCatalog() {
     return this.venueService.getUseTypesCatalog();
+  }
+
+  @Get(':slug/similar')
+  @Public()
+  @ApiOperation({ summary: 'Obtener locales similares a uno dado' })
+  @ApiResponse({ status: 200, description: 'Lista de locales similares' })
+  @ApiResponse({ status: 404, description: 'Local no encontrado' })
+  async getSimilar(@Param('slug') slug: string, @Query('limit') limit?: string) {
+    return this.getSimilarVenuesUseCase.execute(slug, limit ? Number(limit) : undefined);
   }
 
   @Get(':slug')

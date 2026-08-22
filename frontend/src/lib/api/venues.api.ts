@@ -20,6 +20,10 @@ export const getVenueBySlug = async (slug: string): Promise<Venue> => {
   return apiRequest<Venue>(`/venues/${slug}`, { auth: false });
 };
 
+export const getSimilarVenues = async (slug: string, limit = 4): Promise<Venue[]> => {
+  return apiRequest<Venue[]>(`/venues/${slug}/similar?limit=${limit}`, { auth: false });
+};
+
 export const getAmenitiesCatalog = async (): Promise<AmenityCatalog> => {
   return apiRequest<AmenityCatalog>('/venues/catalog/amenities', { auth: false });
 };
