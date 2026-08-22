@@ -14,6 +14,16 @@ export const formatDate = (value: string | Date) => {
   }).format(new Date(value));
 };
 
+export const formatTime12h = (value: string) => {
+  const [hoursStr, minutesStr = '00'] = value.split(':');
+  const hours = Number(hoursStr);
+  if (Number.isNaN(hours)) return value;
+
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hours12}:${minutesStr.padStart(2, '0')} ${period}`;
+};
+
 export const formatDateInput = (date = new Date()) => {
   return date.toISOString().split('T')[0];
 };

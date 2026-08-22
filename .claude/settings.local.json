@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm run lint:*)",
       "Bash(npm run build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git -C \"C:/Users/josoe/Documents/salon-facil\" log --all --oneline --grep=\"Sprint\\\\|venue.*edit\\\\|owner.*onboard\")",
+      "Bash(git -C \"C:/Users/josoe/Documents/salon-facil\" log --all --oneline)"
     ]
   }
 }

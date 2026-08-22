@@ -1,10 +1,11 @@
 'use client';
 
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, Check, Clock, Map, MapPin, Users } from 'lucide-react';
 import { getVenueBySlug } from '@/lib/api/venues.api';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
 import { ErrorState } from '@/components/shared/error-state';
@@ -16,6 +17,14 @@ import { priceUnitLabels, spaceTypeLabels, useTypeLabels } from './venue-filter-
 interface VenueDetailProps {
   slug: string;
 }
+
+const VenueLocationMap = dynamic(
+  () => import('./venue-location-map').then((mod) => mod.VenueLocationMap),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-full w-full" />,
+  },
+);
 
 const VenueDetailSkeleton = () => (
   <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -218,7 +227,9 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
                 <div key={item.id} className="sf-surface flex items-center justify-between border p-3 text-sm">
                   <span>{dayLabels[item.dayOfWeek]}</span>
                   <span className="font-medium">
-                    {item.isClosed ? 'Cerrado' : `${item.opensAt} - ${item.closesAt}`}
+                    {item.isClosed
+                      ? 'Cerrado'
+                      : `${formatTime12h(item.opensAt)} - ${formatTime12h(item.closesAt)}`}
                   </span>
                 </div>
               ))}
@@ -244,21 +255,34 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
           </section>
         ) : null}
 
-        {/* Map Placeholder */}
-        {venue.latitude && venue.longitude ? (
-          <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Ubicacion</h2>
+        {/* Location */}
+        <section className="sf-detail-section">
+          <h2 className="sf-detail-title">Ubicacion</h2>
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 shrink-0" />
+            {venue.address ? `${venue.address}, ` : ''}
+            {venue.district}, {venue.city}
+          </p>
+          {venue.latitude && venue.longitude ? (
+            <div className="mt-3 h-64 w-full overflow-hidden rounded-lg border">
+              <VenueLocationMap
+                latitude={venue.latitude}
+                longitude={venue.longitude}
+                name={venue.name}
+              />
+            </div>
+          ) : (
             <div className="sf-gradient-subtle mt-3 flex min-h-52 items-center justify-center rounded-lg text-center text-sm">
               <div>
                 <Map className="mx-auto mb-2 h-8 w-8 text-primary" />
-                <p className="font-semibold">Mapa interactivo pendiente</p>
+                <p className="font-semibold">Mapa no disponible</p>
                 <p className="mt-1 text-muted-foreground">
-                  Coordenadas: {venue.latitude}, {venue.longitude}
+                  Coordenadas exactas no disponibles todavia.
                 </p>
               </div>
             </div>
-          </section>
-        ) : null}
+          )}
+        </section>
 
         <AvailabilityCalendar venueId={venue.id} />
       </div>
