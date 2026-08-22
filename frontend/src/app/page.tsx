@@ -43,26 +43,11 @@ export default function HomePage() {
       <section className="border-b bg-background">
         <div className="sf-container py-6">
           <div className="sf-card-elevated p-5">
-            <div className="mb-5 flex flex-col justify-between gap-3 border-b pb-5 md:flex-row md:items-end">
-              <div>
-                <p className="text-base font-semibold text-primary">Busca disponibilidad real</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Fecha e invitados son obligatorios para resultados relevantes.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3 text-sm">
-                <Link href="/venues?query=jardin" className="sf-link-muted">
-                  Jardin
-                </Link>
-                <span className="text-border">/</span>
-                <Link href="/venues?query=terraza" className="sf-link-muted">
-                  Terraza
-                </Link>
-                <span className="text-border">/</span>
-                <Link href="/venues?query=corporativo" className="sf-link-muted">
-                  Corporativo
-                </Link>
-              </div>
+            <div className="mb-5 border-b pb-5">
+              <p className="text-base font-semibold text-primary">Busca disponibilidad real</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Fecha e invitados son obligatorios para resultados relevantes.
+              </p>
             </div>
             <HomeSearchForm />
           </div>
