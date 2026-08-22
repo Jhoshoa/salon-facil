@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { IVenueRepository } from '../../domain/repositories/venue.repository.interface';
-import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
+import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
@@ -9,6 +9,7 @@ import {
   AmenityCategory,
   Prisma,
   PriceType,
+  PriceUnit,
   VenueMediaType,
   VenueSpaceType,
   VenueUseType,
@@ -347,11 +348,7 @@ export class VenueRepository implements IVenueRepository {
         id: { not: venue.id },
         status: VenueStatus.ACTIVE,
         isVerified: true,
-        OR: [
-          { spaceType: venue.spaceType },
-          { district: venue.district },
-          { city: venue.city },
-        ],
+        OR: [{ spaceType: venue.spaceType }, { district: venue.district }, { city: venue.city }],
       },
       include: this.venueInclude,
       orderBy: [{ isFeatured: 'desc' }, { viewCount: 'desc' }],
@@ -385,7 +382,15 @@ export class VenueRepository implements IVenueRepository {
   }
 
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {
-    const { services: rawServices, prices: rawPrices, photos, ...venueData } = data;
+    const {
+      services: rawServices,
+      prices: rawPrices,
+      amenities: rawAmenities,
+      useTypes: rawUseTypes,
+      openingHours: rawOpeningHours,
+      photos,
+      ...venueData
+    } = data;
 
     const createData: Prisma.VenueCreateInput = {
       name: venueData.name as string,
@@ -402,6 +407,11 @@ export class VenueRepository implements IVenueRepository {
       capacityMax: venueData.capacityMax as number,
       capacityMin: (venueData.capacityMin as number) ?? 0,
       squareMeters: venueData.squareMeters as number | undefined,
+      spaceType: venueData.spaceType as VenueSpaceType | undefined,
+      priceUnit: venueData.priceUnit as PriceUnit | undefined,
+      minimumHours: venueData.minimumHours as number | undefined,
+      instantBooking: venueData.instantBooking as boolean | undefined,
+      allowsMultipleDays: venueData.allowsMultipleDays as boolean | undefined,
       rules: venueData.rules as string | undefined,
       cancellationPolicy: venueData.cancellationPolicy as string | undefined,
       owner: { connect: { id: ownerId } },
@@ -409,6 +419,17 @@ export class VenueRepository implements IVenueRepository {
 
     if (Array.isArray(photos)) {
       (createData as Record<string, unknown>).photos = photos;
+
+      if (photos.length > 0) {
+        createData.media = {
+          create: (photos as string[]).map((url, index) => ({
+            type: VenueMediaType.IMAGE,
+            url,
+            sortOrder: index,
+            isCover: index === 0,
+          })),
+        };
+      }
     }
 
     if (Array.isArray(rawServices) && rawServices.length > 0) {
@@ -440,6 +461,37 @@ export class VenueRepository implements IVenueRepository {
       };
     }
 
+    if (Array.isArray(rawAmenities) && rawAmenities.length > 0) {
+      createData.amenities = {
+        create: rawAmenities.map((a) => ({
+          amenity: { connect: { id: a.amenityId as string } },
+          isIncluded: (a.isIncluded as boolean) ?? true,
+          extraCost: a.extraCost != null ? new Prisma.Decimal(a.extraCost as number) : undefined,
+          notes: a.notes as string | undefined,
+        })),
+      };
+    }
+
+    if (Array.isArray(rawUseTypes) && rawUseTypes.length > 0) {
+      createData.uses = {
+        create: rawUseTypes.map((u) => ({
+          useType: u.useType as VenueUseType,
+          isPrimary: (u.isPrimary as boolean) ?? false,
+        })),
+      };
+    }
+
+    if (Array.isArray(rawOpeningHours) && rawOpeningHours.length > 0) {
+      createData.openingHours = {
+        create: rawOpeningHours.map((h) => ({
+          dayOfWeek: h.dayOfWeek as number,
+          opensAt: this.timeToDate((h.opensAt as string) ?? '09:00'),
+          closesAt: this.timeToDate((h.closesAt as string) ?? '18:00'),
+          isClosed: (h.isClosed as boolean) ?? false,
+        })),
+      };
+    }
+
     const venue = await this.prisma.venue.create({
       data: createData,
       include: this.venueInclude,
@@ -449,7 +501,14 @@ export class VenueRepository implements IVenueRepository {
   }
 
   async update(id: string, data: Record<string, unknown>): Promise<VenueEntity> {
-    const { services: rawServices, prices: rawPrices, ...venueData } = data;
+    const {
+      services: rawServices,
+      prices: rawPrices,
+      amenities: rawAmenities,
+      useTypes: rawUseTypes,
+      openingHours: rawOpeningHours,
+      ...venueData
+    } = data;
 
     const updateInput: Prisma.VenueUpdateInput = {};
     if (venueData.name != null) updateInput.name = venueData.name;
@@ -467,12 +526,56 @@ export class VenueRepository implements IVenueRepository {
     if (venueData.capacityMax != null) updateInput.capacityMax = venueData.capacityMax;
     if (venueData.capacityMin != null) updateInput.capacityMin = venueData.capacityMin;
     if (venueData.squareMeters != null) updateInput.squareMeters = venueData.squareMeters;
+    if (venueData.spaceType != null) updateInput.spaceType = venueData.spaceType as VenueSpaceType;
+    if (venueData.priceUnit != null) updateInput.priceUnit = venueData.priceUnit as PriceUnit;
+    if (venueData.minimumHours != null) updateInput.minimumHours = venueData.minimumHours as number;
+    if (venueData.instantBooking != null)
+      updateInput.instantBooking = venueData.instantBooking as boolean;
+    if (venueData.allowsMultipleDays != null)
+      updateInput.allowsMultipleDays = venueData.allowsMultipleDays as boolean;
     if (venueData.rules != null) updateInput.rules = venueData.rules;
     if (venueData.cancellationPolicy != null)
       updateInput.cancellationPolicy = venueData.cancellationPolicy;
     if (venueData.status != null) updateInput.status = venueData.status as VenueStatus;
     if (venueData.photos != null) updateInput.photos = venueData.photos;
     if (venueData.videoUrl != null) updateInput.videoUrl = venueData.videoUrl;
+
+    // Replace amenities if provided
+    if (Array.isArray(rawAmenities)) {
+      updateInput.amenities = {
+        deleteMany: {},
+        create: rawAmenities.map((a: Record<string, unknown>) => ({
+          amenity: { connect: { id: a.amenityId as string } },
+          isIncluded: (a.isIncluded as boolean) ?? true,
+          extraCost: a.extraCost != null ? new Prisma.Decimal(a.extraCost as number) : undefined,
+          notes: a.notes as string | undefined,
+        })),
+      };
+    }
+
+    // Replace use types if provided
+    if (Array.isArray(rawUseTypes)) {
+      updateInput.uses = {
+        deleteMany: {},
+        create: rawUseTypes.map((u: Record<string, unknown>) => ({
+          useType: u.useType as VenueUseType,
+          isPrimary: (u.isPrimary as boolean) ?? false,
+        })),
+      };
+    }
+
+    // Replace opening hours if provided
+    if (Array.isArray(rawOpeningHours)) {
+      updateInput.openingHours = {
+        deleteMany: {},
+        create: rawOpeningHours.map((h: Record<string, unknown>) => ({
+          dayOfWeek: h.dayOfWeek as number,
+          opensAt: this.timeToDate((h.opensAt as string) ?? '09:00'),
+          closesAt: this.timeToDate((h.closesAt as string) ?? '18:00'),
+          isClosed: (h.isClosed as boolean) ?? false,
+        })),
+      };
+    }
 
     // Replace services if provided
     if (Array.isArray(rawServices)) {
@@ -514,6 +617,82 @@ export class VenueRepository implements IVenueRepository {
     });
 
     return this.toEntity(venue);
+  }
+
+  async addMedia(venueId: string, urls: string[]): Promise<VenueMediaEntity[]> {
+    const existing = await this.prisma.venueMedia.findMany({
+      where: { venueId },
+      select: { sortOrder: true, isCover: true },
+    });
+    const hasCover = existing.some((item) => item.isCover);
+    const nextSortOrder = existing.length
+      ? Math.max(...existing.map((item) => item.sortOrder)) + 1
+      : 0;
+
+    await this.prisma.venueMedia.createMany({
+      data: urls.map((url, index) => ({
+        venueId,
+        type: VenueMediaType.IMAGE,
+        url,
+        sortOrder: nextSortOrder + index,
+        isCover: !hasCover && index === 0,
+      })),
+    });
+
+    return this.listMedia(venueId);
+  }
+
+  async deleteMedia(venueId: string, mediaId: string): Promise<void> {
+    const media = await this.prisma.venueMedia.findFirst({ where: { id: mediaId, venueId } });
+    if (!media) return;
+
+    await this.prisma.venueMedia.delete({ where: { id: mediaId } });
+
+    if (media.isCover) {
+      const next = await this.prisma.venueMedia.findFirst({
+        where: { venueId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      if (next) {
+        await this.prisma.venueMedia.update({ where: { id: next.id }, data: { isCover: true } });
+      }
+    }
+  }
+
+  async reorderMedia(
+    venueId: string,
+    order: string[],
+    coverId?: string,
+  ): Promise<VenueMediaEntity[]> {
+    await this.prisma.$transaction(
+      order.map((mediaId, index) =>
+        this.prisma.venueMedia.updateMany({
+          where: { id: mediaId, venueId },
+          data: {
+            sortOrder: index,
+            ...(coverId ? { isCover: mediaId === coverId } : {}),
+          },
+        }),
+      ),
+    );
+
+    return this.listMedia(venueId);
+  }
+
+  private async listMedia(venueId: string): Promise<VenueMediaEntity[]> {
+    const media = await this.prisma.venueMedia.findMany({
+      where: { venueId },
+      orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }],
+    });
+
+    return media.map((item) => ({
+      id: item.id,
+      type: item.type,
+      url: item.url,
+      alt: item.alt,
+      sortOrder: item.sortOrder,
+      isCover: item.isCover,
+    }));
   }
 
   async updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity> {

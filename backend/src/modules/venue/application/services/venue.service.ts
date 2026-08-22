@@ -16,6 +16,12 @@ import { VenueFilterDto } from '../dto/venue-filter.dto';
 import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 
+export interface VenueCompletion {
+  score: number;
+  missing: string[];
+  canPublish: boolean;
+}
+
 @Injectable()
 export class VenueService {
   constructor(
@@ -136,6 +142,122 @@ export class VenueService {
 
   getUseTypesCatalog() {
     return this.venueRepository.getUseTypes();
+  }
+
+  async addVenueMedia(
+    id: string,
+    userId: string,
+    userRole: UserRole,
+    urls: string[],
+  ): Promise<VenueEntity['media']> {
+    const venue = await this.getVenueById(id);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    return this.venueRepository.addMedia(id, urls);
+  }
+
+  async deleteVenueMedia(
+    id: string,
+    mediaId: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<void> {
+    const venue = await this.getVenueById(id);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    await this.venueRepository.deleteMedia(id, mediaId);
+  }
+
+  async reorderVenueMedia(
+    id: string,
+    userId: string,
+    userRole: UserRole,
+    order: string[],
+    coverId?: string,
+  ): Promise<VenueEntity['media']> {
+    const venue = await this.getVenueById(id);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    return this.venueRepository.reorderMedia(id, order, coverId);
+  }
+
+  async getVenueCompletion(
+    id: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<VenueCompletion> {
+    const venue = await this.getVenueById(id);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para ver este local');
+    }
+    return this.computeCompletion(venue);
+  }
+
+  async submitForReview(id: string, userId: string, userRole: UserRole): Promise<VenueEntity> {
+    const venue = await this.getVenueById(id);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para publicar este local');
+    }
+    if (venue.status !== VenueStatus.DRAFT && venue.status !== VenueStatus.REJECTED) {
+      throw new BadRequestException(
+        'Solo puedes enviar a revision un local en borrador o rechazado',
+      );
+    }
+
+    const completion = this.computeCompletion(venue);
+    if (!completion.canPublish) {
+      throw new BadRequestException(
+        `Completa la informacion requerida antes de publicar: ${completion.missing.join(', ')}`,
+      );
+    }
+
+    return this.venueRepository.updateStatus(id, VenueStatus.PENDING);
+  }
+
+  private computeCompletion(venue: VenueEntity): VenueCompletion {
+    const checks: { label: string; done: boolean; required: boolean }[] = [
+      { label: 'Nombre y descripcion', done: venue.description.length >= 20, required: true },
+      {
+        label: 'Direccion y distrito',
+        done: Boolean(venue.address && venue.district),
+        required: true,
+      },
+      { label: 'Capacidad maxima', done: venue.capacityMax > 0, required: true },
+      { label: 'Al menos una foto', done: (venue.media?.length ?? 0) > 0, required: true },
+      { label: 'Tipo de espacio', done: Boolean(venue.spaceType), required: true },
+      {
+        label: 'Precio base',
+        done: (venue.prices ?? []).some((p) => p.priceType === 'BASE'),
+        required: true,
+      },
+      {
+        label: 'Horarios de atencion',
+        done: (venue.openingHours ?? []).some((h) => !h.isClosed),
+        required: true,
+      },
+      { label: 'Comodidades', done: (venue.amenities?.length ?? 0) > 0, required: false },
+      {
+        label: 'Tipos de evento (ideal para)',
+        done: (venue.uses?.length ?? 0) > 0,
+        required: false,
+      },
+      { label: 'Descripcion corta', done: Boolean(venue.shortDescription), required: false },
+      { label: 'Reglas del espacio', done: Boolean(venue.rules), required: false },
+      {
+        label: 'Ubicacion en el mapa',
+        done: venue.latitude != null && venue.longitude != null,
+        required: false,
+      },
+    ];
+
+    const score = Math.round((checks.filter((c) => c.done).length / checks.length) * 100);
+    const missing = checks.filter((c) => !c.done).map((c) => c.label);
+    const canPublish = checks.filter((c) => c.required).every((c) => c.done);
+
+    return { score, missing, canPublish };
   }
 
   async verifyVenue(id: string, adminId: string, approve: boolean): Promise<VenueEntity> {
