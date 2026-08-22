@@ -200,6 +200,84 @@ export class VenueController {
     await this.venueService.deleteVenue(id, user.id, user.role);
   }
 
+  @Get(':id/completion')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener porcentaje de completitud del local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Score de completitud y campos faltantes' })
+  async getCompletion(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.getVenueCompletion(id, user.id, user.role);
+  }
+
+  @Put(':id/publish')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Enviar local a revision (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Local enviado a revision (PENDING)' })
+  @ApiResponse({ status: 400, description: 'Faltan datos requeridos para publicar' })
+  async publish(@Param('id') id: string, @CurrentUser() user: { id: string; role: UserRole }) {
+    return this.venueService.submitForReview(id, user.id, user.role);
+  }
+
+  @Post(':id/media')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseInterceptors(
+    FilesInterceptor('photos', MAX_PHOTOS, {
+      limits: { fileSize: MAX_FILE_SIZE },
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Agregar fotos al local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 201, description: 'Fotos agregadas' })
+  async addMedia(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+    @UploadedFiles() files?: Express.Multer.File[],
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Debes adjuntar al menos una foto');
+    }
+    validateFiles(files);
+
+    const photoUrls = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
+    return this.venueService.addVenueMedia(id, user.id, user.role, photoUrls);
+  }
+
+  @Put(':id/media/order')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reordenar fotos y definir portada (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Fotos reordenadas' })
+  async reorderMedia(
+    @Param('id') id: string,
+    @Body('order') order: string[],
+    @Body('coverId') coverId: string | undefined,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    if (!Array.isArray(order) || order.length === 0) {
+      throw new BadRequestException('order debe ser un arreglo con los IDs de las fotos');
+    }
+    return this.venueService.reorderVenueMedia(id, user.id, user.role, order, coverId);
+  }
+
+  @Delete(':id/media/:mediaId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eliminar una foto del local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 204, description: 'Foto eliminada' })
+  async deleteMedia(
+    @Param('id') id: string,
+    @Param('mediaId') mediaId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    await this.venueService.deleteVenueMedia(id, mediaId, user.id, user.role);
+  }
+
   // ========== ADMIN ENDPOINTS ==========
 
   @Put(':id/verify')

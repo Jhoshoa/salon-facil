@@ -39,6 +39,11 @@ export const OwnerDashboard = () => {
         icon={Store}
         title="No tienes salones registrados"
         description="Crea o activa un salon para empezar a recibir reservas."
+        action={
+          <Button asChild>
+            <Link href="/dashboard/venues/new">Crear local</Link>
+          </Button>
+        }
       />
     );
   }
@@ -68,6 +73,9 @@ export const OwnerDashboard = () => {
 
       <div className="flex flex-wrap gap-2">
         <Button asChild>
+          <Link href="/dashboard/venues">Gestionar locales</Link>
+        </Button>
+        <Button asChild variant="outline">
           <Link href="/dashboard/bookings">Gestionar reservas</Link>
         </Button>
         <Button asChild variant="outline">

@@ -3,9 +3,12 @@ import {
   IsBoolean,
   IsDateString,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -13,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { PriceUnit, VenueSpaceType, VenueUseType } from '@prisma/client';
 
 type Constructor<T extends object> = new () => T;
 
@@ -36,6 +40,20 @@ function parseJsonArray<T extends object>(value: unknown, dtoClass?: Constructor
   }
 
   return parsedValue.map((item) => Object.assign(new dtoClass(), item));
+}
+
+// With enableImplicitConversion, class-transformer's built-in primitive conversion runs
+// BEFORE this @Transform and coerces any non-empty string to `true` via `Boolean(value)`
+// (e.g. `Boolean('false') === true`) — which breaks multipart/form-data bodies where every
+// field arrives as a string. Read the untouched raw value from `obj` to parse it correctly.
+function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
+  const raw = obj[key];
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'string') {
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+  }
+  return raw;
 }
 
 export class CreateVenueServiceDto {
@@ -103,6 +121,52 @@ export class CreateVenuePriceDto {
   discountLabel?: string;
 }
 
+export class CreateVenueAmenityDto {
+  @IsUUID()
+  amenityId!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isIncluded: boolean = true;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  extraCost?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CreateVenueUseDto {
+  @IsIn(Object.values(VenueUseType))
+  useType!: VenueUseType;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary: boolean = false;
+}
+
+export class CreateVenueOpeningHourDto {
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  dayOfWeek!: number;
+
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'opensAt debe tener formato HH:mm' })
+  opensAt?: string;
+
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'closesAt debe tener formato HH:mm' })
+  closesAt?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isClosed: boolean = false;
+}
+
 export class CreateVenueDto {
   @IsString()
   @MinLength(3, { message: 'El nombre debe tener al menos 3 caracteres' })
@@ -154,6 +218,30 @@ export class CreateVenueDto {
   squareMeters?: number;
 
   @IsOptional()
+  @IsIn(Object.values(VenueSpaceType))
+  spaceType?: VenueSpaceType;
+
+  @IsOptional()
+  @IsIn(Object.values(PriceUnit))
+  priceUnit?: PriceUnit;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  minimumHours?: number;
+
+  @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  instantBooking?: boolean;
+
+  @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  allowsMultipleDays?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @Transform(({ value }) => {
@@ -189,4 +277,25 @@ export class CreateVenueDto {
   @Transform(({ value }) => parseJsonArray(value, CreateVenuePriceDto))
   @Type(() => CreateVenuePriceDto)
   prices?: CreateVenuePriceDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Transform(({ value }) => parseJsonArray(value, CreateVenueAmenityDto))
+  @Type(() => CreateVenueAmenityDto)
+  amenities?: CreateVenueAmenityDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Transform(({ value }) => parseJsonArray(value, CreateVenueUseDto))
+  @Type(() => CreateVenueUseDto)
+  useTypes?: CreateVenueUseDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Transform(({ value }) => parseJsonArray(value, CreateVenueOpeningHourDto))
+  @Type(() => CreateVenueOpeningHourDto)
+  openingHours?: CreateVenueOpeningHourDto[];
 }

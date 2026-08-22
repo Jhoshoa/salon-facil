@@ -169,6 +169,7 @@ export interface Venue {
   longitude: number | null;
   capacityMin: number;
   capacityMax: number;
+  squareMeters: number | null;
   spaceType: VenueSpaceType | null;
   minimumHours: number;
   priceUnit: PriceUnit;
@@ -190,6 +191,67 @@ export interface Venue {
   owner?: { id: string; fullName: string; phone?: string; avatarUrl: string | null };
   reviewCount?: number;
   averageRating?: number;
+}
+
+export interface VenuePriceInput {
+  priceType: VenuePrice['priceType'];
+  dayOfWeek?: number;
+  specificDate?: string;
+  startDate?: string;
+  endDate?: string;
+  price: number;
+  discountPercent?: number;
+  discountLabel?: string;
+}
+
+export interface VenueAmenityInput {
+  amenityId: string;
+  isIncluded?: boolean;
+  extraCost?: number;
+  notes?: string;
+}
+
+export interface VenueUseInput {
+  useType: VenueUseType;
+  isPrimary?: boolean;
+}
+
+export interface VenueOpeningHourInput {
+  dayOfWeek: number;
+  opensAt?: string;
+  closesAt?: string;
+  isClosed?: boolean;
+}
+
+export interface VenueFormPayload {
+  name: string;
+  description: string;
+  shortDescription?: string;
+  address: string;
+  district: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  capacityMax: number;
+  capacityMin?: number;
+  squareMeters?: number;
+  spaceType?: VenueSpaceType;
+  priceUnit?: PriceUnit;
+  minimumHours?: number;
+  instantBooking?: boolean;
+  allowsMultipleDays?: boolean;
+  rules?: string;
+  cancellationPolicy?: string;
+  prices?: VenuePriceInput[];
+  amenities?: VenueAmenityInput[];
+  useTypes?: VenueUseInput[];
+  openingHours?: VenueOpeningHourInput[];
+}
+
+export interface VenueCompletion {
+  score: number;
+  missing: string[];
+  canPublish: boolean;
 }
 
 export interface VenueSearchParams {

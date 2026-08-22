@@ -60,7 +60,6 @@ export class VenueRepository implements IVenueRepository {
     services: { orderBy: { sortOrder: 'asc' as const } },
     prices: { where: { isActive: true } },
     amenities: {
-      where: { isIncluded: true },
       include: { amenity: true },
       orderBy: { amenity: { sortOrder: 'asc' as const } },
     },
@@ -871,7 +870,11 @@ export class VenueRepository implements IVenueRepository {
       updatedAt: raw.updatedAt,
       services: raw.services?.map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (s: any) => new VenueServiceEntity(s),
+        (s: any) =>
+          new VenueServiceEntity({
+            ...s,
+            extraCost: s.extraCost != null ? Number(s.extraCost) : null,
+          }),
       ),
       prices: raw.prices?.map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -879,6 +882,7 @@ export class VenueRepository implements IVenueRepository {
           new VenuePriceEntity({
             ...p,
             price: Number(p.price),
+            discountPercent: p.discountPercent != null ? Number(p.discountPercent) : null,
           }),
       ),
       amenities: raw.amenities?.map((item: RawVenueAmenity) => ({
