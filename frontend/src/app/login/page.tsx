@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { CalendarCheck } from 'lucide-react';
 import { LoginForm } from '@/components/auth/login-form';
 
@@ -16,7 +17,9 @@ export default function LoginPage() {
           <h1 className="sf-auth-title">Iniciar sesion</h1>
           <p className="sf-auth-subtitle">Accede para gestionar tus reservas y espacios.</p>
         </div>
-        <LoginForm />
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
       </section>
     </main>
   );

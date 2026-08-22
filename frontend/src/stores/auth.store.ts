@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthResponse, AuthUser, UserRole } from '@/types/api';
@@ -51,3 +52,23 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+/**
+ * The persisted store starts as its default (logged-out) state on both the server
+ * render and the client's first render, then hydrates from localStorage a tick later.
+ * Any auth-gated UI must wait for this flag before trusting `isAuthenticated`/`role`,
+ * otherwise it will flash-redirect logged-in users before hydration completes.
+ */
+export const useAuthHydrated = () => {
+  // `useAuthStore.persist` only exists in the browser (it's undefined during Next.js SSR),
+  // so it must never be touched outside an effect — start `false` unconditionally and let
+  // the effect (browser-only) resolve the real hydration state.
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(useAuthStore.persist.hasHydrated());
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  return hydrated;
+};

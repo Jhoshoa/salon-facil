@@ -13,6 +13,15 @@ interface AuthenticatedRequest {
   query: Record<string, unknown>;
 }
 
+/**
+ * Only activates on routes decorated with @Ownership() — none exist yet, so this guard is
+ * currently a no-op everywhere. It compares `request[source][field]` directly against the
+ * authenticated user's id, which only works when the owner id IS the route param/body value
+ * (e.g. a user editing their own `/users/:userId`). It cannot resolve ownership for entities
+ * like venues/bookings where the param is the resource's own id and the owner id requires a
+ * DB lookup — those are enforced manually in the service layer instead
+ * (see `VenueEntity.canBeEditedBy`, `BookingEntity`/`PaymentService` equivalents).
+ */
 @Injectable()
 export class OwnershipGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

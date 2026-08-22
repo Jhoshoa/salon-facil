@@ -55,7 +55,13 @@ Uses **Clean Architecture** with four layers per module:
 
 Modules: `auth`, `venue`, `booking`, `payment`, `upload`
 
-Global guards applied in order: JwtAuthGuard → RolesGuard → OwnershipGuard
+Global guards applied in order: JwtAuthGuard → RolesGuard → OwnershipGuard.
+`OwnershipGuard` only activates on routes tagged with `@Ownership()` (none currently exist —
+it's a no-op today). Ownership for venues/bookings/payments is instead enforced manually in
+each service via `entity.canBeEditedBy(userId, userRole)`, since resolving the owner requires
+a DB lookup the generic param-based `OwnershipGuard` doesn't do. `@Ownership()` is reserved for
+future routes where the owner id is directly the request param/body (e.g. a user editing their
+own `/users/:userId`).
 
 Use `@Public()` decorator to bypass JWT authentication on specific endpoints.
 

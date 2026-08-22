@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { login } from '@/lib/api/auth.api';
@@ -15,6 +15,7 @@ import { SubmitButton } from '@/components/shared/submit-button';
 
 export const LoginForm = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
 
   const form = useForm<LoginFormValues>({
@@ -28,6 +29,17 @@ export const LoginForm = () => {
     onSuccess: (session) => {
       setSession(session);
       toast.success('Sesion iniciada');
+
+      const next = searchParams.get('next');
+      const isSafeNext = next?.startsWith('/') && !next.startsWith('//');
+      const isDashboardNext = next?.startsWith('/dashboard');
+      const canUseNext = isSafeNext && (!isDashboardNext || session.user.role !== 'CLIENT');
+
+      if (canUseNext && next) {
+        router.push(next);
+        return;
+      }
+
       router.push(session.user.role === 'OWNER' ? '/dashboard' : '/bookings');
     },
     onError: (error: { message?: string }) => {
