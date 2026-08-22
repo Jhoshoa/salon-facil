@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Map, SlidersHorizontal } from 'lucide-react';
+import { Clock, SlidersHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,43 +59,31 @@ export const VenueFilterSidebar = ({
   };
 
   const toggleSpaceType = (spaceType: VenueSpaceType) => {
-    const spaceTypes = values.spaceTypes.includes(spaceType)
+    const nextSpaceTypes = values.spaceTypes.includes(spaceType)
       ? values.spaceTypes.filter((item) => item !== spaceType)
       : [...values.spaceTypes, spaceType];
-    onChange({ ...values, spaceTypes });
+    onChange({ ...values, spaceTypes: nextSpaceTypes });
   };
 
   const toggleUseType = (useType: VenueUseType) => {
-    const useTypes = values.useTypes.includes(useType)
+    const nextUseTypes = values.useTypes.includes(useType)
       ? values.useTypes.filter((item) => item !== useType)
       : [...values.useTypes, useType];
-    onChange({ ...values, useTypes });
+    onChange({ ...values, useTypes: nextUseTypes });
   };
 
   const amenityGroups = Object.entries(amenityCatalog).filter(([, amenities]) => amenities?.length);
 
   return (
     <aside className="space-y-4">
-      <div className="overflow-hidden rounded-md border bg-card shadow-sm">
-        <div className="sf-soft-gradient flex h-40 items-center justify-center">
-          <div className="text-center">
-            <Map className="mx-auto h-8 w-8" />
-            <p className="mt-2 text-sm font-semibold">Mapa de zonas</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Vista interactiva en siguiente paso
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-md border bg-white shadow-sm">
-        <div className="sf-surface flex items-center gap-2 border-b p-4">
-          <SlidersHorizontal className="h-4 w-4" />
+      <div className="sf-card overflow-hidden">
+        <div className="sf-surface-accent flex items-center gap-2 border-b p-4">
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
           <h2 className="font-semibold">Filtrar por</h2>
         </div>
 
-        <div className="space-y-5 p-4">
-          <div className="space-y-2">
+        <div className="space-y-6 p-4">
+          <div className="sf-filter-section">
             <Label htmlFor="districtFilter">Zona o distrito</Label>
             <Input
               id="districtFilter"
@@ -105,18 +93,15 @@ export const VenueFilterSidebar = ({
             />
           </div>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Presupuesto</p>
-            <div className="grid grid-cols-3 gap-2">
+          <div className="sf-filter-section">
+            <p className="sf-filter-title">Presupuesto</p>
+            <div className="flex flex-wrap gap-2">
               {(['EVENT', 'HOUR', 'DAY'] as PriceUnit[]).map((unit) => (
                 <button
                   key={unit}
                   type="button"
-                  className={`rounded-md border px-2 py-2 text-sm ${
-                    values.priceUnit === unit
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'bg-background text-muted-foreground'
-                  }`}
+                  className="sf-filter-chip"
+                  data-active={values.priceUnit === unit}
                   onClick={() =>
                     onChange({ ...values, priceUnit: values.priceUnit === unit ? '' : unit })
                   }
@@ -125,9 +110,11 @@ export const VenueFilterSidebar = ({
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label htmlFor="minPrice">Min.</Label>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="sf-form-group">
+                <Label htmlFor="minPrice" className="text-xs">
+                  Min.
+                </Label>
                 <Input
                   id="minPrice"
                   type="number"
@@ -137,8 +124,10 @@ export const VenueFilterSidebar = ({
                   placeholder="1000"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="maxPrice">Max.</Label>
+              <div className="sf-form-group">
+                <Label htmlFor="maxPrice" className="text-xs">
+                  Max.
+                </Label>
                 <Input
                   id="maxPrice"
                   type="number"
@@ -151,7 +140,7 @@ export const VenueFilterSidebar = ({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="sf-filter-section">
             <Label htmlFor="minCapacityFilter">Capacidad minima</Label>
             <Input
               id="minCapacityFilter"
@@ -163,22 +152,19 @@ export const VenueFilterSidebar = ({
             />
           </div>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Tipo de espacio</p>
-            <div className="space-y-2">
+          <div className="sf-filter-section">
+            <p className="sf-filter-title">Tipo de espacio</p>
+            <div className="space-y-2.5">
               {isCatalogLoading ? (
                 <Skeleton className="h-24 w-full" />
               ) : (
                 spaceTypes.map((spaceType) => (
-                  <label
-                    key={spaceType}
-                    className="flex items-center gap-2 text-sm text-muted-foreground"
-                  >
+                  <label key={spaceType} className="sf-filter-option cursor-pointer">
                     <input
                       type="checkbox"
                       checked={values.spaceTypes.includes(spaceType)}
                       onChange={() => toggleSpaceType(spaceType)}
-                      className="h-4 w-4 rounded border-input"
+                      className="h-4 w-4 rounded border-input accent-primary"
                     />
                     {spaceTypeLabels[spaceType]}
                   </label>
@@ -187,22 +173,19 @@ export const VenueFilterSidebar = ({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Ideal para</p>
-            <div className="space-y-2">
+          <div className="sf-filter-section">
+            <p className="sf-filter-title">Ideal para</p>
+            <div className="space-y-2.5">
               {isCatalogLoading ? (
                 <Skeleton className="h-24 w-full" />
               ) : (
                 useTypes.slice(0, 8).map((useType) => (
-                  <label
-                    key={useType}
-                    className="flex items-center gap-2 text-sm text-muted-foreground"
-                  >
+                  <label key={useType} className="sf-filter-option cursor-pointer">
                     <input
                       type="checkbox"
                       checked={values.useTypes.includes(useType)}
                       onChange={() => toggleUseType(useType)}
-                      className="h-4 w-4 rounded border-input"
+                      className="h-4 w-4 rounded border-input accent-primary"
                     />
                     {useTypeLabels[useType]}
                   </label>
@@ -211,27 +194,24 @@ export const VenueFilterSidebar = ({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Comodidades</p>
-            <div className="space-y-2">
+          <div className="sf-filter-section">
+            <p className="sf-filter-title">Comodidades</p>
+            <div className="space-y-3">
               {isCatalogLoading ? (
                 <Skeleton className="h-24 w-full" />
               ) : amenityGroups.length ? (
                 amenityGroups.map(([category, amenities]) => (
                   <div key={category} className="space-y-2">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {category.replace('_', ' ')}
                     </p>
                     {amenities?.slice(0, 5).map((amenity) => (
-                      <label
-                        key={amenity.key}
-                        className="flex items-center gap-2 text-sm text-muted-foreground"
-                      >
+                      <label key={amenity.key} className="sf-filter-option cursor-pointer">
                         <input
                           type="checkbox"
                           checked={values.amenities.includes(amenity.key)}
                           onChange={() => toggleAmenity(amenity.key)}
-                          className="h-4 w-4 rounded border-input"
+                          className="h-4 w-4 rounded border-input accent-primary"
                         />
                         {amenity.name}
                       </label>
@@ -240,15 +220,12 @@ export const VenueFilterSidebar = ({
                 ))
               ) : (
                 popularFilters.map((filter) => (
-                  <label
-                    key={filter}
-                    className="flex items-center gap-2 text-sm text-muted-foreground"
-                  >
+                  <label key={filter} className="sf-filter-option cursor-pointer">
                     <input
                       type="checkbox"
                       checked={values.services.includes(filter)}
                       onChange={() => toggleService(filter)}
-                      className="h-4 w-4 rounded border-input"
+                      className="h-4 w-4 rounded border-input accent-primary"
                     />
                     {filter}
                   </label>
@@ -257,16 +234,16 @@ export const VenueFilterSidebar = ({
             </div>
           </div>
 
-          <label className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+          <label className="sf-card flex cursor-pointer items-center justify-between gap-3 p-3 text-sm transition-colors hover:bg-muted/50">
             <span className="inline-flex items-center gap-2">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4 text-primary" />
               Reserva inmediata
             </span>
             <input
               type="checkbox"
               checked={values.instantBooking}
               onChange={(event) => onChange({ ...values, instantBooking: event.target.checked })}
-              className="h-4 w-4 rounded border-input"
+              className="h-4 w-4 rounded border-input accent-primary"
             />
           </label>
         </div>

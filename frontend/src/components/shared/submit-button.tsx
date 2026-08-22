@@ -12,11 +12,9 @@ export const SubmitButton = ({
   loadingText = 'Guardando...',
   disabled,
   ...props
-}: SubmitButtonProps) => {
-  return (
-    <Button disabled={disabled || isLoading} {...props}>
-      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-      {isLoading ? loadingText : children}
-    </Button>
-  );
-};
+}: SubmitButtonProps) => (
+  <Button disabled={disabled || isLoading} {...props}>
+    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+    {isLoading ? loadingText : children}
+  </Button>
+);

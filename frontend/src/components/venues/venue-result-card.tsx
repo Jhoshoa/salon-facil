@@ -37,30 +37,27 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
   const services = amenities.length ? [] : (venue.services?.slice(0, 3) ?? []);
 
   return (
-    <article className="sf-card grid gap-4 overflow-hidden p-3 transition-all hover:-translate-y-0.5 hover:shadow-md md:grid-cols-[280px_1fr_200px]">
-      <Link
-        href={`/venues/${venue.slug}`}
-        className="relative aspect-[4/3] overflow-hidden rounded-md bg-muted focus:outline-none focus:ring-2 focus:ring-ring md:aspect-auto"
-      >
+    <article className="sf-result-card">
+      <Link href={`/venues/${venue.slug}`} className="sf-result-image sf-focus-ring">
         {photo ? (
           <Image
             src={photo}
             alt={venue.name}
             fill
             className="object-cover"
-            sizes="(min-width: 1024px) 260px, 100vw"
+            sizes="(min-width: 1024px) 280px, 100vw"
           />
         ) : (
-          <div className="sf-empty-gradient flex h-full items-center justify-center text-sm text-muted-foreground">
+          <div className="sf-gradient-subtle flex h-full items-center justify-center text-sm text-muted-foreground">
             Foto pendiente
           </div>
         )}
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          {venue.instantBooking ? (
-            <Badge className="sf-badge-action">Reserva inmediata</Badge>
-          ) : null}
+          {venue.instantBooking ? <Badge>Reserva inmediata</Badge> : null}
           {venue.isVerified ? (
-            <Badge className="border-0 bg-card/90 text-primary">Verificado</Badge>
+            <Badge variant="secondary" className="bg-card/95">
+              Verificado
+            </Badge>
           ) : null}
         </div>
       </Link>
@@ -69,34 +66,32 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
         <div>
           <Link
             href={`/venues/${venue.slug}`}
-            className="text-xl font-semibold tracking-normal text-foreground hover:text-primary"
+            className="text-xl font-semibold text-foreground hover:text-primary"
           >
             {venue.name}
           </Link>
-          <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+          <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
             {venue.district}, {venue.city}
           </p>
         </div>
 
-        <p className="line-clamp-2 text-sm text-muted-foreground">
+        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
           {venue.shortDescription ?? venue.description}
         </p>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="sf-badge-muted gap-1">
+          <Badge variant="secondary" className="gap-1.5">
             <Users className="h-3.5 w-3.5" />
             {venue.capacityMin}-{venue.capacityMax} personas
           </Badge>
           {venue.spaceType ? (
-            <Badge variant="outline" className="sf-badge-info">
-              {spaceTypeLabel[venue.spaceType] ?? venue.spaceType}
-            </Badge>
+            <Badge variant="accent">{spaceTypeLabel[venue.spaceType] ?? venue.spaceType}</Badge>
           ) : null}
         </div>
 
         {amenities.length ? (
-          <div className="sf-text-action grid gap-1 text-sm sm:grid-cols-2">
+          <div className="grid gap-1.5 text-sm text-primary sm:grid-cols-2">
             {amenities.map((item) => (
               <span key={item.id} className="inline-flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
@@ -105,7 +100,7 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             ))}
           </div>
         ) : services.length ? (
-          <div className="sf-text-action grid gap-1 text-sm sm:grid-cols-2">
+          <div className="grid gap-1.5 text-sm text-primary sm:grid-cols-2">
             {services.map((service) => (
               <span key={service.id} className="inline-flex items-center gap-2">
                 <Check className="h-4 w-4" />
@@ -116,16 +111,12 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
         ) : null}
       </div>
 
-      <div className="sf-surface flex flex-col justify-between gap-4 rounded-md border p-4 md:text-right">
+      <div className="sf-result-price-box">
         <div>
-          <p className="text-sm text-muted-foreground">Desde</p>
-          <p className="text-2xl font-bold tracking-normal">
-            {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            por {priceUnitLabel[venue.priceUnit] ?? 'evento'}
-          </p>
-          <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <p className="sf-price-label">Desde</p>
+          <p className="sf-price">{basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}</p>
+          <p className="sf-price-unit">por {priceUnitLabel[venue.priceUnit] ?? 'evento'}</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="h-3.5 w-3.5" />
             Min. {venue.minimumHours} h
           </p>

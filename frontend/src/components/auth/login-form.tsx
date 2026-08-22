@@ -38,27 +38,35 @@ export const LoginForm = () => {
   const canSubmit = form.formState.isValid && !mutation.isPending;
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-      <div className="space-y-2">
+    <form className="space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <div className="sf-form-group">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" {...form.register('email')} />
+        <Input id="email" type="email" placeholder="tu@email.com" {...form.register('email')} />
         {form.formState.errors.email ? (
-          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+          <p className="sf-form-error">{form.formState.errors.email.message}</p>
         ) : null}
       </div>
-      <div className="space-y-2">
+
+      <div className="sf-form-group">
         <Label htmlFor="password">Contrasena</Label>
-        <Input id="password" type="password" {...form.register('password')} />
+        <Input
+          id="password"
+          type="password"
+          placeholder="Tu contrasena"
+          {...form.register('password')}
+        />
         {form.formState.errors.password ? (
-          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+          <p className="sf-form-error">{form.formState.errors.password.message}</p>
         ) : null}
       </div>
+
       <SubmitButton className="w-full" disabled={!canSubmit} isLoading={mutation.isPending}>
         Iniciar sesion
       </SubmitButton>
+
       <p className="text-center text-sm text-muted-foreground">
         No tienes cuenta?{' '}
-        <Link href="/register" className="font-medium text-foreground underline">
+        <Link href="/register" className="sf-link">
           Registrate
         </Link>
       </p>

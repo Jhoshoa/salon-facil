@@ -1,13 +1,21 @@
+import Link from 'next/link';
+import { CalendarCheck } from 'lucide-react';
 import { RegisterForm } from '@/components/auth/register-form';
 
 export default function RegisterPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <section className="w-full max-w-2xl rounded-md border bg-card p-6 shadow-sm">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Crear cuenta</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Registrate como cliente o dueno de local para operar en SalonFacil.
+    <main className="sf-auth-container sf-hero">
+      <section className="sf-auth-card-lg">
+        <div className="sf-auth-header">
+          <Link href="/" className="mb-6 inline-flex items-center gap-2">
+            <span className="sf-logo">
+              <CalendarCheck className="h-5 w-5" />
+            </span>
+            <span className="text-lg font-bold">SalonFacil</span>
+          </Link>
+          <h1 className="sf-auth-title">Crear cuenta</h1>
+          <p className="sf-auth-subtitle">
+            Registrate como cliente o propietario de local para operar en SalonFacil.
           </p>
         </div>
         <RegisterForm />

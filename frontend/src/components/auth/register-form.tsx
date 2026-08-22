@@ -11,6 +11,7 @@ import { registerSchema, type RegisterFormValues } from '@/lib/validators/auth.s
 import { useAuthStore } from '@/stores/auth.store';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { SubmitButton } from '@/components/shared/submit-button';
 
 export const RegisterForm = () => {
@@ -46,57 +47,64 @@ export const RegisterForm = () => {
   const canSubmit = form.formState.isValid && !mutation.isPending;
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2 sm:col-span-2">
+    <form className="space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div className="sf-form-group sm:col-span-2">
           <Label htmlFor="fullName">Nombre completo</Label>
-          <Input id="fullName" {...form.register('fullName')} />
+          <Input id="fullName" placeholder="Juan Perez" {...form.register('fullName')} />
           {form.formState.errors.fullName ? (
-            <p className="text-sm text-destructive">{form.formState.errors.fullName.message}</p>
+            <p className="sf-form-error">{form.formState.errors.fullName.message}</p>
           ) : null}
         </div>
-        <div className="space-y-2">
+
+        <div className="sf-form-group">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" {...form.register('email')} />
+          <Input id="email" type="email" placeholder="tu@email.com" {...form.register('email')} />
           {form.formState.errors.email ? (
-            <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+            <p className="sf-form-error">{form.formState.errors.email.message}</p>
           ) : null}
         </div>
-        <div className="space-y-2">
+
+        <div className="sf-form-group">
           <Label htmlFor="phone">Telefono</Label>
-          <Input id="phone" {...form.register('phone')} />
+          <Input id="phone" placeholder="70000000" {...form.register('phone')} />
           {form.formState.errors.phone ? (
-            <p className="text-sm text-destructive">{form.formState.errors.phone.message}</p>
+            <p className="sf-form-error">{form.formState.errors.phone.message}</p>
           ) : null}
         </div>
-        <div className="space-y-2">
+
+        <div className="sf-form-group">
           <Label htmlFor="password">Contrasena</Label>
-          <Input id="password" type="password" {...form.register('password')} />
+          <Input
+            id="password"
+            type="password"
+            placeholder="Min. 8 caracteres"
+            {...form.register('password')}
+          />
           {form.formState.errors.password ? (
-            <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+            <p className="sf-form-error">{form.formState.errors.password.message}</p>
           ) : null}
         </div>
-        <div className="space-y-2">
+
+        <div className="sf-form-group">
           <Label htmlFor="role">Tipo de cuenta</Label>
-          <select
-            id="role"
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            {...form.register('role')}
-          >
+          <Select id="role" {...form.register('role')}>
             <option value="CLIENT">Cliente</option>
-            <option value="OWNER">Dueno de local</option>
-          </select>
+            <option value="OWNER">Propietario de local</option>
+          </Select>
           {form.formState.errors.role ? (
-            <p className="text-sm text-destructive">{form.formState.errors.role.message}</p>
+            <p className="sf-form-error">{form.formState.errors.role.message}</p>
           ) : null}
         </div>
       </div>
+
       <SubmitButton className="w-full" disabled={!canSubmit} isLoading={mutation.isPending}>
         Crear cuenta
       </SubmitButton>
+
       <p className="text-center text-sm text-muted-foreground">
         Ya tienes cuenta?{' '}
-        <Link href="/login" className="font-medium text-foreground underline">
+        <Link href="/login" className="sf-link">
           Inicia sesion
         </Link>
       </p>

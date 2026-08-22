@@ -111,6 +111,45 @@ export const VenueSearch = ({
     return isValid;
   };
 
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    setErrors((prev) => {
+      if (!prev.startDate && !prev.endDate) return prev;
+      const next = { ...prev };
+      if (value) delete next.startDate;
+      if (!(value && endDate && endDate < value)) delete next.endDate;
+      return next;
+    });
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setEndDate(value);
+    setErrors((prev) => {
+      if (!prev.endDate) return prev;
+      if (!(startDate && value && value < startDate)) {
+        const next = { ...prev };
+        delete next.endDate;
+        return next;
+      }
+      return prev;
+    });
+  };
+
+  const handleCapacityChange = (value: string) => {
+    setCapacity(value);
+    setFilters((current) => ({ ...current, minCapacity: value }));
+    setErrors((prev) => {
+      if (!prev.capacity) return prev;
+      const parsed = Number(value);
+      if (value && !Number.isNaN(parsed) && parsed >= 1) {
+        const next = { ...prev };
+        delete next.capacity;
+        return next;
+      }
+      return prev;
+    });
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     submitSearch();
@@ -142,104 +181,99 @@ export const VenueSearch = ({
 
   return (
     <div className="space-y-6">
-      <form className="sf-card-strong sticky top-20 z-30 p-3" onSubmit={handleSubmit}>
-        <div className="grid gap-2 lg:grid-cols-[1fr_190px_190px_170px_150px]">
-          <div className="space-y-2">
-            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
-              <Label htmlFor="query" className="text-xs text-muted-foreground">
-                Indica destino o salon
-              </Label>
-              <Input
-                id="query"
-                value={queryText}
-                onChange={(event) => setQueryText(event.target.value)}
-                placeholder="Salon, zona o servicio"
-                className="h-8 border-0 px-0 text-base shadow-none focus-visible:ring-0"
-              />
-            </div>
+      <form
+        className="sf-search-bar sf-search-bar-catalog sticky top-[calc(var(--header-height)+0.5rem)] z-30"
+        onSubmit={handleSubmit}
+      >
+        <div className="sf-search-grid">
+          <div className="sf-search-field">
+            <Label htmlFor="query" className="sf-field-label">
+              Indica destino o salon
+            </Label>
+            <Input
+              id="query"
+              value={queryText}
+              onChange={(event) => setQueryText(event.target.value)}
+              placeholder="Salon, zona o servicio"
+              className="sf-field-input"
+            />
           </div>
-          <div className="space-y-2">
-            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
-              <Label
-                htmlFor="startDate"
-                className="flex items-center gap-2 text-xs text-muted-foreground"
+
+          <div className="sf-search-field" data-error={Boolean(errors.startDate)}>
+            <Label htmlFor="startDate" className="sf-field-label">
+              <CalendarDays className="mr-1.5 inline h-3.5 w-3.5" />
+              Fecha inicio
+            </Label>
+            <Input
+              id="startDate"
+              type="date"
+              value={startDate}
+              onChange={(event) => handleStartDateChange(event.target.value)}
+              aria-invalid={Boolean(errors.startDate)}
+              className="sf-field-input"
+            />
+            {errors.startDate ? <p className="sf-field-popover">{errors.startDate}</p> : null}
+          </div>
+
+          <div className="sf-search-field" data-error={Boolean(errors.endDate)}>
+            <Label htmlFor="endDate" className="sf-field-label">
+              Fecha fin (opcional)
+            </Label>
+            <Input
+              id="endDate"
+              type="date"
+              value={endDate}
+              onChange={(event) => handleEndDateChange(event.target.value)}
+              aria-invalid={Boolean(errors.endDate)}
+              className="sf-field-input"
+            />
+            {errors.endDate ? <p className="sf-field-popover">{errors.endDate}</p> : null}
+          </div>
+
+          <div className="sf-search-field" data-error={Boolean(errors.capacity)}>
+            <Label htmlFor="capacity" className="sf-field-label">
+              <Users className="mr-1.5 inline h-3.5 w-3.5" />
+              Ocupacion
+            </Label>
+            <Input
+              id="capacity"
+              type="number"
+              min={1}
+              value={capacity}
+              onChange={(event) => handleCapacityChange(event.target.value)}
+              placeholder="Personas"
+              aria-invalid={Boolean(errors.capacity)}
+              className="sf-field-input"
+            />
+            {errors.capacity ? <p className="sf-field-popover">{errors.capacity}</p> : null}
+          </div>
+
+          <div className="sf-search-submit">
+            <div className="flex w-full gap-2 md:h-full">
+              <Button
+                type="submit"
+                size="xl"
+                className="h-full flex-1 md:w-auto"
+                disabled={query.isFetching}
               >
-                <CalendarDays className="h-4 w-4" />
-                Fecha inicio
-              </Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                aria-invalid={Boolean(errors.startDate)}
-                className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
-              />
-            </div>
-            {errors.startDate ? (
-              <p className="text-sm text-destructive">{errors.startDate}</p>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
-              <Label htmlFor="endDate" className="text-xs text-muted-foreground">
-                Fecha fin opcional
-              </Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                aria-invalid={Boolean(errors.endDate)}
-                className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
-              />
-            </div>
-            {errors.endDate ? <p className="text-sm text-destructive">{errors.endDate}</p> : null}
-          </div>
-          <div className="space-y-2">
-            <div className="sf-surface rounded-md border px-3 py-2 transition-colors focus-within:border-primary">
-              <Label
-                htmlFor="capacity"
-                className="flex items-center gap-2 text-xs text-muted-foreground"
+                <Search className="h-4 w-4" />
+                Buscar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="xl"
+                className="h-full lg:hidden"
+                onClick={() => setFiltersOpen(true)}
               >
-                <Users className="h-4 w-4" />
-                Ocupacion
-              </Label>
-              <Input
-                id="capacity"
-                type="number"
-                min={1}
-                value={capacity}
-                onChange={(event) => {
-                  setCapacity(event.target.value);
-                  setFilters((current) => ({ ...current, minCapacity: event.target.value }));
-                }}
-                placeholder="Personas"
-                aria-invalid={Boolean(errors.capacity)}
-                className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
-              />
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
             </div>
-            {errors.capacity ? <p className="text-sm text-destructive">{errors.capacity}</p> : null}
-          </div>
-          <div className="flex items-end gap-2">
-            <Button type="submit" className="sf-action h-[58px] w-full" disabled={query.isFetching}>
-              <Search className="h-4 w-4" />
-              Buscar
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-[58px] w-full lg:hidden"
-              onClick={() => setFiltersOpen(true)}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtros
-            </Button>
           </div>
         </div>
       </form>
 
-      <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <div className="hidden lg:sticky lg:top-44 lg:block lg:self-start">
           <VenueFilterSidebar
             values={filters}
@@ -251,11 +285,11 @@ export const VenueSearch = ({
           />
         </div>
 
-        <section className="space-y-4">
+        <section className="space-y-5">
           {submittedParams ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold tracking-normal">
+                <h2 className="text-2xl font-bold">
                   {venues.length
                     ? `${query.data?.total ?? venues.length} locales encontrados`
                     : 'Locales disponibles'}
@@ -312,7 +346,7 @@ export const VenueSearch = ({
       </div>
 
       <AppDrawer open={filtersOpen} title="Filtros" onOpenChange={setFiltersOpen}>
-        <div className="space-y-4 pb-4">
+        <div className="space-y-5 pb-5">
           <VenueFilterSidebar
             values={filters}
             onChange={setFilters}

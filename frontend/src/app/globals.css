@@ -4,44 +4,51 @@
 
 @layer base {
   :root {
+    /* Core colors */
     --background: 0 0% 100%;
-    --foreground: 214 32% 14%;
+    --foreground: 222 20% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 214 32% 14%;
+    --card-foreground: 222 20% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 214 32% 14%;
-    --primary: 207 91% 42%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 79 24% 86%;
-    --secondary-foreground: 79 28% 26%;
-    --muted: 42 28% 89%;
-    --muted-foreground: 220 14% 40%;
-    --accent: 203 38% 89%;
-    --accent-foreground: 214 32% 14%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 38 21% 78%;
-    --input: 38 21% 78%;
-    --ring: 207 91% 42%;
-    --radius: 0.5rem;
+    --popover-foreground: 222 20% 12%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 14% 46%;
+    --border: 220 14% 90%;
+    --input: 220 14% 90%;
+    --ring: 217 91% 50%;
+    --radius: 0.625rem;
 
-    --surface-subtle: 43 42% 96%;
-    --surface-strong: 203 38% 89%;
-    --card-border: 38 21% 84%;
-    --brand-action: 207 91% 42%;
-    --brand-action-hover: 207 91% 35%;
-    --brand-action-foreground: 0 0% 100%;
-    --brand-muted: 79 24% 86%;
-    --brand-muted-foreground: 79 28% 26%;
-    --brand-info: 203 38% 89%;
-    --brand-info-foreground: 214 32% 14%;
-    --brand-warm: 24 52% 86%;
-    --brand-warm-foreground: 214 32% 14%;
-    --hero-start: 207 91% 42%;
-    --hero-mid: 211 70% 52%;
-    --hero-end: 203 38% 89%;
-    --home-hero-start: 0 0% 100%;
-    --home-hero-end: 203 38% 96%;
+    /* Brand colors */
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 20% 12%;
+    --accent: 217 91% 97%;
+    --accent-foreground: 217 91% 40%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Semantic colors */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Component tokens */
+    --header-height: 4rem;
+    --container-padding: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --container-padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      --container-padding: 2rem;
+    }
   }
 }
 
@@ -50,154 +57,405 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-foreground;
-    font-family:
-      Inter,
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
       sans-serif;
   }
 
   ::selection {
     @apply bg-primary text-primary-foreground;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight text-foreground;
+  }
 }
 
+/* ============================================
+   DESIGN SYSTEM: sf-* Component Classes
+   ============================================ */
+
 @layer components {
+  /* --- Layout --- */
+  .sf-container {
+    @apply mx-auto w-full max-w-7xl;
+    padding-inline: var(--container-padding);
+  }
+
+  .sf-section {
+    @apply py-12 lg:py-16;
+  }
+
+  .sf-section-sm {
+    @apply py-8 lg:py-10;
+  }
+
+  /* --- Cards --- */
   .sf-card {
-    @apply rounded-md border bg-card shadow-sm;
-    border-color: hsl(var(--card-border));
+    @apply rounded-[var(--radius)] border bg-card shadow-sm;
   }
 
-  .sf-header {
-    border-color: hsl(var(--card-border));
-    background-color: hsl(var(--background) / 0.92);
+  .sf-card-elevated {
+    @apply rounded-[var(--radius)] border bg-card;
+    box-shadow:
+      0 1px 3px 0 rgb(0 0 0 / 0.04),
+      0 6px 16px -4px rgb(0 0 0 / 0.08);
   }
 
-  .sf-card-strong {
-    @apply rounded-md border bg-card shadow-lg;
-    border-color: hsl(var(--card-border));
-    box-shadow: 0 18px 45px hsl(var(--foreground) / 0.08);
+  .sf-card-interactive {
+    @apply sf-card transition-all duration-200;
   }
 
+  .sf-card-interactive:hover {
+    @apply -translate-y-0.5 shadow-md;
+  }
+
+  /* --- Surfaces --- */
   .sf-surface {
-    background-color: hsl(var(--surface-subtle));
+    @apply rounded-[var(--radius)] bg-muted/50;
   }
 
-  .sf-surface-strong {
-    background-color: hsl(var(--surface-strong));
+  .sf-surface-accent {
+    @apply rounded-[var(--radius)] bg-accent;
   }
 
-  .sf-action {
-    background-color: hsl(var(--brand-action));
-    color: hsl(var(--brand-action-foreground));
+  /* --- Header & Navigation --- */
+  .sf-header {
+    @apply sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80;
+    height: var(--header-height);
   }
 
-  .sf-action:hover {
-    background-color: hsl(var(--brand-action-hover));
+  .sf-nav-link {
+    @apply text-sm font-medium text-muted-foreground transition-colors hover:text-foreground;
   }
 
-  .sf-hero {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--hero-start)) 0%,
-      hsl(var(--hero-mid)) 52%,
-      hsl(var(--hero-end)) 100%
-    );
-  }
-
-  .sf-home-hero {
-    background:
-      radial-gradient(circle at 20% 12%, hsl(var(--brand-info) / 0.58), transparent 32rem),
-      linear-gradient(180deg, hsl(var(--home-hero-start)) 0%, hsl(var(--home-hero-end)) 100%);
-  }
-
-  .sf-search-dock {
-    @apply border-b bg-background;
-    border-color: hsl(var(--card-border));
-  }
-
-  .sf-logo-mark {
-    @apply flex h-10 w-10 items-center justify-center rounded-md text-sm font-bold;
-    background-color: hsl(var(--surface-subtle));
-    color: hsl(var(--primary));
-  }
-
-  .sf-carousel-card {
-    @apply h-full overflow-hidden rounded-md border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md;
-    border-color: hsl(var(--card-border));
-  }
-
+  /* --- Footer --- */
   .sf-footer {
-    @apply border-t bg-card;
-    border-color: hsl(var(--card-border));
+    @apply border-t bg-muted/30;
   }
 
-  .sf-top-band,
-  .sf-booking-header {
-    background-color: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
+  /* --- Forms --- */
+  .sf-form-group {
+    @apply space-y-2;
   }
 
-  .sf-soft-gradient {
+  .sf-form-error {
+    @apply text-sm text-destructive;
+  }
+
+  .sf-field-wrapper {
+    @apply sf-surface border px-3 py-2.5 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20;
+  }
+
+  .sf-field-label {
+    @apply mb-1 block text-xs font-medium text-muted-foreground;
+  }
+
+  .sf-field-input {
+    @apply h-7 w-full border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0;
+  }
+
+  /* --- Search Bar --- */
+  .sf-search-bar {
+    @apply sf-card-elevated p-2;
+  }
+
+  .sf-search-grid {
+    @apply flex flex-col divide-y divide-border md:flex-row md:items-stretch md:divide-x md:divide-y-0;
+  }
+
+  .sf-search-field {
+    @apply relative flex-1 px-3 py-2 transition-colors focus-within:bg-accent/40;
+  }
+
+  .sf-search-submit {
+    @apply p-1 md:flex md:items-stretch md:p-0 md:pl-1;
+  }
+
+  .sf-field-popover {
+    @apply relative mt-1.5 block rounded-[var(--radius)] border border-destructive/30 bg-card px-2.5 py-1.5 text-xs font-medium text-destructive shadow-sm md:absolute md:left-3 md:top-full md:z-20 md:mt-1.5 md:w-max md:whitespace-nowrap md:shadow-lg;
+    animation: sf-popover-in 0.12s ease-out;
+  }
+
+  .sf-field-popover::before {
+    content: '';
+    @apply absolute -top-1 left-3 hidden h-2 w-2 rotate-45 border-l border-t border-destructive/30 bg-card md:block;
+  }
+
+  /* Wider variant (extra field/button) needs the single-row switch later than the default bar */
+  .sf-search-bar-catalog .sf-search-grid {
+    @apply md:flex-col md:divide-x-0 md:divide-y lg:flex-row lg:items-stretch lg:divide-x lg:divide-y-0;
+  }
+
+  .sf-search-bar-catalog .sf-search-submit {
+    @apply md:block md:p-1 lg:flex lg:items-stretch lg:p-0 lg:pl-1;
+  }
+
+  .sf-search-bar-catalog .sf-field-popover {
+    @apply md:relative md:mt-1.5 md:block md:shadow-sm lg:absolute lg:left-3 lg:top-full lg:z-20 lg:mt-1.5 lg:w-max lg:whitespace-nowrap lg:shadow-lg;
+  }
+
+  .sf-search-bar-catalog .sf-field-popover::before {
+    @apply md:hidden lg:block;
+  }
+
+  @keyframes sf-popover-in {
+    from {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* --- Badges --- */
+  .sf-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .sf-badge-primary {
+    @apply sf-badge bg-primary text-primary-foreground;
+  }
+
+  .sf-badge-secondary {
+    @apply sf-badge bg-secondary text-secondary-foreground;
+  }
+
+  .sf-badge-accent {
+    @apply sf-badge bg-accent text-accent-foreground;
+  }
+
+  .sf-badge-success {
+    @apply sf-badge bg-success/10 text-success;
+  }
+
+  .sf-badge-outline {
+    @apply sf-badge border bg-transparent;
+  }
+
+  /* --- Hero Sections --- */
+  .sf-hero {
+    @apply relative overflow-hidden;
     background: linear-gradient(
       135deg,
-      hsl(var(--brand-info)) 0%,
-      hsl(var(--brand-muted)) 55%,
-      hsl(var(--brand-warm)) 100%
+      hsl(217 91% 97%) 0%,
+      hsl(220 14% 98%) 50%,
+      hsl(0 0% 100%) 100%
     );
-    color: hsl(var(--foreground));
   }
 
-  .sf-empty-gradient {
-    background: linear-gradient(135deg, hsl(var(--muted)), hsl(var(--brand-info)));
+  .sf-hero::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0;
+    background: radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      hsl(217 91% 50% / 0.08),
+      transparent
+    );
   }
 
-  .sf-badge-muted {
-    border-color: transparent;
-    background-color: hsl(var(--brand-muted));
-    color: hsl(var(--brand-muted-foreground));
+  /* --- Empty & Gradient States --- */
+  .sf-gradient-subtle {
+    background: linear-gradient(135deg, hsl(217 91% 97%), hsl(220 14% 96%));
   }
 
-  .sf-badge-info {
-    border-color: hsl(var(--brand-info));
-    background-color: hsl(var(--brand-info));
-    color: hsl(var(--brand-info-foreground));
+  .sf-gradient-warm {
+    background: linear-gradient(135deg, hsl(217 91% 97%), hsl(38 92% 96%));
   }
 
-  .sf-badge-warm {
-    border-color: transparent;
-    background-color: hsl(var(--brand-warm));
-    color: hsl(var(--brand-warm-foreground));
+  /* --- Logo Mark --- */
+  .sf-logo {
+    @apply flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-primary text-primary-foreground shadow-sm;
   }
 
-  .sf-badge-action {
-    border-color: transparent;
-    background-color: hsl(var(--brand-action));
-    color: hsl(var(--brand-action-foreground));
+  .sf-logo-ghost {
+    @apply flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-muted text-primary;
   }
 
-  .sf-text-action {
-    color: hsl(var(--brand-action));
+  /* --- Feature Cards --- */
+  .sf-feature-card {
+    @apply sf-card p-5;
   }
 
-  .sf-warning {
-    border-color: hsl(var(--brand-action) / 0.24);
-    background-color: hsl(var(--brand-warm));
-    color: hsl(var(--brand-warm-foreground));
+  .sf-feature-icon {
+    @apply mb-4 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius)] bg-accent text-primary;
   }
 
-  .sf-glass {
-    border-color: hsl(var(--primary-foreground) / 0.18);
-    background-color: hsl(var(--primary-foreground) / 0.12);
-    color: hsl(var(--primary-foreground));
+  /* --- Result Cards --- */
+  .sf-result-card {
+    @apply sf-card-interactive grid gap-4 overflow-hidden p-3;
   }
 
-  .sf-glass-muted {
-    color: hsl(var(--primary-foreground) / 0.78);
+  @media (min-width: 768px) {
+    .sf-result-card {
+      @apply grid-cols-[280px_1fr_200px];
+    }
+  }
+
+  .sf-result-image {
+    @apply relative aspect-[4/3] overflow-hidden rounded-lg bg-muted md:aspect-auto md:min-h-[200px];
+  }
+
+  .sf-result-price-box {
+    @apply sf-surface flex flex-col justify-between gap-4 border p-4 md:text-right;
+  }
+
+  /* --- Carousel Cards --- */
+  .sf-carousel-card {
+    @apply sf-card-interactive h-full overflow-hidden;
+  }
+
+  .sf-carousel-image {
+    @apply sf-gradient-subtle relative flex aspect-[4/3] items-center justify-center;
+  }
+
+  /* --- Stat Cards --- */
+  .sf-stat {
+    @apply text-center;
+  }
+
+  .sf-stat-value {
+    @apply text-3xl font-bold text-foreground;
+  }
+
+  .sf-stat-label {
+    @apply mt-1 text-sm text-muted-foreground;
+  }
+
+  /* --- Filter Sidebar --- */
+  .sf-filter-section {
+    @apply space-y-3;
+  }
+
+  .sf-filter-title {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .sf-filter-option {
+    @apply flex items-center gap-2.5 text-sm text-muted-foreground;
+  }
+
+  .sf-filter-chip {
+    @apply inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-sm transition-colors;
+  }
+
+  .sf-filter-chip[data-active='true'] {
+    @apply border-primary bg-primary text-primary-foreground;
+  }
+
+  .sf-filter-chip[data-active='false'] {
+    @apply bg-background text-muted-foreground hover:border-primary/50;
+  }
+
+  /* --- CTA Sections --- */
+  .sf-cta {
+    @apply sf-card-elevated grid gap-6 p-6 md:grid-cols-[1fr_auto] md:items-center;
+  }
+
+  .sf-cta-title {
+    @apply text-2xl font-bold;
+  }
+
+  .sf-cta-description {
+    @apply mt-2 text-muted-foreground;
+  }
+
+  /* --- Trust Logos --- */
+  .sf-trust-logo {
+    @apply sf-card flex items-center gap-3 p-4;
+  }
+
+  /* --- Venue Detail --- */
+  .sf-detail-section {
+    @apply sf-card space-y-4 p-5;
+  }
+
+  .sf-detail-title {
+    @apply text-lg font-semibold;
+  }
+
+  .sf-detail-grid {
+    @apply grid gap-3 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  /* --- Auth Pages --- */
+  .sf-auth-container {
+    @apply flex min-h-screen items-center justify-center px-4 py-10;
+  }
+
+  .sf-auth-card {
+    @apply sf-card-elevated w-full p-6 sm:p-8;
+  }
+
+  .sf-auth-card-sm {
+    @apply sf-auth-card max-w-md;
+  }
+
+  .sf-auth-card-lg {
+    @apply sf-auth-card max-w-2xl;
+  }
+
+  .sf-auth-header {
+    @apply mb-6 text-center sm:text-left;
+  }
+
+  .sf-auth-title {
+    @apply text-2xl font-bold;
+  }
+
+  .sf-auth-subtitle {
+    @apply mt-2 text-sm text-muted-foreground;
+  }
+
+  /* --- Price Display --- */
+  .sf-price {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .sf-price-label {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .sf-price-unit {
+    @apply text-xs text-muted-foreground;
+  }
+
+  /* --- Dividers --- */
+  .sf-divider {
+    @apply h-px w-full bg-border;
+  }
+
+  .sf-divider-vertical {
+    @apply h-full w-px bg-border;
+  }
+
+  /* --- Utilities --- */
+  .sf-text-gradient {
+    @apply bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent;
+  }
+
+  .sf-focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+
+  .sf-link {
+    @apply font-medium text-primary underline-offset-4 hover:underline;
+  }
+
+  .sf-link-muted {
+    @apply text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline;
   }
 }
