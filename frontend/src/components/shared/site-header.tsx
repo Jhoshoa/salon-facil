@@ -59,6 +59,11 @@ export const SiteHeader = () => {
               Panel owner
             </Link>
           ) : null}
+          {showGuest ? (
+            <Link href="/propietarios" className="sf-nav-link">
+              Publica tu espacio
+            </Link>
+          ) : null}
         </nav>
 
         <div className="flex items-center gap-2">

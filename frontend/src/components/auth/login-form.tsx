@@ -10,6 +10,7 @@ import { login } from '@/lib/api/auth.api';
 import { loginSchema, type LoginFormValues } from '@/lib/validators/auth.schema';
 import { useAuthStore } from '@/stores/auth.store';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { SubmitButton } from '@/components/shared/submit-button';
 
@@ -61,9 +62,8 @@ export const LoginForm = () => {
 
       <div className="sf-form-group">
         <Label htmlFor="password">Contrasena</Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           placeholder="Tu contrasena"
           {...form.register('password')}
         />

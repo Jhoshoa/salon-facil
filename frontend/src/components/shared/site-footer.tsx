@@ -14,10 +14,10 @@ const footerColumns = [
   {
     title: 'Owners',
     links: [
-      { label: 'Publicar espacio', href: '/register' },
+      { label: 'Publicar espacio', href: '/propietarios' },
       { label: 'Gestionar reservas', href: '/dashboard' },
       { label: 'Calendario', href: '/dashboard/calendar' },
-      { label: 'Pagos', href: '/dashboard/payments' },
+      { label: 'Pagos', href: '/dashboard/bookings' },
     ],
   },
   {

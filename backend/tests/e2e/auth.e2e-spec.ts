@@ -109,6 +109,68 @@ describe('Auth (e2e)', () => {
         })
         .expect(400);
     });
+
+    it.each([
+      ['password without uppercase', 'password1!'],
+      ['password without lowercase', 'PASSWORD1!'],
+      ['password without a digit', 'Password!!'],
+      ['password without a special character', 'Password12'],
+    ])('should return 400 for %s', (_label, password) => {
+      return request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({
+          email: `weak-${Date.now()}-${Math.random()}@email.com`,
+          password,
+          phone: '+59171234567',
+          fullName: 'Test',
+          role: 'CLIENT',
+        })
+        .expect(400);
+    });
+
+    it.each([
+      ['missing country code', '71234567'],
+      ['too few digits after +591', '+5917123456'],
+      ['too many digits after +591', '+591712345678'],
+      ['wrong country code', '+59571234567'],
+    ])('should return 400 for phone with %s', (_label, phone) => {
+      return request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({
+          email: `phone-${Date.now()}-${Math.random()}@email.com`,
+          password: 'Password123!',
+          phone,
+          fullName: 'Test',
+          role: 'CLIENT',
+        })
+        .expect(400);
+    });
+
+    it('should accept a well-formed password and phone', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({
+          email: `valid-${uniqueId}@email.com`,
+          password: 'Str0ng!Pass',
+          phone: phoneFor(10),
+          fullName: 'Valid Format User',
+          role: 'CLIENT',
+        })
+        .expect(201);
+    });
+
+    it('should accept "=" as a valid special character in the password', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({
+          email: `valid-equals-${uniqueId}@email.com`,
+          password: 'Str0ng=Pass',
+          phone: phoneFor(11),
+          fullName: 'Equals Sign User',
+          role: 'CLIENT',
+        })
+        .expect(201);
+    });
   });
 
   describe('POST /api/v1/auth/login', () => {
