@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { createBooking, previewBookingPrice } from '@/lib/api/bookings.api';
-import { formatCurrency, formatDateInput, formatTime12h } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatDateInput, formatTime12h } from '@/lib/formatters';
 import { bookingSchema, type BookingFormValues } from '@/lib/validators/booking.schema';
 import { useAuthStore } from '@/stores/auth.store';
 import type { DailyScheduleEntry, Venue } from '@/types/api';
@@ -273,75 +273,99 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        {isMixedUnits ? (
           <div className="space-y-2">
-            <Label htmlFor="startTime">{isMixedUnits ? 'Horario por defecto' : 'Inicio'}</Label>
-            <Input
-              id="startTime"
-              type="time"
-              className="sf-surface"
-              {...form.register('startTime')}
-            />
+            <Label htmlFor="startTime">Horario para los dias por hora</Label>
+            <p className="text-xs text-muted-foreground">
+              Este local cobra por hora algunos dias del rango elegido y por dia completo
+              otros. Se usa por defecto en los dias por hora; podes ajustarlo
+              individualmente mas abajo.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                id="startTime"
+                type="time"
+                className="sf-surface w-full"
+                {...form.register('startTime')}
+              />
+              <span className="text-sm text-muted-foreground">a</span>
+              <Input
+                id="endTime"
+                type="time"
+                className="sf-surface w-full"
+                {...form.register('endTime')}
+              />
+            </div>
             {form.formState.errors.startTime ? (
               <p className="text-sm text-destructive">{form.formState.errors.startTime.message}</p>
             ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="endTime">{isMixedUnits ? ' ' : 'Fin'}</Label>
-            <Input id="endTime" type="time" className="sf-surface" {...form.register('endTime')} />
             {form.formState.errors.endTime ? (
               <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
             ) : null}
           </div>
-        </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="startTime">Inicio</Label>
+              <Input
+                id="startTime"
+                type="time"
+                className="sf-surface"
+                {...form.register('startTime')}
+              />
+              {form.formState.errors.startTime ? (
+                <p className="text-sm text-destructive">{form.formState.errors.startTime.message}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endTime">Fin</Label>
+              <Input id="endTime" type="time" className="sf-surface" {...form.register('endTime')} />
+              {form.formState.errors.endTime ? (
+                <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {isMixedUnits ? (
           <div className="space-y-2 rounded-[var(--radius)] border p-3">
-            <p className="text-xs text-muted-foreground">
-              Este local cobra por hora algunos dias del rango elegido y por dia completo otros.
-              Ajusta el horario solo en los dias que lo necesitan.
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">Horario por dia</p>
             {previewDays.map((day) => {
               const dayOfWeek = new Date(`${day.date}T00:00:00Z`).getUTCDay();
               const opening = openingHourByWeekday.get(dayOfWeek);
               const schedule = dailySchedule[day.date];
 
               return (
-                <div
-                  key={day.date}
-                  className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-2 text-sm"
-                >
-                  <span className="w-28 font-medium">{day.date}</span>
+                <div key={day.date} className="sf-surface rounded-[var(--radius)] border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium capitalize">{formatDate(day.date)}</span>
+                    {day.unit !== 'HOUR' ? (
+                      <span className="sf-badge-outline">Dia completo</span>
+                    ) : null}
+                  </div>
                   {day.unit === 'HOUR' && schedule ? (
-                    <>
+                    <div className="mt-2 flex items-center gap-2">
                       <Input
                         type="time"
-                        className="sf-surface w-32"
+                        className="sf-surface w-full"
                         value={schedule.startTime}
                         onChange={(e) => updateDailySchedule(day.date, { startTime: e.target.value })}
                       />
                       <span className="text-muted-foreground">a</span>
                       <Input
                         type="time"
-                        className="sf-surface w-32"
+                        className="sf-surface w-full"
                         value={schedule.endTime}
                         onChange={(e) => updateDailySchedule(day.date, { endTime: e.target.value })}
                       />
-                      {opening && !opening.isClosed ? (
-                        <span className="text-xs text-muted-foreground">
-                          (horario del local: {formatTime12h(opening.opensAt)} -{' '}
-                          {formatTime12h(opening.closesAt)})
-                        </span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">
-                      Dia completo
-                      {opening && !opening.isClosed
-                        ? ` (horario del local: ${formatTime12h(opening.opensAt)} - ${formatTime12h(opening.closesAt)})`
-                        : ''}
-                    </span>
-                  )}
+                    </div>
+                  ) : null}
+                  {opening && !opening.isClosed ? (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Horario del local: {formatTime12h(opening.opensAt)} -{' '}
+                      {formatTime12h(opening.closesAt)}
+                    </p>
+                  ) : null}
                 </div>
               );
             })}

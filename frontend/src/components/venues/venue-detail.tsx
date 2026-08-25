@@ -262,11 +262,14 @@ export const VenueDetail = ({ slug, initialStartDate, initialEndDate }: VenueDet
         {venue.openingHours?.length ? (
           <section className="sf-detail-section">
             <h2 className="sf-detail-title">Horarios</h2>
-            <div className="sf-detail-grid">
+            <div className="space-y-2">
               {venue.openingHours.map((item) => (
-                <div key={item.id} className="sf-surface flex items-center justify-between border p-3 text-sm">
+                <div
+                  key={item.id}
+                  className="sf-surface flex items-center justify-between gap-2 rounded-[var(--radius)] border p-3 text-sm"
+                >
                   <span>{dayLabels[item.dayOfWeek]}</span>
-                  <span className="font-medium">
+                  <span className="whitespace-nowrap font-medium">
                     {item.isClosed
                       ? 'Cerrado'
                       : `${formatTime12h(item.opensAt)} - ${formatTime12h(item.closesAt)}`}
