@@ -2,11 +2,15 @@
 
 import { createAdminAmenity, getAdminAmenities, updateAdminAmenity } from '@/lib/api/venues.api';
 import { CatalogManager } from '@/components/admin/catalog-manager';
+import { Breadcrumbs } from '@/components/shared/breadcrumbs';
 import type { CatalogAmenityInput } from '@/types/api';
 
 const AdminAmenitiesPage = () => {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+      <Breadcrumbs
+        items={[{ label: 'Panel admin', href: '/admin' }, { label: 'Catalogo' }, { label: 'Comodidades' }]}
+      />
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Comodidades</h1>
       </div>

@@ -7,6 +7,7 @@ import { getMyVenues } from '@/lib/api/venues.api';
 import { VenueForm } from './venue-form';
 import { VenueMediaManager } from './venue-media-manager';
 import { VenueCompletionCard } from './venue-completion-card';
+import { Breadcrumbs } from '@/components/shared/breadcrumbs';
 import { ErrorState } from '@/components/shared/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,9 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
+            <Breadcrumbs
+              items={[{ label: 'Mis locales', href: '/dashboard/venues' }, { label: venue.name }]}
+            />
             <h1 className="text-2xl font-semibold">{venue.name}</h1>
             <p className="text-sm text-muted-foreground">Edita la informacion de tu local.</p>
           </div>
