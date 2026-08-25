@@ -7,13 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-export type DayVariant = 'available' | 'booked' | 'blocked' | 'past';
+export type DayVariant = 'available' | 'booked' | 'blocked' | 'past' | 'closed';
+export type RangePosition = 'start' | 'middle' | 'end' | 'single';
 
 export interface DayCellData {
   date: string;
   day: number;
   variant: DayVariant;
   label?: string;
+  /** Only ever set on 'available' cells — marks them as part of an in-progress or confirmed range selection. */
+  rangePosition?: RangePosition;
 }
 
 interface LegendItem {
@@ -39,6 +42,7 @@ const cellVariantClasses: Record<DayVariant, string> = {
   booked: 'border-amber-200 bg-amber-50 text-amber-800',
   blocked: 'border-border bg-muted text-muted-foreground',
   past: 'border-transparent bg-muted/30 text-muted-foreground/40',
+  closed: 'border-transparent bg-muted/50 text-muted-foreground/50',
 };
 
 const legendDotClasses: Record<DayVariant, string> = {
@@ -46,6 +50,7 @@ const legendDotClasses: Record<DayVariant, string> = {
   booked: 'bg-amber-400',
   blocked: 'bg-muted-foreground/60',
   past: 'bg-muted-foreground/20',
+  closed: 'bg-muted-foreground/40',
 };
 
 const monthToDate = (month: string) => parse(month, 'yyyy-MM', new Date());
@@ -128,7 +133,9 @@ export const MonthCalendarGrid = ({
               day: date.getDate(),
               variant: 'available',
             };
-            const clickable = Boolean(onDayClick) && cell.variant !== 'past';
+            const clickable =
+              Boolean(onDayClick) && cell.variant !== 'past' && cell.variant !== 'closed';
+            const isRangeEdge = cell.rangePosition === 'start' || cell.rangePosition === 'end' || cell.rangePosition === 'single';
 
             return (
               <button
@@ -140,6 +147,8 @@ export const MonthCalendarGrid = ({
                 className={cn(
                   'flex min-h-14 flex-col items-center justify-start rounded-md border p-1.5 transition-colors',
                   cellVariantClasses[cell.variant],
+                  cell.rangePosition ? 'border-primary/30 bg-primary/15' : null,
+                  isRangeEdge ? 'ring-2 ring-primary/50' : null,
                   clickable ? 'cursor-pointer' : 'cursor-default',
                 )}
               >

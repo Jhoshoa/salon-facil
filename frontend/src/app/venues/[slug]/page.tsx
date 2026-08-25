@@ -5,9 +5,13 @@ interface VenueDetailPageProps {
   params: {
     slug: string;
   };
+  searchParams: {
+    startDate?: string;
+    endDate?: string;
+  };
 }
 
-export default function VenueDetailPage({ params }: VenueDetailPageProps) {
+export default function VenueDetailPage({ params, searchParams }: VenueDetailPageProps) {
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader />
@@ -17,7 +21,11 @@ export default function VenueDetailPage({ params }: VenueDetailPageProps) {
         </div>
       </div>
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <VenueDetail slug={params.slug} />
+        <VenueDetail
+          slug={params.slug}
+          initialStartDate={searchParams.startDate}
+          initialEndDate={searchParams.endDate}
+        />
       </div>
     </main>
   );

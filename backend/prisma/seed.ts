@@ -857,6 +857,7 @@ async function main(): Promise<void> {
       clientId: clientAna.id,
       eventType: 'Quinceanera',
       eventDate: new Date('2026-09-15'),
+      endDate: new Date('2026-09-15'),
       startTime: new Date('1970-01-01T18:00:00.000Z'),
       endTime: new Date('1970-01-01T02:00:00.000Z'),
       guestCount: 200,
@@ -876,6 +877,7 @@ async function main(): Promise<void> {
       clientId: clientPedro.id,
       eventType: 'Cumpleanos',
       eventDate: new Date('2026-08-20'),
+      endDate: new Date('2026-08-20'),
       startTime: new Date('1970-01-01T19:00:00.000Z'),
       endTime: new Date('1970-01-01T01:00:00.000Z'),
       guestCount: 80,
@@ -895,6 +897,7 @@ async function main(): Promise<void> {
       clientId: clientAna.id,
       eventType: 'Boda',
       eventDate: new Date('2026-12-20'),
+      endDate: new Date('2026-12-20'),
       startTime: new Date('1970-01-01T17:00:00.000Z'),
       endTime: new Date('1970-01-01T03:00:00.000Z'),
       guestCount: 250,
@@ -906,6 +909,81 @@ async function main(): Promise<void> {
       status: BookingStatus.PENDING,
       specialRequests: 'Ceremonia civil en jardin y recepcion en salon principal.',
     },
+  });
+
+  // Multi-day booking (venueEstudio allows it and prices by the hour: Bs 280 base,
+  // Bs 350 on Saturdays) — demonstrates the per-day price breakdown end to end.
+  const bookingProduction = await prisma.booking.create({
+    data: {
+      venueId: venueEstudio.id,
+      clientId: clientAna.id,
+      eventType: 'Produccion audiovisual',
+      eventDate: new Date('2026-09-11'),
+      endDate: new Date('2026-09-13'),
+      startTime: new Date('1970-01-01T09:00:00.000Z'),
+      endTime: new Date('1970-01-01T17:00:00.000Z'),
+      guestCount: 12,
+      basePrice: 280,
+      appliedPrice: 7280,
+      totalPrice: 7280,
+      depositAmount: 2184,
+      depositPaid: false,
+      status: BookingStatus.PENDING,
+      specialRequests: 'Sesion de 3 dias para catalogo de producto.',
+    },
+  });
+
+  await prisma.bookingDate.createMany({
+    data: [
+      {
+        bookingId: bookingQuince.id,
+        venueId: venueImperial.id,
+        date: bookingQuince.eventDate,
+        startTime: bookingQuince.startTime,
+        endTime: bookingQuince.endTime,
+        appliedPrice: bookingQuince.appliedPrice,
+      },
+      {
+        bookingId: bookingBirthday.id,
+        venueId: venueFiesta.id,
+        date: bookingBirthday.eventDate,
+        startTime: bookingBirthday.startTime,
+        endTime: bookingBirthday.endTime,
+        appliedPrice: bookingBirthday.appliedPrice,
+      },
+      {
+        bookingId: bookingWedding.id,
+        venueId: venuePinos.id,
+        date: bookingWedding.eventDate,
+        startTime: bookingWedding.startTime,
+        endTime: bookingWedding.endTime,
+        appliedPrice: bookingWedding.appliedPrice,
+      },
+      {
+        bookingId: bookingProduction.id,
+        venueId: venueEstudio.id,
+        date: new Date('2026-09-11'),
+        startTime: bookingProduction.startTime,
+        endTime: bookingProduction.endTime,
+        appliedPrice: 2240,
+      },
+      {
+        bookingId: bookingProduction.id,
+        venueId: venueEstudio.id,
+        date: new Date('2026-09-12'),
+        startTime: bookingProduction.startTime,
+        endTime: bookingProduction.endTime,
+        appliedPrice: 2800,
+      },
+      {
+        bookingId: bookingProduction.id,
+        venueId: venueEstudio.id,
+        date: new Date('2026-09-13'),
+        startTime: bookingProduction.startTime,
+        endTime: bookingProduction.endTime,
+        appliedPrice: 2240,
+      },
+    ],
   });
 
   await prisma.payment.createMany({
@@ -962,9 +1040,8 @@ async function main(): Promise<void> {
 
   await prisma.calendarBlock.createMany({
     data: [
-      { venueId: venueImperial.id, date: new Date('2026-09-15'), reason: 'Reserva: Quinceanera' },
-      { venueId: venueFiesta.id, date: new Date('2026-08-20'), reason: 'Reserva: Cumpleanos' },
-      { venueId: venuePinos.id, date: new Date('2026-12-20'), reason: 'Reserva: Boda pendiente' },
+      // Occupied dates now come from BookingDate (created above), not CalendarBlock —
+      // it's reserved for owner-initiated blocks like this one.
       { venueId: venueImperial.id, date: new Date('2026-10-01'), reason: 'Mantenimiento general' },
     ],
   });

@@ -24,7 +24,9 @@ export const BookingCard = ({ booking }: BookingCardProps) => {
           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
             <span className="inline-flex items-center gap-2">
               <CalendarDays className="h-4 w-4" />
-              {formatDate(booking.eventDate)}
+              {booking.eventDate === booking.endDate
+                ? formatDate(booking.eventDate)
+                : `${formatDate(booking.eventDate)} - ${formatDate(booking.endDate)}`}
             </span>
             <span className="inline-flex items-center gap-2">
               <Users className="h-4 w-4" />

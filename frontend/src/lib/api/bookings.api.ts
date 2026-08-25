@@ -1,9 +1,11 @@
 import { apiRequest } from './client';
 import type {
+  AvailabilityRangeEntry,
   AvailabilityResult,
   Booking,
   CreateBookingPayload,
   CreateBookingResponse,
+  RangePriceCalculation,
 } from '@/types/api';
 
 export const createBooking = async (
@@ -23,6 +25,33 @@ export const checkAvailability = async (
   return apiRequest<AvailabilityResult>(`/venues/${venueId}/bookings/availability?date=${date}`, {
     auth: false,
   });
+};
+
+export const checkAvailabilityRange = async (
+  venueId: string,
+  startDate: string,
+  endDate: string,
+): Promise<AvailabilityRangeEntry[]> => {
+  return apiRequest<AvailabilityRangeEntry[]>(
+    `/venues/${venueId}/bookings/availability-range?startDate=${startDate}&endDate=${endDate}`,
+    { auth: false },
+  );
+};
+
+export const previewBookingPrice = async (
+  venueId: string,
+  params: { eventDate: string; endDate?: string; startTime: string; endTime: string },
+): Promise<RangePriceCalculation> => {
+  const search = new URLSearchParams({
+    eventDate: params.eventDate,
+    startTime: params.startTime,
+    endTime: params.endTime,
+    ...(params.endDate ? { endDate: params.endDate } : {}),
+  });
+  return apiRequest<RangePriceCalculation>(
+    `/venues/${venueId}/bookings/preview-price?${search.toString()}`,
+    { auth: false },
+  );
 };
 
 export const getMyBookings = async (): Promise<Booking[]> => {

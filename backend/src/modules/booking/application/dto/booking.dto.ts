@@ -25,6 +25,10 @@ export class CreateBookingDto {
   @IsDateString({}, { message: 'La fecha del evento debe ser una fecha valida' })
   eventDate!: string;
 
+  @IsOptional()
+  @IsDateString({}, { message: 'La fecha de fin debe ser una fecha valida' })
+  endDate?: string;
+
   @IsString({ message: 'La hora de inicio es requerida' })
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
     message: 'La hora de inicio debe tener formato HH:MM',
@@ -59,6 +63,35 @@ export class CheckAvailabilityDto {
   @IsOptional()
   @IsString()
   endTime?: string;
+}
+
+export class CheckAvailabilityRangeDto {
+  @IsDateString({}, { message: 'La fecha de inicio debe ser valida' })
+  startDate!: string;
+
+  @IsDateString({}, { message: 'La fecha de fin debe ser valida' })
+  endDate!: string;
+}
+
+export class PreviewPriceDto {
+  @IsDateString({}, { message: 'La fecha del evento debe ser una fecha valida' })
+  eventDate!: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'La fecha de fin debe ser una fecha valida' })
+  endDate?: string;
+
+  @IsString({ message: 'La hora de inicio es requerida' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'La hora de inicio debe tener formato HH:MM',
+  })
+  startTime!: string;
+
+  @IsString({ message: 'La hora de fin es requerida' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'La hora de fin debe tener formato HH:MM',
+  })
+  endTime!: string;
 }
 
 export class UpdateBookingStatusDto {

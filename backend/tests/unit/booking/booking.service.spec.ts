@@ -24,6 +24,7 @@ const makeBooking = (overrides: Partial<BookingEntity> = {}) =>
     clientId: 'client-1',
     eventType: 'Boda',
     eventDate: new Date('2026-09-15'),
+    endDate: new Date('2026-09-15'),
     startTime: '14:00',
     endTime: '22:00',
     guestCount: 100,
@@ -67,16 +68,17 @@ describe('BookingService', () => {
     findByClient: jest.Mock;
     findByVenue: jest.Mock;
     findActiveByVenueInRange: jest.Mock;
+    findBookedDatesInRange: jest.Mock;
     findByVenueAndStatus: jest.Mock;
     create: jest.Mock;
     updateStatus: jest.Mock;
     markDepositPaid: jest.Mock;
     hasConflict: jest.Mock;
+    deleteBookingDatesByBookingId: jest.Mock;
     createCalendarBlock: jest.Mock;
     getCalendarBlocks: jest.Mock;
     findCalendarBlockById: jest.Mock;
     deleteCalendarBlock: jest.Mock;
-    deleteCalendarBlockByVenueAndDate: jest.Mock;
     isDateBlocked: jest.Mock;
     countByVenueAndStatus: jest.Mock;
     incrementVenueBookingCount: jest.Mock;
@@ -86,6 +88,7 @@ describe('BookingService', () => {
   };
   let mockPriceCalculator: {
     calculate: jest.Mock;
+    calculateRange: jest.Mock;
   };
   let mockAvailabilityService: {
     checkAvailability: jest.Mock;
@@ -98,16 +101,17 @@ describe('BookingService', () => {
       findByClient: jest.fn(),
       findByVenue: jest.fn(),
       findActiveByVenueInRange: jest.fn(),
+      findBookedDatesInRange: jest.fn().mockResolvedValue([]),
       findByVenueAndStatus: jest.fn(),
       create: jest.fn(),
       updateStatus: jest.fn(),
       markDepositPaid: jest.fn(),
       hasConflict: jest.fn(),
+      deleteBookingDatesByBookingId: jest.fn(),
       createCalendarBlock: jest.fn(),
-      getCalendarBlocks: jest.fn(),
+      getCalendarBlocks: jest.fn().mockResolvedValue([]),
       findCalendarBlockById: jest.fn(),
       deleteCalendarBlock: jest.fn(),
-      deleteCalendarBlockByVenueAndDate: jest.fn(),
       isDateBlocked: jest.fn(),
       countByVenueAndStatus: jest.fn(),
       incrementVenueBookingCount: jest.fn(),
@@ -129,6 +133,13 @@ describe('BookingService', () => {
           discountApplied: null,
           discountLabel: null,
         },
+      }),
+      calculateRange: jest.fn().mockReturnValue({
+        basePrice: 5000,
+        appliedPrice: 5000,
+        totalPrice: 5000,
+        depositAmount: 1500,
+        days: [{ date: '2026-09-15', matchedPriceType: 'BASE', appliedPrice: 5000 }],
       }),
     };
 
@@ -210,11 +221,78 @@ describe('BookingService', () => {
 
     it('should throw ConflictException when date is not available', async () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue());
-      mockAvailabilityService.checkAvailability.mockResolvedValue({
-        available: false,
-        reason: 'Fecha ya reservada',
-        conflicts: ['Fecha ya reservada'],
+      mockBookingRepository.findBookedDatesInRange.mockResolvedValue(['2026-09-15']);
+
+      await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('should throw ConflictException when a date in range is blocked by the owner', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+      mockBookingRepository.getCalendarBlocks.mockResolvedValue([
+        { id: 'block-1', date: new Date('2026-09-15'), reason: 'Mantenimiento' },
+      ]);
+
+      await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('should throw BadRequestException for a multi-day range when the venue does not allow it', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: false }));
+
+      await expect(
+        service.requestBooking('venue-1', 'client-1', { ...bookingDto, endDate: '2026-09-17' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when endDate is before eventDate', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: true }));
+
+      await expect(
+        service.requestBooking('venue-1', 'client-1', { ...bookingDto, endDate: '2026-09-10' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when the range exceeds the max booking days', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: true }));
+
+      await expect(
+        service.requestBooking('venue-1', 'client-1', { ...bookingDto, endDate: '2026-12-01' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create a multi-day booking successfully when the venue allows it', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: true }));
+      mockPriceCalculator.calculateRange.mockReturnValue({
+        basePrice: 5000,
+        appliedPrice: 15000,
+        totalPrice: 15000,
+        depositAmount: 4500,
+        days: [
+          { date: '2026-09-15', matchedPriceType: 'BASE', appliedPrice: 5000 },
+          { date: '2026-09-16', matchedPriceType: 'BASE', appliedPrice: 5000 },
+          { date: '2026-09-17', matchedPriceType: 'BASE', appliedPrice: 5000 },
+        ],
       });
+      mockBookingRepository.create.mockResolvedValue(
+        makeBooking({ endDate: new Date('2026-09-17') }),
+      );
+
+      const result = await service.requestBooking('venue-1', 'client-1', {
+        ...bookingDto,
+        endDate: '2026-09-17',
+      });
+
+      expect(result.priceCalculation.totalPrice).toBe(15000);
+      const createCallArg = mockBookingRepository.create.mock.calls[0][0];
+      expect(createCallArg.dailyBreakdown).toHaveLength(3);
+    });
+
+    it('should throw ConflictException when a day collides at insert time (unique constraint)', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+      mockBookingRepository.create.mockRejectedValue({ code: 'P2002' });
 
       await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
         ConflictException,
@@ -413,8 +491,8 @@ describe('BookingService', () => {
     it('should return bookings and blocks mapped to date-only entries', async () => {
       mockBookingRepository.findActiveByVenueInRange.mockResolvedValue([
         {
-          id: 'booking-1',
-          eventDate: new Date('2026-09-15T00:00:00.000Z'),
+          bookingId: 'booking-1',
+          date: new Date('2026-09-15T00:00:00.000Z'),
           status: 'APPROVED',
           eventType: 'Boda',
         },

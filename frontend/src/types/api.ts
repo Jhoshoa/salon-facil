@@ -339,6 +339,7 @@ export interface Booking {
   clientId: string;
   eventType: string;
   eventDate: string;
+  endDate: string;
   startTime: string;
   endTime: string;
   guestCount: number;
@@ -373,26 +374,41 @@ export interface CreateReviewPayload {
 export interface CreateBookingPayload {
   eventType: string;
   eventDate: string;
+  endDate?: string;
   startTime: string;
   endTime: string;
   guestCount: number;
   specialRequests?: string;
 }
 
+export interface DailyPriceBreakdown {
+  date: string;
+  matchedPriceType: string;
+  appliedPrice: number;
+}
+
+export interface RangePriceCalculation {
+  basePrice: number;
+  appliedPrice: number;
+  totalPrice: number;
+  depositAmount: number;
+  days: DailyPriceBreakdown[];
+}
+
 export interface CreateBookingResponse {
   booking: Booking;
-  priceCalculation: {
-    basePrice: number;
-    appliedPrice: number;
-    totalPrice: number;
-    depositAmount: number;
-  };
+  priceCalculation: RangePriceCalculation;
 }
 
 export interface AvailabilityResult {
   available: boolean;
   reason: string | null;
   conflicts: string[];
+}
+
+export interface AvailabilityRangeEntry {
+  date: string;
+  available: boolean;
 }
 
 export interface CalendarDayBooking {

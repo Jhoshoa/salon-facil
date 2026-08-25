@@ -15,11 +15,12 @@ import {
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
-import { PriceCalculatorService, PriceCalculationResult } from './price-calculator.service';
+import { PriceCalculatorService, RangePriceCalculationResult } from './price-calculator.service';
 import { AvailabilityService } from './availability.service';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
+const MAX_BOOKING_RANGE_DAYS = 30;
 
 @Injectable()
 export class BookingService {
@@ -37,12 +38,13 @@ export class BookingService {
     dto: {
       eventType: string;
       eventDate: string;
+      endDate?: string;
       startTime: string;
       endTime: string;
       guestCount: number;
       specialRequests?: string;
     },
-  ): Promise<{ booking: BookingEntity; priceCalculation: PriceCalculationResult }> {
+  ): Promise<{ booking: BookingEntity; priceCalculation: RangePriceCalculationResult }> {
     const venue = await this.venueService.getVenueById(venueId);
 
     if (dto.guestCount > venue.capacityMax) {
@@ -55,25 +57,65 @@ export class BookingService {
       throw new BadRequestException('La hora de inicio debe ser anterior a la hora de fin');
     }
 
-    const eventDate = new Date(dto.eventDate);
+    const startDate = new Date(dto.eventDate);
+    const endDate = dto.endDate ? new Date(dto.endDate) : startDate;
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      throw new BadRequestException('Fecha invalida');
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (eventDate < today) {
+    if (startDate < today) {
       throw new BadRequestException('La fecha del evento no puede ser en el pasado');
     }
-
-    const availability = await this.availabilityService.checkAvailability(venueId, eventDate);
-    if (!availability.available) {
-      throw new ConflictException(availability.reason);
+    if (endDate < startDate) {
+      throw new BadRequestException('La fecha de fin debe ser igual o posterior a la de inicio');
     }
 
-    const priceCalculation = this.priceCalculator.calculate(venue.prices ?? [], eventDate);
+    const isMultiDay = endDate.getTime() !== startDate.getTime();
+    if (isMultiDay && !venue.allowsMultipleDays) {
+      throw new BadRequestException('Este local no permite reservas de mas de un dia');
+    }
+
+    const dates = this.buildDateSequence(startDate, endDate);
+    if (dates.length > MAX_BOOKING_RANGE_DAYS) {
+      throw new BadRequestException(
+        `El rango de la reserva no puede superar los ${MAX_BOOKING_RANGE_DAYS} dias`,
+      );
+    }
+
+    const [bookedDates, blockedDates] = await Promise.all([
+      this.bookingRepository.findBookedDatesInRange(venueId, startDate, endDate),
+      this.bookingRepository.getCalendarBlocks(venueId, startDate, endDate),
+    ]);
+    if (bookedDates.length > 0) {
+      throw new ConflictException(
+        `Las siguientes fechas ya estan reservadas: ${bookedDates.join(', ')}`,
+      );
+    }
+    if (blockedDates.length > 0) {
+      throw new ConflictException(
+        `Las siguientes fechas estan bloqueadas por el propietario: ${blockedDates
+          .map((block) => this.toDateOnly(block.date))
+          .join(', ')}`,
+      );
+    }
+
+    const hoursPerDay = this.computeHoursBetween(dto.startTime, dto.endTime);
+    const priceCalculation = this.priceCalculator.calculateRange(
+      venue.prices ?? [],
+      dates,
+      venue.priceUnit,
+      hoursPerDay,
+    );
 
     const bookingData: CreateBookingData = {
       venueId,
       clientId,
       eventType: dto.eventType,
-      eventDate,
+      startDate,
+      endDate,
       startTime: dto.startTime,
       endTime: dto.endTime,
       guestCount: dto.guestCount,
@@ -82,19 +124,80 @@ export class BookingService {
       totalPrice: priceCalculation.totalPrice,
       depositAmount: priceCalculation.depositAmount,
       specialRequests: dto.specialRequests,
+      dailyBreakdown: priceCalculation.days.map((day) => ({
+        date: new Date(day.date),
+        appliedPrice: day.appliedPrice,
+      })),
     };
 
     let booking: BookingEntity;
     try {
       booking = await this.bookingRepository.create(bookingData);
     } catch (error) {
-      if (this.isUniqueCalendarBlockError(error)) {
-        throw new ConflictException('Fecha no disponible');
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException(
+          'Una o mas fechas de este rango ya no estan disponibles. Elegi otro rango.',
+        );
       }
       throw error;
     }
 
     return { booking, priceCalculation };
+  }
+
+  /** Read-only price preview (no availability check, no write) so the client can see the total before submitting. */
+  async previewPrice(
+    venueId: string,
+    dto: { eventDate: string; endDate?: string; startTime: string; endTime: string },
+  ): Promise<RangePriceCalculationResult> {
+    const venue = await this.venueService.getVenueById(venueId);
+
+    if (dto.startTime >= dto.endTime) {
+      throw new BadRequestException('La hora de inicio debe ser anterior a la hora de fin');
+    }
+
+    const startDate = new Date(dto.eventDate);
+    const endDate = dto.endDate ? new Date(dto.endDate) : startDate;
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      throw new BadRequestException('Fecha invalida');
+    }
+    if (endDate < startDate) {
+      throw new BadRequestException('La fecha de fin debe ser igual o posterior a la de inicio');
+    }
+
+    const dates = this.buildDateSequence(startDate, endDate);
+    if (dates.length > MAX_BOOKING_RANGE_DAYS) {
+      throw new BadRequestException(
+        `El rango de la reserva no puede superar los ${MAX_BOOKING_RANGE_DAYS} dias`,
+      );
+    }
+
+    const hoursPerDay = this.computeHoursBetween(dto.startTime, dto.endTime);
+    return this.priceCalculator.calculateRange(
+      venue.prices ?? [],
+      dates,
+      venue.priceUnit,
+      hoursPerDay,
+    );
+  }
+
+  /** Calendar-day sequence from start to end, inclusive. */
+  private buildDateSequence(startDate: Date, endDate: Date): Date[] {
+    const dates: Date[] = [];
+    const cursor = new Date(startDate);
+    while (cursor <= endDate) {
+      dates.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return dates;
+  }
+
+  private computeHoursBetween(startTime: string, endTime: string): number {
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    const minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+    return Math.round((minutes / 60) * 100) / 100;
   }
 
   async getBookingById(id: string, userId?: string, userRole?: UserRole): Promise<BookingEntity> {
@@ -179,10 +282,7 @@ export class BookingService {
       bookingId,
       BookingStatus.CANCELLED_BY_OWNER,
     );
-    await this.bookingRepository.deleteCalendarBlockByVenueAndDate(
-      booking.venueId,
-      booking.eventDate,
-    );
+    await this.bookingRepository.deleteBookingDatesByBookingId(bookingId);
     return updated;
   }
 
@@ -206,10 +306,7 @@ export class BookingService {
       bookingId,
       BookingStatus.CANCELLED_BY_CLIENT,
     );
-    await this.bookingRepository.deleteCalendarBlockByVenueAndDate(
-      booking.venueId,
-      booking.eventDate,
-    );
+    await this.bookingRepository.deleteBookingDatesByBookingId(bookingId);
     return updated;
   }
 
@@ -328,12 +425,12 @@ export class BookingService {
       venueId,
       startDate: this.toDateOnly(startDate),
       endDate: this.toDateOnly(endDate),
-      bookings: bookings.map((booking) => ({
-        id: booking.id,
-        date: this.toDateOnly(booking.eventDate),
+      bookings: bookings.map((entry) => ({
+        id: entry.bookingId,
+        date: this.toDateOnly(entry.date),
         type: 'booking',
-        status: booking.status,
-        eventType: booking.eventType,
+        status: entry.status,
+        eventType: entry.eventType,
       })),
       blocks: blocks.map((block) => ({
         id: block.id,
@@ -363,6 +460,11 @@ export class BookingService {
     return this.availabilityService.checkAvailability(venueId, eventDate);
   }
 
+  async checkAvailabilityRange(venueId: string, startDate: Date, endDate: Date) {
+    this.validateCalendarRange(startDate, endDate);
+    return this.availabilityService.checkAvailabilityRange(venueId, startDate, endDate);
+  }
+
   private toDateOnly(date: Date): string {
     return date.toISOString().split('T')[0];
   }
@@ -384,7 +486,7 @@ export class BookingService {
     }
   }
 
-  private isUniqueCalendarBlockError(error: unknown): boolean {
+  private isUniqueConstraintError(error: unknown): boolean {
     return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
   }
 }

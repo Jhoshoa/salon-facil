@@ -2,8 +2,10 @@
 
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Check, Clock, Map, MapPin, Star, Users } from 'lucide-react';
+import { CalendarClock, Check, Clock, Map, MapPin, Star, Users, X } from 'lucide-react';
+import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
@@ -13,11 +15,12 @@ import { ErrorState } from '@/components/shared/error-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AmenityCategory, Venue } from '@/types/api';
-import { priceUnitLabels } from './venue-filter-labels';
 import { VenueSimilarCard } from './venue-similar-card';
 
 interface VenueDetailProps {
   slug: string;
+  initialStartDate?: string;
+  initialEndDate?: string;
 }
 
 const VenueLocationMap = dynamic(
@@ -69,7 +72,7 @@ const groupAmenities = (venue: Venue) =>
     {},
   );
 
-export const VenueDetail = ({ slug }: VenueDetailProps) => {
+export const VenueDetail = ({ slug, initialStartDate, initialEndDate }: VenueDetailProps) => {
   const query = useQuery({
     queryKey: ['venue', slug],
     queryFn: () => getVenueBySlug(slug),
@@ -80,11 +83,40 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
     queryFn: () => getSimilarVenues(slug),
   });
 
+  const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | undefined>(
+    initialStartDate ? { start: initialStartDate, end: initialEndDate ?? initialStartDate } : undefined,
+  );
+  const [staleRangeNotice, setStaleRangeNotice] = useState<string | null>(null);
+
+  const rangeValidationQuery = useQuery({
+    queryKey: ['venue-availability-range-check', query.data?.id, initialStartDate, initialEndDate],
+    queryFn: () =>
+      checkAvailabilityRange(
+        query.data!.id,
+        initialStartDate!,
+        initialEndDate ?? initialStartDate!,
+      ),
+    enabled: Boolean(initialStartDate) && Boolean(query.data?.id),
+  });
+
+  useEffect(() => {
+    if (!rangeValidationQuery.data) return;
+    const allAvailable = rangeValidationQuery.data.every((day) => day.available);
+    if (!allAvailable) {
+      setSelectedRange(undefined);
+      setStaleRangeNotice('Las fechas que buscaste ya no estan disponibles para este local.');
+    }
+  }, [rangeValidationQuery.data]);
+
+  const handleRangeChange = (start: string, end: string) => {
+    setSelectedRange({ start, end });
+    setStaleRangeNotice(null);
+  };
+
   if (query.isLoading) return <VenueDetailSkeleton />;
   if (query.isError || !query.data) return <ErrorState onRetry={() => query.refetch()} />;
 
   const venue = query.data;
-  const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
   const photos = getVenuePhotos(venue);
   const mainPhoto = photos[0];
   const amenityGroups = Object.entries(groupAmenities(venue)) as [
@@ -133,41 +165,30 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
 
         {/* Header */}
         <section className="sf-detail-section">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap gap-2">
-                {venue.spaceType ? (
-                  <Badge variant="secondary">{venue.spaceType.name}</Badge>
-                ) : null}
-                {venue.instantBooking ? <Badge>Reserva inmediata</Badge> : null}
-                {venue.isVerified ? (
-                  <Badge variant="outline" className="border-primary/30 text-primary">
-                    Verificado
-                  </Badge>
-                ) : null}
-              </div>
-              <h1 className="mt-4 text-3xl font-bold">{venue.name}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-                <p className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
-                  {venue.district}, {venue.city}
-                </p>
-                {venue.averageRating ? (
-                  <p className="flex items-center gap-1 font-medium text-foreground">
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    {venue.averageRating.toFixed(1)}
-                    <span className="font-normal text-muted-foreground">
-                      ({venue.reviewCount} {venue.reviewCount === 1 ? 'resena' : 'resenas'})
-                    </span>
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="sf-surface min-w-44 border p-4 text-right shadow-sm">
-              <p className="sf-price-label">Desde</p>
-              <p className="sf-price">{basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}</p>
-              <p className="sf-price-unit">por {priceUnitLabels[venue.priceUnit].toLowerCase()}</p>
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {venue.spaceType ? <Badge variant="secondary">{venue.spaceType.name}</Badge> : null}
+            {venue.instantBooking ? <Badge>Reserva inmediata</Badge> : null}
+            {venue.isVerified ? (
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                Verificado
+              </Badge>
+            ) : null}
+          </div>
+          <h1 className="mt-4 text-3xl font-bold">{venue.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+            <p className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" />
+              {venue.district}, {venue.city}
+            </p>
+            {venue.averageRating ? (
+              <p className="flex items-center gap-1 font-medium text-foreground">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                {venue.averageRating.toFixed(1)}
+                <span className="font-normal text-muted-foreground">
+                  ({venue.reviewCount} {venue.reviewCount === 1 ? 'resena' : 'resenas'})
+                </span>
+              </p>
+            ) : null}
           </div>
           <p className="mt-4 leading-7 text-muted-foreground">{venue.description}</p>
         </section>
@@ -303,7 +324,13 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
           )}
         </section>
 
-        <AvailabilityCalendar venueId={venue.id} />
+        <AvailabilityCalendar
+          venueId={venue.id}
+          allowsMultipleDays={venue.allowsMultipleDays}
+          openingHours={venue.openingHours}
+          onRangeSelect={handleRangeChange}
+          externalRange={selectedRange}
+        />
 
         {venue.reviewCount ? (
           <VenueReviews
@@ -314,8 +341,21 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
         ) : null}
       </div>
 
-      <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px]">
-        <BookingForm venue={venue} />
+      <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
+        {staleRangeNotice ? (
+          <div className="sf-warning flex items-start justify-between gap-2 rounded-md border p-3 text-sm">
+            <p>{staleRangeNotice}</p>
+            <button
+              type="button"
+              onClick={() => setStaleRangeNotice(null)}
+              aria-label="Cerrar aviso"
+              className="shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+        <BookingForm venue={venue} selectedRange={selectedRange} onDatesChange={handleRangeChange} />
       </aside>
       </div>
 

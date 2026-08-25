@@ -8,6 +8,8 @@ import type { Venue } from '@/types/api';
 
 interface VenueResultCardProps {
   venue: Venue;
+  startDate?: string;
+  endDate?: string;
 }
 
 const getBasePrice = (venue: Venue) => {
@@ -21,16 +23,23 @@ const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
 };
 
 
-export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
+export const VenueResultCard = ({ venue, startDate, endDate }: VenueResultCardProps) => {
   const photo =
     venue.media?.find((item) => item.isCover)?.url ?? venue.media?.[0]?.url ?? venue.photos?.[0];
   const basePrice = getBasePrice(venue);
   const amenities = venue.amenities?.slice(0, 4) ?? [];
   const services = amenities.length ? [] : (venue.services?.slice(0, 3) ?? []);
 
+  const detailHref = (() => {
+    if (!startDate) return `/venues/${venue.slug}`;
+    const params = new URLSearchParams({ startDate });
+    if (endDate) params.set('endDate', endDate);
+    return `/venues/${venue.slug}?${params.toString()}`;
+  })();
+
   return (
     <article className="sf-result-card">
-      <Link href={`/venues/${venue.slug}`} className="sf-result-image sf-focus-ring">
+      <Link href={detailHref} className="sf-result-image sf-focus-ring">
         {photo ? (
           <Image
             src={photo}
@@ -57,7 +66,7 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
       <div className="space-y-3 py-1">
         <div>
           <Link
-            href={`/venues/${venue.slug}`}
+            href={detailHref}
             className="text-xl font-semibold text-foreground hover:text-primary"
           >
             {venue.name}
@@ -125,7 +134,7 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             </p>
           </div>
           <Button asChild size="sm">
-            <Link href={`/venues/${venue.slug}`}>
+            <Link href={detailHref}>
               Ver detalles
               <ArrowRight className="h-4 w-4" />
             </Link>

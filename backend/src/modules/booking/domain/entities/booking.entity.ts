@@ -28,6 +28,7 @@ export class BookingEntity {
   clientId!: string;
   eventType!: string;
   eventDate!: Date;
+  endDate!: Date;
   startTime!: string;
   endTime!: string;
   guestCount!: number;
@@ -79,5 +80,9 @@ export class BookingEntity {
   hasActivePayment(): boolean {
     if (!this.payments || this.payments.length === 0) return false;
     return this.payments.some((p) => p.status === 'COMPLETED');
+  }
+
+  isMultiDay(): boolean {
+    return new Date(this.eventDate).getTime() !== new Date(this.endDate).getTime();
   }
 }

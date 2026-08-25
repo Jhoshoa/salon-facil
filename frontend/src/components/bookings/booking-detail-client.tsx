@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { cancelBooking, getBooking } from '@/lib/api/bookings.api';
 import { getBookingPayments } from '@/lib/api/payments.api';
 import { getBookingReview } from '@/lib/api/reviews.api';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
 import { PaymentProofDrawer } from '@/components/payments/payment-proof-drawer';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -97,8 +97,11 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
               <BookingStatusBadge status={booking.status} />
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {booking.eventType} · {formatDate(booking.eventDate)} · {booking.startTime} -{' '}
-              {booking.endTime}
+              {booking.eventType} ·{' '}
+              {booking.eventDate === booking.endDate
+                ? formatDate(booking.eventDate)
+                : `${formatDate(booking.eventDate)} - ${formatDate(booking.endDate)}`}{' '}
+              · {formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

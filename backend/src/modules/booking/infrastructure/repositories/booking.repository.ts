@@ -4,10 +4,28 @@ import {
   IBookingRepository,
   CreateBookingData,
   CreateCalendarBlockData,
+  OccupiedDateEntry,
 } from '../../domain/repositories/booking.repository.interface';
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
 import { Prisma } from '@prisma/client';
+
+const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.PENDING,
+  BookingStatus.APPROVED,
+  BookingStatus.DEPOSIT_PAID,
+  BookingStatus.FULLY_PAID,
+];
+
+const BOOKING_INCLUDE = {
+  venue: {
+    select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
+  },
+  client: {
+    select: { id: true, fullName: true, email: true, phone: true },
+  },
+  payments: true,
+} satisfies Prisma.BookingInclude;
 
 @Injectable()
 export class BookingRepository implements IBookingRepository {
@@ -16,15 +34,7 @@ export class BookingRepository implements IBookingRepository {
   async findById(id: string): Promise<BookingEntity | null> {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
-      include: {
-        venue: {
-          select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
-        },
-        client: {
-          select: { id: true, fullName: true, email: true, phone: true },
-        },
-        payments: true,
-      },
+      include: BOOKING_INCLUDE,
     });
     return booking ? this.toEntity(booking) : null;
   }
@@ -34,24 +44,9 @@ export class BookingRepository implements IBookingRepository {
       where: {
         venueId,
         eventDate,
-        status: {
-          in: [
-            BookingStatus.PENDING,
-            BookingStatus.APPROVED,
-            BookingStatus.DEPOSIT_PAID,
-            BookingStatus.FULLY_PAID,
-          ],
-        },
+        status: { in: ACTIVE_BOOKING_STATUSES },
       },
-      include: {
-        venue: {
-          select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
-        },
-        client: {
-          select: { id: true, fullName: true, email: true, phone: true },
-        },
-        payments: true,
-      },
+      include: BOOKING_INCLUDE,
     });
     return booking ? this.toEntity(booking) : null;
   }
@@ -88,23 +83,38 @@ export class BookingRepository implements IBookingRepository {
     venueId: string,
     startDate: Date,
     endDate: Date,
-  ): Promise<BookingEntity[]> {
-    const bookings = await this.prisma.booking.findMany({
+  ): Promise<OccupiedDateEntry[]> {
+    const rows = await this.prisma.bookingDate.findMany({
       where: {
         venueId,
-        eventDate: { gte: startDate, lte: endDate },
-        status: {
-          in: [
-            BookingStatus.PENDING,
-            BookingStatus.APPROVED,
-            BookingStatus.DEPOSIT_PAID,
-            BookingStatus.FULLY_PAID,
-          ],
-        },
+        date: { gte: startDate, lte: endDate },
+        booking: { status: { in: ACTIVE_BOOKING_STATUSES } },
       },
-      orderBy: { eventDate: 'asc' },
+      include: {
+        booking: { select: { id: true, status: true, eventType: true } },
+      },
+      orderBy: { date: 'asc' },
     });
-    return bookings.map((b) => this.toEntity(b));
+
+    return rows.map((row) => ({
+      bookingId: row.booking.id,
+      date: row.date,
+      status: row.booking.status as BookingStatus,
+      eventType: row.booking.eventType,
+    }));
+  }
+
+  async findBookedDatesInRange(venueId: string, startDate: Date, endDate: Date): Promise<string[]> {
+    const rows = await this.prisma.bookingDate.findMany({
+      where: {
+        venueId,
+        date: { gte: startDate, lte: endDate },
+        booking: { status: { in: ACTIVE_BOOKING_STATUSES } },
+      },
+      select: { date: true },
+      orderBy: { date: 'asc' },
+    });
+    return rows.map((row) => row.date.toISOString().split('T')[0]);
   }
 
   async findByVenueAndStatus(venueId: string, status: BookingStatus): Promise<BookingEntity[]> {
@@ -122,15 +132,19 @@ export class BookingRepository implements IBookingRepository {
   }
 
   async create(data: CreateBookingData): Promise<BookingEntity> {
+    const startTime = this.timeToDate(data.startTime);
+    const endTime = this.timeToDate(data.endTime);
+
     const booking = await this.prisma.$transaction(async (tx) => {
       const created = await tx.booking.create({
         data: {
           venueId: data.venueId,
           clientId: data.clientId,
           eventType: data.eventType,
-          eventDate: data.eventDate,
-          startTime: data.startTime,
-          endTime: data.endTime,
+          eventDate: data.startDate,
+          endDate: data.endDate,
+          startTime,
+          endTime,
           guestCount: data.guestCount,
           basePrice: new Prisma.Decimal(data.basePrice),
           appliedPrice: new Prisma.Decimal(data.appliedPrice),
@@ -140,25 +154,23 @@ export class BookingRepository implements IBookingRepository {
         },
       });
 
-      await tx.calendarBlock.create({
-        data: {
+      // One row per day; the (venueId, date) unique constraint is what actually
+      // prevents a double booking under concurrent requests — this insert either
+      // succeeds for every day atomically or the whole transaction rolls back.
+      await tx.bookingDate.createMany({
+        data: data.dailyBreakdown.map((day) => ({
+          bookingId: created.id,
           venueId: data.venueId,
-          date: data.eventDate,
-          reason: `Reserva ${created.id}`,
-        },
+          date: day.date,
+          startTime,
+          endTime,
+          appliedPrice: new Prisma.Decimal(day.appliedPrice),
+        })),
       });
 
       return tx.booking.findUniqueOrThrow({
         where: { id: created.id },
-        include: {
-          venue: {
-            select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
-          },
-          client: {
-            select: { id: true, fullName: true, email: true, phone: true },
-          },
-          payments: true,
-        },
+        include: BOOKING_INCLUDE,
       });
     });
     return this.toEntity(booking);
@@ -168,15 +180,7 @@ export class BookingRepository implements IBookingRepository {
     const booking = await this.prisma.booking.update({
       where: { id },
       data: { status },
-      include: {
-        venue: {
-          select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
-        },
-        client: {
-          select: { id: true, fullName: true, email: true, phone: true },
-        },
-        payments: true,
-      },
+      include: BOOKING_INCLUDE,
     });
     return this.toEntity(booking);
   }
@@ -188,39 +192,32 @@ export class BookingRepository implements IBookingRepository {
         status: BookingStatus.DEPOSIT_PAID,
         depositPaid: true,
       },
-      include: {
-        venue: {
-          select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
-        },
-        client: {
-          select: { id: true, fullName: true, email: true, phone: true },
-        },
-        payments: true,
-      },
+      include: BOOKING_INCLUDE,
     });
     return this.toEntity(booking);
   }
 
   async hasConflict(venueId: string, eventDate: Date, excludeBookingId?: string): Promise<boolean> {
-    const where: Prisma.BookingWhereInput = {
+    const where: Prisma.BookingDateWhereInput = {
       venueId,
-      eventDate,
-      status: {
-        in: [
-          BookingStatus.PENDING,
-          BookingStatus.APPROVED,
-          BookingStatus.DEPOSIT_PAID,
-          BookingStatus.FULLY_PAID,
-        ],
-      },
+      date: eventDate,
+      booking: { status: { in: ACTIVE_BOOKING_STATUSES } },
     };
 
     if (excludeBookingId) {
-      where.id = { not: excludeBookingId };
+      where.bookingId = { not: excludeBookingId };
     }
 
-    const count = await this.prisma.booking.count({ where });
+    const count = await this.prisma.bookingDate.count({ where });
     return count > 0;
+  }
+
+  private timeToDate(value: string): Date {
+    return new Date(`1970-01-01T${value}:00.000Z`);
+  }
+
+  async deleteBookingDatesByBookingId(bookingId: string): Promise<void> {
+    await this.prisma.bookingDate.deleteMany({ where: { bookingId } });
   }
 
   async createCalendarBlock(data: CreateCalendarBlockData): Promise<CalendarBlockEntity> {
@@ -271,12 +268,6 @@ export class BookingRepository implements IBookingRepository {
     await this.prisma.calendarBlock.delete({ where: { id } });
   }
 
-  async deleteCalendarBlockByVenueAndDate(venueId: string, date: Date): Promise<void> {
-    await this.prisma.calendarBlock.deleteMany({
-      where: { venueId, date },
-    });
-  }
-
   async isDateBlocked(venueId: string, date: Date): Promise<boolean> {
     const block = await this.prisma.calendarBlock.findFirst({
       where: { venueId, date },
@@ -305,6 +296,7 @@ export class BookingRepository implements IBookingRepository {
       clientId: raw.clientId,
       eventType: raw.eventType,
       eventDate: raw.eventDate,
+      endDate: raw.endDate,
       startTime: raw.startTime,
       endTime: raw.endTime,
       guestCount: raw.guestCount,

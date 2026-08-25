@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { PriceUnit } from '@prisma/client';
 import { PriceCalculatorService } from '../../../src/modules/booking/application/services/price-calculator.service';
 import {
   VenuePriceEntity,
@@ -155,6 +156,75 @@ describe('PriceCalculatorService', () => {
       const result = service.calculate(prices, new Date('2026-03-15'));
 
       expect(result.depositAmount).toBe(999.9);
+    });
+  });
+
+  describe('calculateRange', () => {
+    // Friday, Saturday, Sunday — exercises the WEEKEND override landing in the middle of a range.
+    const friSatSun = [new Date('2026-09-11'), new Date('2026-09-12'), new Date('2026-09-13')];
+
+    it('DAY unit: sums the applicable price per day, honoring weekend overrides', () => {
+      const prices = [
+        makePrice({ priceType: PriceType.BASE, price: 280 }),
+        makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
+      ];
+
+      const result = service.calculateRange(prices, friSatSun, PriceUnit.DAY, 1);
+
+      expect(result.days.map((d) => d.appliedPrice)).toEqual([280, 350, 280]);
+      expect(result.totalPrice).toBe(910);
+      expect(result.appliedPrice).toBe(910);
+      expect(result.depositAmount).toBe(273);
+    });
+
+    it('HOUR unit: multiplies each day rate by hoursPerDay', () => {
+      const prices = [
+        makePrice({ priceType: PriceType.BASE, price: 280 }),
+        makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
+      ];
+
+      const result = service.calculateRange(prices, friSatSun, PriceUnit.HOUR, 8);
+
+      expect(result.days.map((d) => d.appliedPrice)).toEqual([2240, 2800, 2240]);
+      expect(result.totalPrice).toBe(7280);
+    });
+
+    it('EVENT unit: one flat total resolved from the start date, not multiplied by days', () => {
+      const prices = [makePrice({ priceType: PriceType.BASE, price: 5000 })];
+
+      const result = service.calculateRange(prices, friSatSun, PriceUnit.EVENT, 8);
+
+      expect(result.totalPrice).toBe(5000);
+      expect(result.days[0].appliedPrice).toBe(5000);
+      expect(result.days[1].appliedPrice).toBe(0);
+      expect(result.days[2].appliedPrice).toBe(0);
+    });
+
+    it('always keeps sum(days.appliedPrice) === totalPrice, regardless of priceUnit', () => {
+      const prices = [
+        makePrice({ priceType: PriceType.BASE, price: 280 }),
+        makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
+      ];
+
+      for (const unit of [PriceUnit.EVENT, PriceUnit.DAY, PriceUnit.HOUR]) {
+        const result = service.calculateRange(prices, friSatSun, unit, 8);
+        const sum = result.days.reduce((total, day) => total + day.appliedPrice, 0);
+        expect(sum).toBe(result.totalPrice);
+      }
+    });
+
+    it('a single-day range behaves the same as calculate()', () => {
+      const prices = [makePrice({ priceType: PriceType.BASE, price: 5000 })];
+      const single = service.calculate(prices, new Date('2026-03-15'));
+
+      const result = service.calculateRange(prices, [new Date('2026-03-15')], PriceUnit.DAY, 4);
+
+      expect(result.totalPrice).toBe(single.totalPrice);
+      expect(result.depositAmount).toBe(single.depositAmount);
+    });
+
+    it('throws when given an empty date array', () => {
+      expect(() => service.calculateRange([], [], PriceUnit.DAY, 4)).toThrow();
     });
   });
 });

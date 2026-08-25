@@ -3,6 +3,14 @@ import { CalendarBlockEntity } from '../entities/calendar-block.entity';
 
 export const BOOKING_REPOSITORY = Symbol('BOOKING_REPOSITORY');
 
+/** One occupied day within a venue's calendar, sourced from BookingDate. */
+export interface OccupiedDateEntry {
+  bookingId: string;
+  date: Date;
+  status: BookingStatus;
+  eventType: string;
+}
+
 export interface IBookingRepository {
   // Booking CRUD
   findById(id: string): Promise<BookingEntity | null>;
@@ -13,12 +21,16 @@ export interface IBookingRepository {
     venueId: string,
     startDate: Date,
     endDate: Date,
-  ): Promise<BookingEntity[]>;
+  ): Promise<OccupiedDateEntry[]>;
+  /** Date-only (YYYY-MM-DD) strings, for dates within the range that already have an active booking. */
+  findBookedDatesInRange(venueId: string, startDate: Date, endDate: Date): Promise<string[]>;
   findByVenueAndStatus(venueId: string, status: BookingStatus): Promise<BookingEntity[]>;
   create(data: CreateBookingData): Promise<BookingEntity>;
   updateStatus(id: string, status: BookingStatus): Promise<BookingEntity>;
   markDepositPaid(id: string): Promise<BookingEntity>;
   hasConflict(venueId: string, eventDate: Date, excludeBookingId?: string): Promise<boolean>;
+  /** Frees every day held by this booking (used on cancel/reject). */
+  deleteBookingDatesByBookingId(bookingId: string): Promise<void>;
 
   // Calendar Blocks
   createCalendarBlock(data: CreateCalendarBlockData): Promise<CalendarBlockEntity>;
@@ -29,7 +41,6 @@ export interface IBookingRepository {
   ): Promise<CalendarBlockEntity[]>;
   findCalendarBlockById(id: string): Promise<CalendarBlockEntity | null>;
   deleteCalendarBlock(id: string): Promise<void>;
-  deleteCalendarBlockByVenueAndDate(venueId: string, date: Date): Promise<void>;
   isDateBlocked(venueId: string, date: Date): Promise<boolean>;
 
   // Counts
@@ -41,7 +52,8 @@ export interface CreateBookingData {
   venueId: string;
   clientId: string;
   eventType: string;
-  eventDate: Date;
+  startDate: Date;
+  endDate: Date;
   startTime: string;
   endTime: string;
   guestCount: number;
@@ -50,6 +62,8 @@ export interface CreateBookingData {
   totalPrice: number;
   depositAmount: number;
   specialRequests?: string;
+  /** One entry per day in [startDate, endDate], used to create the BookingDate rows. */
+  dailyBreakdown: { date: Date; appliedPrice: number }[];
 }
 
 export interface CreateCalendarBlockData {

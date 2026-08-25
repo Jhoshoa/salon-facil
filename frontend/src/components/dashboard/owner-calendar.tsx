@@ -128,6 +128,31 @@ export const OwnerCalendar = () => {
     );
   }, [calendarQuery.data, month, today]);
 
+  const monthBookings = useMemo(() => {
+    // The calendar lists one entry per occupied day, so a multi-day booking appears once
+    // per day it spans — collapse those back into a single row with its full date range.
+    const byId = new Map<
+      string,
+      { id: string; eventType: string; status: BookingStatus; firstDate: string; lastDate: string }
+    >();
+    calendarQuery.data?.bookings.forEach((entry) => {
+      const existing = byId.get(entry.id);
+      if (!existing) {
+        byId.set(entry.id, {
+          id: entry.id,
+          eventType: entry.eventType,
+          status: entry.status,
+          firstDate: entry.date,
+          lastDate: entry.date,
+        });
+        return;
+      }
+      if (entry.date < existing.firstDate) existing.firstDate = entry.date;
+      if (entry.date > existing.lastDate) existing.lastDate = entry.date;
+    });
+    return Array.from(byId.values()).sort((a, b) => a.firstDate.localeCompare(b.firstDate));
+  }, [calendarQuery.data]);
+
   const handleDayClick = (day: DayCellData) => {
     if (day.variant === 'available') {
       setBlockDate(day.date);
@@ -203,11 +228,14 @@ export const OwnerCalendar = () => {
           {!calendarQuery.isLoading && !calendarQuery.data?.bookings.length ? (
             <EmptyState icon={CalendarX} title="Sin reservas este mes" />
           ) : null}
-          {calendarQuery.data?.bookings.map((booking) => (
+          {monthBookings.map((booking) => (
             <div key={booking.id} className="rounded-md border p-3">
               <p className="font-medium">{booking.eventType}</p>
               <p className="text-sm text-muted-foreground">
-                {formatDate(booking.date)} · {statusLabel[booking.status]}
+                {booking.firstDate === booking.lastDate
+                  ? formatDate(booking.firstDate)
+                  : `${formatDate(booking.firstDate)} - ${formatDate(booking.lastDate)}`}{' '}
+                · {statusLabel[booking.status]}
               </p>
             </div>
           ))}

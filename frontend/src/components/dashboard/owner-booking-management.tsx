@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { approveBooking, getVenueBookings, rejectBooking } from '@/lib/api/bookings.api';
 import { getMyVenues } from '@/lib/api/venues.api';
 import { getPendingOwnerPayments, confirmPayment, rejectPayment } from '@/lib/api/payments.api';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
 import type { Booking, Payment } from '@/types/api';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
@@ -44,7 +44,10 @@ const OwnerBookingRow = ({
         <BookingStatusBadge status={booking.status} />
       </div>
       <p className="text-sm text-muted-foreground">
-        {formatDate(booking.eventDate)} · {booking.startTime} - {booking.endTime} ·{' '}
+        {booking.eventDate === booking.endDate
+          ? formatDate(booking.eventDate)
+          : `${formatDate(booking.eventDate)} - ${formatDate(booking.endDate)}`}{' '}
+        · {formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)} ·{' '}
         {booking.guestCount} invitados
       </p>
       <p className="text-sm text-muted-foreground">

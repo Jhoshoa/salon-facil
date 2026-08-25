@@ -338,7 +338,12 @@ export const VenueSearch = ({
           {venues.length > 0 ? (
             <div className="space-y-4">
               {venues.map((venue) => (
-                <VenueResultCard key={venue.id} venue={venue} />
+                <VenueResultCard
+                  key={venue.id}
+                  venue={venue}
+                  startDate={submittedParams?.startDate}
+                  endDate={submittedParams?.endDate}
+                />
               ))}
             </div>
           ) : null}

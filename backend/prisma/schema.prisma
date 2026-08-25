@@ -165,41 +165,41 @@ model RefreshToken {
 }
 
 model Venue {
-  id                 String          @id @default(uuid())
-  ownerId            String          @map("owner_id")
+  id                 String      @id @default(uuid())
+  ownerId            String      @map("owner_id")
   name               String
-  slug               String          @unique
-  description        String          @db.Text
-  shortDescription   String?         @map("short_description") @db.VarChar(255)
+  slug               String      @unique
+  description        String      @db.Text
+  shortDescription   String?     @map("short_description") @db.VarChar(255)
   address            String
   district           String
-  city               String          @default("El Alto")
-  state              String          @default("La Paz")
-  country            String          @default("Bolivia")
-  latitude           Decimal?        @db.Decimal(10, 8)
-  longitude          Decimal?        @db.Decimal(11, 8)
-  capacityMin        Int             @default(0) @map("capacity_min")
-  capacityMax        Int             @map("capacity_max")
-  squareMeters       Int?            @map("square_meters")
-  photos             Json            @default("[]")
-  videoUrl           String?         @map("video_url")
-  spaceTypeId        String?         @map("space_type_id")
-  minimumHours       Int             @default(4) @map("minimum_hours")
-  priceUnit          PriceUnit       @default(EVENT) @map("price_unit")
-  instantBooking     Boolean         @default(false) @map("instant_booking")
-  allowsMultipleDays Boolean         @default(false) @map("allows_multiple_days")
-  rules              String?         @db.Text
-  cancellationPolicy String?         @map("cancellation_policy") @db.Text
-  status             VenueStatus     @default(DRAFT)
-  isVerified         Boolean         @default(false) @map("is_verified")
-  verifiedAt         DateTime?       @map("verified_at")
-  verifiedById       String?         @map("verified_by_id")
-  isFeatured         Boolean         @default(false) @map("is_featured")
-  featuredUntil      DateTime?       @map("featured_until")
-  viewCount          Int             @default(0) @map("view_count")
-  bookingCount       Int             @default(0) @map("booking_count")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
+  city               String      @default("El Alto")
+  state              String      @default("La Paz")
+  country            String      @default("Bolivia")
+  latitude           Decimal?    @db.Decimal(10, 8)
+  longitude          Decimal?    @db.Decimal(11, 8)
+  capacityMin        Int         @default(0) @map("capacity_min")
+  capacityMax        Int         @map("capacity_max")
+  squareMeters       Int?        @map("square_meters")
+  photos             Json        @default("[]")
+  videoUrl           String?     @map("video_url")
+  spaceTypeId        String?     @map("space_type_id")
+  minimumHours       Int         @default(4) @map("minimum_hours")
+  priceUnit          PriceUnit   @default(EVENT) @map("price_unit")
+  instantBooking     Boolean     @default(false) @map("instant_booking")
+  allowsMultipleDays Boolean     @default(false) @map("allows_multiple_days")
+  rules              String?     @db.Text
+  cancellationPolicy String?     @map("cancellation_policy") @db.Text
+  status             VenueStatus @default(DRAFT)
+  isVerified         Boolean     @default(false) @map("is_verified")
+  verifiedAt         DateTime?   @map("verified_at")
+  verifiedById       String?     @map("verified_by_id")
+  isFeatured         Boolean     @default(false) @map("is_featured")
+  featuredUntil      DateTime?   @map("featured_until")
+  viewCount          Int         @default(0) @map("view_count")
+  bookingCount       Int         @default(0) @map("booking_count")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
 
   owner          User               @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   verifiedBy     User?              @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
@@ -211,6 +211,7 @@ model Venue {
   media          VenueMedia[]
   prices         VenuePrice[]
   bookings       Booking[]
+  bookingDates   BookingDate[]
   reviews        Review[]
   calendarBlocks CalendarBlock[]
 
@@ -385,6 +386,7 @@ model Booking {
   clientId        String        @map("client_id")
   eventType       String        @map("event_type")
   eventDate       DateTime      @map("event_date") @db.Date
+  endDate         DateTime      @map("end_date") @db.Date
   startTime       DateTime      @map("start_time") @db.Time
   endTime         DateTime      @map("end_time") @db.Time
   guestCount      Int           @map("guest_count")
@@ -400,10 +402,11 @@ model Booking {
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  venue    Venue     @relation(fields: [venueId], references: [id], onDelete: Restrict)
-  client   User      @relation("ClientBookings", fields: [clientId], references: [id], onDelete: Restrict)
+  venue    Venue         @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  client   User          @relation("ClientBookings", fields: [clientId], references: [id], onDelete: Restrict)
   payments Payment[]
   review   Review?
+  dates    BookingDate[]
 
   @@index([venueId])
   @@index([clientId])
@@ -411,6 +414,24 @@ model Booking {
   @@index([status])
   @@index([venueId, eventDate])
   @@map("bookings")
+}
+
+model BookingDate {
+  id           String   @id @default(uuid())
+  bookingId    String   @map("booking_id")
+  venueId      String   @map("venue_id")
+  date         DateTime @db.Date
+  startTime    DateTime @map("start_time") @db.Time
+  endTime      DateTime @map("end_time") @db.Time
+  appliedPrice Decimal  @map("applied_price") @db.Decimal(12, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  venue   Venue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, date])
+  @@index([bookingId])
+  @@map("booking_dates")
 }
 
 model Payment {
