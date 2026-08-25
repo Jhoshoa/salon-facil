@@ -294,6 +294,54 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
     setSeasonRules((prev) => prev.filter((rule) => rule.key !== key));
   };
 
+  const timeToMinutes = (time: string) => {
+    const [hour, minute] = time.split(':').map(Number);
+    return hour * 60 + minute;
+  };
+  // "00:00" as a closing time means "open until midnight" (end of day), not "closes at the
+  // start of the day" — matches the same convention used by the booking form and backend.
+  const endTimeToMinutes = (time: string) => (time === '00:00' ? 24 * 60 : timeToMinutes(time));
+
+  /** Hours the local is open that weekday, from the Horarios tab's live values — null if
+   * closed or not configured. Used to show a hora↔dia equivalence while pricing a day. */
+  const hoursForWeekday = (dayOfWeek: number): number | null => {
+    const entry = openingHours.find((h) => h.dayOfWeek === dayOfWeek);
+    if (!entry || entry.isClosed) return null;
+    const hours = (endTimeToMinutes(entry.closesAt) - timeToMinutes(entry.opensAt)) / 60;
+    return hours > 0 ? Math.round(hours * 10) / 10 : null;
+  };
+
+  /** Live "por hora <-> por dia" equivalence shown under a weekday rule's price, so the owner
+   * can catch a mismatched day price before saving (the bug this was built to prevent: an
+   * hourly rate that implies Bs 3.920 for a full day, next to an unrelated Bs 350 day rate). */
+  const weekdayPricingHint = (rule: WeekdayRuleState): string | null => {
+    const hours = hoursForWeekday(rule.dayOfWeek);
+    if (hours == null) return 'Local cerrado este dia segun la pestaña Horarios.';
+
+    const effectiveUnit = rule.unit || defaultPriceUnit;
+    const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
+    if (!price) return null;
+
+    if (effectiveUnit === 'HOUR') {
+      const fullDay = Math.round(price * hours * 100) / 100;
+      return `Bs ${price}/hora × ${hours}h de atencion = Bs ${fullDay} si reservan el dia completo`;
+    }
+    if (effectiveUnit === 'DAY') {
+      const impliedHourly = Math.round((price / hours) * 100) / 100;
+      return `Bs ${price} por el dia completo ≈ Bs ${impliedHourly}/hora (local abierto ${hours}h)`;
+    }
+    return null;
+  };
+
+  const seasonPricingHint = (rule: SeasonRuleState): string | null => {
+    const effectiveUnit = rule.unit || defaultPriceUnit;
+    const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
+    if (!price) return null;
+    if (effectiveUnit === 'HOUR') return `Se cobrara Bs ${price} por cada hora dentro de esta temporada.`;
+    if (effectiveUnit === 'DAY') return `Se cobrara Bs ${price} por dia completo, sin importar las horas.`;
+    return `Se cobrara Bs ${price} una sola vez por todo el evento.`;
+  };
+
   /** Returns an error message if invalid, or null. Runs before submit since these rules
    * live outside react-hook-form (they're a variable-length, mode-dependent structure). */
   const validatePriceRules = (): string | null => {
@@ -374,6 +422,8 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
   const useTypes = form.watch('useTypes');
   const openingHours = form.watch('openingHours');
   const spaceType = form.watch('spaceType');
+  const defaultPriceUnit = form.watch('priceUnit');
+  const defaultBasePrice = form.watch('basePrice');
 
   const toggleAmenity = (id: string) => {
     const next = amenityIds.includes(id)
@@ -618,81 +668,104 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                     permiten agregar excepciones por dia de semana y/o por temporada.
                   </p>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(
                     [
-                      { value: 'single', label: 'Un solo precio y unidad para todo el local' },
-                      { value: 'weekday', label: 'Reglas por dia de la semana' },
-                      { value: 'weekday_season', label: 'Reglas por dia de la semana + temporadas' },
-                    ] as { value: PricingMode; label: string }[]
+                      {
+                        value: 'single',
+                        label: 'Un solo precio y unidad para todo el local',
+                        description: 'Todos los dias se cobran igual, con el precio y la unidad de arriba.',
+                      },
+                      {
+                        value: 'weekday',
+                        label: 'Reglas por dia de la semana',
+                        description:
+                          'Elegi que dias se cobran por hora y cuales por dia completo (ej. entre semana por hora, fin de semana solo dia completo). Los dias sin regla propia usan el precio base.',
+                      },
+                      {
+                        value: 'weekday_season',
+                        label: 'Reglas por dia de la semana + temporadas',
+                        description:
+                          'Ademas de lo anterior, defini precios especiales para fechas puntuales (fin de año, feriados) que reemplazan el precio normal solo en esas fechas.',
+                      },
+                    ] as { value: PricingMode; label: string; description: string }[]
                   ).map((option) => (
-                    <label key={option.value} className="flex items-center gap-2 text-sm">
+                    <label key={option.value} className="flex items-start gap-2 text-sm">
                       <input
                         type="radio"
                         name="pricingMode"
-                        className="h-4 w-4"
+                        className="mt-0.5 h-4 w-4"
                         checked={pricingMode === option.value}
                         onChange={() => setPricingMode(option.value)}
                       />
-                      {option.label}
+                      <span>
+                        <span className="block font-medium">{option.label}</span>
+                        <span className="block text-xs text-muted-foreground">{option.description}</span>
+                      </span>
                     </label>
                   ))}
                 </div>
 
                 {pricingMode !== 'single' ? (
                   <div className="space-y-2">
-                    {weekdayRules.map((rule) => (
-                      <div
-                        key={rule.dayOfWeek}
-                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3"
-                      >
-                        <label className="flex w-36 items-center gap-2 text-sm font-medium">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={rule.enabled}
-                            onChange={(e) =>
-                              updateWeekdayRule(rule.dayOfWeek, { enabled: e.target.checked })
-                            }
-                          />
-                          {dayLabels[rule.dayOfWeek]}
-                        </label>
-                        {rule.enabled ? (
-                          <>
-                            <Select
-                              className="w-40"
-                              value={rule.unit}
-                              onChange={(e) =>
-                                updateWeekdayRule(rule.dayOfWeek, {
-                                  unit: e.target.value as PriceUnit | '',
-                                })
-                              }
-                            >
-                              <option value="">Hereda unidad del local</option>
-                              {Object.entries(priceUnitLabels).map(([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ))}
-                            </Select>
-                            <Input
-                              type="number"
-                              min={0}
-                              placeholder="Precio (Bs)"
-                              className="w-32"
-                              value={rule.price}
-                              onChange={(e) =>
-                                updateWeekdayRule(rule.dayOfWeek, { price: e.target.value })
-                              }
-                            />
-                          </>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            Usa el precio base
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                    {weekdayRules.map((rule) => {
+                      const hint = rule.enabled ? weekdayPricingHint(rule) : null;
+                      return (
+                        <div
+                          key={rule.dayOfWeek}
+                          className="rounded-[var(--radius)] border p-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-3">
+                            <label className="flex w-36 items-center gap-2 text-sm font-medium">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={rule.enabled}
+                                onChange={(e) =>
+                                  updateWeekdayRule(rule.dayOfWeek, { enabled: e.target.checked })
+                                }
+                              />
+                              {dayLabels[rule.dayOfWeek]}
+                            </label>
+                            {rule.enabled ? (
+                              <>
+                                <Select
+                                  className="w-40"
+                                  value={rule.unit}
+                                  onChange={(e) =>
+                                    updateWeekdayRule(rule.dayOfWeek, {
+                                      unit: e.target.value as PriceUnit | '',
+                                    })
+                                  }
+                                >
+                                  <option value="">Hereda unidad del local</option>
+                                  {Object.entries(priceUnitLabels).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  ))}
+                                </Select>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="Precio (Bs)"
+                                  className="w-32"
+                                  value={rule.price}
+                                  onChange={(e) =>
+                                    updateWeekdayRule(rule.dayOfWeek, { price: e.target.value })
+                                  }
+                                />
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                Usa el precio base
+                              </span>
+                            )}
+                          </div>
+                          {hint ? <p className="mt-2 text-xs text-muted-foreground">{hint}</p> : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
 
@@ -778,6 +851,9 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                             Eliminar
                           </Button>
                         </div>
+                        {seasonPricingHint(rule) ? (
+                          <p className="text-xs text-muted-foreground">{seasonPricingHint(rule)}</p>
+                        ) : null}
                       </div>
                     ))}
                   </div>

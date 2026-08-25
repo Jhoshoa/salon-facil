@@ -166,10 +166,14 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
         ? `Combinado: ${[...previewUnits].map((u) => unitLabels[u]).join(' y ')}`
         : null;
 
-  const singleDayHours =
-    !isMultiDay && previewDays[0]?.unit === 'HOUR'
-      ? Math.round(((endTimeToMinutes(values.endTime) - timeToMinutes(values.startTime)) / 60) * 10) / 10
-      : null;
+  /** Hours actually billed for a given day in the range — from its per-day override if the
+   * client customized it, otherwise the global startTime/endTime used for every HOUR day. */
+  const hoursForDate = (date: string): number => {
+    const schedule = dailySchedule[date] ?? { startTime: values.startTime, endTime: values.endTime };
+    return Math.round(((endTimeToMinutes(schedule.endTime) - timeToMinutes(schedule.startTime)) / 60) * 10) / 10;
+  };
+
+  const singleDayHours = !isMultiDay && previewDays[0]?.unit === 'HOUR' ? hoursForDate(previewDays[0].date) : null;
 
   // Once we know which days resolved to HOUR in a mixed range, seed a per-day override for
   // each (defaulting to the global start/end time) so the user can adjust them individually.
@@ -226,21 +230,33 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
           {previewQuery.data && pricingModeLabel ? (
             <p className="sf-glass-muted mt-0.5 text-xs">
               {pricingModeLabel}
-              {singleDayHours != null ? ` · ${singleDayHours} ${singleDayHours === 1 ? 'hora' : 'horas'}` : ''}
+              {singleDayHours != null
+                ? ` · ${singleDayHours} ${singleDayHours === 1 ? 'hora' : 'horas'} · ${formatCurrency(
+                    Math.round((previewQuery.data.totalPrice / singleDayHours) * 100) / 100,
+                  )}/hora`
+                : ''}
             </p>
           ) : !previewQuery.data && basePrice > 0 ? (
             <p className="sf-glass-muted mt-0.5 text-xs">{capitalize(unitLabels[venue.priceUnit])}</p>
           ) : null}
           {previewQuery.data && isMultiDay ? (
             <ul className="sf-glass-muted mt-2 space-y-1 text-xs">
-              {previewQuery.data.days.map((day) => (
-                <li key={day.date} className="flex items-center justify-between gap-3">
-                  <span>
-                    {day.date} <span className="opacity-70">({unitLabels[day.unit]})</span>
-                  </span>
-                  <span>{formatCurrency(day.appliedPrice)}</span>
-                </li>
-              ))}
+              {previewQuery.data.days.map((day) => {
+                const hours = day.unit === 'HOUR' ? hoursForDate(day.date) : null;
+                const rate = hours && hours > 0 ? Math.round((day.appliedPrice / hours) * 100) / 100 : null;
+                return (
+                  <li key={day.date} className="flex items-center justify-between gap-3">
+                    <span>
+                      {day.date}{' '}
+                      <span className="opacity-70">
+                        ({unitLabels[day.unit]}
+                        {rate != null ? ` · ${formatCurrency(rate)}/hora` : ''})
+                      </span>
+                    </span>
+                    <span>{formatCurrency(day.appliedPrice)}</span>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
         </div>
