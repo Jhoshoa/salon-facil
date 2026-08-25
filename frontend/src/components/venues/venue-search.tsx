@@ -2,15 +2,17 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { CalendarDays, Search, SlidersHorizontal, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { buildQueryString } from '@/lib/api/client';
 import {
   getAmenitiesCatalog,
   getSpaceTypesCatalog,
   getUseTypesCatalog,
   searchVenues,
 } from '@/lib/api/venues.api';
-import type { VenueSearchParams } from '@/types/api';
+import type { PriceUnit, VenueSearchParams } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,29 +28,53 @@ interface VenueSearchProps {
   initialStartDate?: string;
   initialEndDate?: string;
   initialCapacity?: string;
+  initialDistrict?: string;
+  initialMinPrice?: string;
+  initialMaxPrice?: string;
+  initialMinCapacity?: string;
+  initialServices?: string;
+  initialAmenities?: string;
+  initialSpaceTypes?: string;
+  initialUseTypes?: string;
+  initialPriceUnit?: string;
+  initialInstantBooking?: string;
 }
+
+const splitCsv = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
 
 export const VenueSearch = ({
   initialQuery = '',
   initialStartDate = '',
   initialEndDate = '',
   initialCapacity = '',
+  initialDistrict = '',
+  initialMinPrice = '',
+  initialMaxPrice = '',
+  initialMinCapacity = '',
+  initialServices = '',
+  initialAmenities = '',
+  initialSpaceTypes = '',
+  initialUseTypes = '',
+  initialPriceUnit = '',
+  initialInstantBooking = '',
 }: VenueSearchProps) => {
+  const router = useRouter();
+  const pathname = usePathname();
   const [queryText, setQueryText] = useState(initialQuery);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
   const [capacity, setCapacity] = useState(initialCapacity);
   const [filters, setFilters] = useState<VenueFilterValues>({
-    district: '',
-    minPrice: '',
-    maxPrice: '',
-    minCapacity: initialCapacity,
-    services: [],
-    amenities: [],
-    spaceTypes: [],
-    useTypes: [],
-    priceUnit: '',
-    instantBooking: false,
+    district: initialDistrict,
+    minPrice: initialMinPrice,
+    maxPrice: initialMaxPrice,
+    minCapacity: initialMinCapacity || initialCapacity,
+    services: splitCsv(initialServices),
+    amenities: splitCsv(initialAmenities),
+    spaceTypes: splitCsv(initialSpaceTypes),
+    useTypes: splitCsv(initialUseTypes),
+    priceUnit: (initialPriceUnit as PriceUnit | '') || '',
+    instantBooking: initialInstantBooking === 'true',
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [errors, setErrors] = useState<{ startDate?: string; endDate?: string; capacity?: string }>(
@@ -58,9 +84,19 @@ export const VenueSearch = ({
     if (!initialStartDate || !initialCapacity) return null;
     return {
       query: initialQuery,
+      district: initialDistrict || undefined,
       startDate: initialStartDate,
       endDate: initialEndDate,
       guestCount: Number(initialCapacity),
+      minCapacity: initialMinCapacity ? Number(initialMinCapacity) : undefined,
+      minPrice: initialMinPrice ? Number(initialMinPrice) : undefined,
+      maxPrice: initialMaxPrice ? Number(initialMaxPrice) : undefined,
+      services: initialServices || undefined,
+      amenities: splitCsv(initialAmenities).length ? splitCsv(initialAmenities) : undefined,
+      spaceTypes: splitCsv(initialSpaceTypes).length ? splitCsv(initialSpaceTypes) : undefined,
+      useTypes: splitCsv(initialUseTypes).length ? splitCsv(initialUseTypes) : undefined,
+      priceUnit: (initialPriceUnit as PriceUnit | '') || undefined,
+      instantBooking: initialInstantBooking === 'true' || undefined,
       limit: 12,
     };
   });
@@ -157,7 +193,16 @@ export const VenueSearch = ({
 
   const submitSearch = () => {
     if (!validate()) return false;
-    setSubmittedParams(buildSearchParams());
+    const params = buildSearchParams();
+    setSubmittedParams(params);
+    // Search state lives in the URL, not just in memory: this is what lets the browser's
+    // Back button (after opening a venue's detail page) land the user on the exact same
+    // results instead of a blank search form. `page.tsx` reads the query string back with
+    // `capacity` as the key name (matching the home page's search form), not `guestCount`.
+    const { guestCount, limit: _limit, ...urlParams } = params;
+    router.replace(`${pathname}${buildQueryString({ ...urlParams, capacity: guestCount })}`, {
+      scroll: false,
+    });
     return true;
   };
 

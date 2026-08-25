@@ -8,6 +8,16 @@ interface VenuesPageProps {
     startDate?: string;
     endDate?: string;
     capacity?: string;
+    district?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    minCapacity?: string;
+    services?: string;
+    amenities?: string;
+    spaceTypes?: string;
+    useTypes?: string;
+    priceUnit?: string;
+    instantBooking?: string;
   };
 }
 
@@ -35,6 +45,16 @@ export default function VenuesPage({ searchParams }: VenuesPageProps) {
           initialStartDate={searchParams.startDate}
           initialEndDate={searchParams.endDate}
           initialCapacity={searchParams.capacity}
+          initialDistrict={searchParams.district}
+          initialMinPrice={searchParams.minPrice}
+          initialMaxPrice={searchParams.maxPrice}
+          initialMinCapacity={searchParams.minCapacity}
+          initialServices={searchParams.services}
+          initialAmenities={searchParams.amenities}
+          initialSpaceTypes={searchParams.spaceTypes}
+          initialUseTypes={searchParams.useTypes}
+          initialPriceUnit={searchParams.priceUnit}
+          initialInstantBooking={searchParams.instantBooking}
         />
       </div>
     </main>
