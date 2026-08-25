@@ -8,6 +8,7 @@ import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
+import { VenueReviews } from '@/components/reviews/venue-reviews';
 import { ErrorState } from '@/components/shared/error-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,13 +29,13 @@ const VenueLocationMap = dynamic(
 );
 
 const VenueDetailSkeleton = () => (
-  <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-    <div className="space-y-6">
+  <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+    <div className="min-w-0 flex-1 space-y-6">
       <Skeleton className="aspect-[16/9] w-full" />
       <Skeleton className="h-8 w-2/3" />
       <Skeleton className="h-24 w-full" />
     </div>
-    <Skeleton className="h-96 w-full" />
+    <Skeleton className="h-96 w-full shrink-0 lg:w-[380px]" />
   </div>
 );
 
@@ -94,8 +95,9 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
   const secondaryUses = venue.uses?.filter((item) => !item.isPrimary).slice(0, 6) ?? [];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-6">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="min-w-0 flex-1 space-y-6">
         {/* Gallery */}
         <section className="grid gap-2 md:grid-cols-[2fr_1fr]">
           <div className="sf-result-image min-h-[280px] shadow-sm md:min-h-[360px]">
@@ -301,15 +303,22 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
           )}
         </section>
 
+        <VenueReviews
+          venueId={venue.id}
+          averageRating={venue.averageRating}
+          reviewCount={venue.reviewCount}
+        />
+
         <AvailabilityCalendar venueId={venue.id} />
       </div>
 
-      <aside className="lg:sticky lg:top-24 lg:self-start">
+      <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px]">
         <BookingForm venue={venue} />
       </aside>
+      </div>
 
       {similarQuery.data?.length ? (
-        <section className="sf-detail-section lg:col-span-2">
+        <section className="sf-detail-section">
           <h2 className="sf-detail-title">Espacios similares</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {similarQuery.data.map((similarVenue) => (

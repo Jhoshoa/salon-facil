@@ -1,17 +1,20 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CreditCard, XCircle } from 'lucide-react';
+import { CreditCard, Star, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cancelBooking, getBooking } from '@/lib/api/bookings.api';
 import { getBookingPayments } from '@/lib/api/payments.api';
+import { getBookingReview } from '@/lib/api/reviews.api';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { PaymentProofDrawer } from '@/components/payments/payment-proof-drawer';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import { ReviewFormDialog } from '@/components/reviews/review-form-dialog';
+import { StarRating } from '@/components/reviews/star-rating';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -27,10 +30,17 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
   const queryClient = useQueryClient();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const bookingQuery = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: () => getBooking(bookingId),
+  });
+
+  const reviewQuery = useQuery({
+    queryKey: ['booking', bookingId, 'review'],
+    queryFn: () => getBookingReview(bookingId),
+    enabled: bookingQuery.data?.status === 'COMPLETED',
   });
 
   const paymentsQuery = useQuery({
@@ -75,6 +85,7 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
   const booking = bookingQuery.data;
   const showPaymentAction = canUploadDeposit(booking.status, booking.depositPaid);
   const showCancelAction = ['PENDING', 'APPROVED'].includes(booking.status);
+  const showReviewAction = booking.status === 'COMPLETED' && !reviewQuery.isLoading && !reviewQuery.data;
 
   return (
     <div className="space-y-6">
@@ -101,6 +112,12 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
               <Button variant="outline" onClick={() => setCancelOpen(true)}>
                 <XCircle className="h-4 w-4" />
                 Cancelar
+              </Button>
+            ) : null}
+            {showReviewAction ? (
+              <Button variant="outline" onClick={() => setReviewOpen(true)}>
+                <Star className="h-4 w-4" />
+                Calificar
               </Button>
             ) : null}
           </div>
@@ -157,7 +174,25 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
         </div>
       </section>
 
+      {reviewQuery.data ? (
+        <section className="rounded-md border bg-card p-4 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold">Tu resena</h2>
+          <StarRating value={reviewQuery.data.rating} size="sm" />
+          {reviewQuery.data.comment ? (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {reviewQuery.data.comment}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       <PaymentProofDrawer booking={booking} open={paymentOpen} onOpenChange={setPaymentOpen} />
+      <ReviewFormDialog
+        bookingId={bookingId}
+        venueName={booking.venue?.name}
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+      />
       <ConfirmDialog
         open={cancelOpen}
         title="Cancelar reserva"

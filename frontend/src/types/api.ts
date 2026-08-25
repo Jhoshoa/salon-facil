@@ -353,6 +353,23 @@ export interface Booking {
   client?: { id: string; fullName: string; email: string; phone: string | null };
 }
 
+export interface Review {
+  id: string;
+  venueId: string;
+  clientId: string;
+  bookingId: string;
+  rating: number;
+  comment: string | null;
+  isVerified: boolean;
+  createdAt: string;
+  client?: { id: string; fullName: string };
+}
+
+export interface CreateReviewPayload {
+  rating: number;
+  comment?: string;
+}
+
 export interface CreateBookingPayload {
   eventType: string;
   eventDate: string;
