@@ -6,8 +6,11 @@ import type {
   CatalogItem,
   CatalogItemInput,
   PaginatedResponse,
+  SeasonalEvent,
+  SeasonalEventInput,
   UpdateCatalogAmenityPayload,
   UpdateCatalogItemPayload,
+  UpdateSeasonalEventPayload,
   Venue,
   VenueCompletion,
   VenueFormPayload,
@@ -60,6 +63,10 @@ export const getSpaceTypesCatalog = async (): Promise<CatalogItem[]> => {
 
 export const getUseTypesCatalog = async (): Promise<CatalogItem[]> => {
   return apiRequest<CatalogItem[]>('/venues/catalog/use-types', { auth: false });
+};
+
+export const getSeasonalEventsCatalog = async (): Promise<SeasonalEvent[]> => {
+  return apiRequest<SeasonalEvent[]>('/venues/catalog/seasonal-events', { auth: false });
 };
 
 export const getMyVenues = async (): Promise<Venue[]> => {
@@ -192,6 +199,29 @@ export const updateAdminAmenity = async (
   data: UpdateCatalogAmenityPayload,
 ): Promise<Amenity> => {
   return apiRequest<Amenity>(`/venues/admin/catalog/amenities/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const getAdminSeasonalEvents = async (): Promise<SeasonalEvent[]> => {
+  return apiRequest<SeasonalEvent[]>('/venues/admin/catalog/seasonal-events');
+};
+
+export const createAdminSeasonalEvent = async (
+  data: SeasonalEventInput,
+): Promise<SeasonalEvent> => {
+  return apiRequest<SeasonalEvent>('/venues/admin/catalog/seasonal-events', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAdminSeasonalEvent = async (
+  id: string,
+  data: UpdateSeasonalEventPayload,
+): Promise<SeasonalEvent> => {
+  return apiRequest<SeasonalEvent>(`/venues/admin/catalog/seasonal-events/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });

@@ -85,6 +85,8 @@ export interface VenuePrice {
   endDate: string | null;
   price: number;
   currency: string;
+  /** null = hereda la unidad por defecto del local; con valor, fuerza esa unidad para los dias que cubre. */
+  unit: PriceUnit | null;
   discountPercent: number | null;
   discountLabel: string | null;
   isActive: boolean;
@@ -224,8 +226,36 @@ export interface VenuePriceInput {
   startDate?: string;
   endDate?: string;
   price: number;
+  unit?: PriceUnit;
   discountPercent?: number;
   discountLabel?: string;
+}
+
+export interface SeasonalEvent {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  note: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface SeasonalEventInput {
+  name: string;
+  startDate: string;
+  endDate: string;
+  note?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateSeasonalEventPayload {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  note?: string;
+  sortOrder?: number;
+  isActive?: boolean;
 }
 
 export interface VenueAmenityInput {
@@ -371,6 +401,12 @@ export interface CreateReviewPayload {
   comment?: string;
 }
 
+export interface DailyScheduleEntry {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
 export interface CreateBookingPayload {
   eventType: string;
   eventDate: string;
@@ -379,11 +415,14 @@ export interface CreateBookingPayload {
   endTime: string;
   guestCount: number;
   specialRequests?: string;
+  /** Horario por dia solo para los dias cuya unidad efectiva resulta HOUR. */
+  dailySchedule?: DailyScheduleEntry[];
 }
 
 export interface DailyPriceBreakdown {
   date: string;
   matchedPriceType: string;
+  unit: PriceUnit;
   appliedPrice: number;
 }
 

@@ -89,6 +89,7 @@ describe('BookingService', () => {
   let mockPriceCalculator: {
     calculate: jest.Mock;
     calculateRange: jest.Mock;
+    resolveUnitForDate: jest.Mock;
   };
   let mockAvailabilityService: {
     checkAvailability: jest.Mock;
@@ -139,8 +140,11 @@ describe('BookingService', () => {
         appliedPrice: 5000,
         totalPrice: 5000,
         depositAmount: 1500,
-        days: [{ date: '2026-09-15', matchedPriceType: 'BASE', appliedPrice: 5000 }],
+        days: [{ date: '2026-09-15', matchedPriceType: 'BASE', unit: 'EVENT', appliedPrice: 5000 }],
       }),
+      // No per-rule unit overrides in these fixtures — mirrors production's fallback to the
+      // venue's own priceUnit when no matching VenuePrice declares a unit of its own.
+      resolveUnitForDate: jest.fn((_prices, _date, defaultUnit) => defaultUnit),
     };
 
     mockAvailabilityService = {
@@ -297,6 +301,96 @@ describe('BookingService', () => {
       await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
         ConflictException,
       );
+    });
+  });
+
+  describe('requestBooking — per-day schedule for mixed pricing units', () => {
+    // Friday (day 5) resolves to HOUR, Saturday (day 6) resolves to DAY — simulates a venue
+    // configured "por hora entre semana, por dia el fin de semana" (docs/fase-1 plan).
+    const mixedVenue = () =>
+      makeVenue({
+        allowsMultipleDays: true,
+        openingHours: [
+          { id: 'oh-fri', dayOfWeek: 5, opensAt: '09:00', closesAt: '22:00', isClosed: false },
+          { id: 'oh-sat', dayOfWeek: 6, opensAt: '10:00', closesAt: '20:00', isClosed: false },
+        ],
+      });
+    const mixedDto = {
+      eventType: 'Boda',
+      eventDate: '2026-09-18', // Friday
+      endDate: '2026-09-19', // Saturday
+      startTime: '09:00',
+      endTime: '22:00',
+      guestCount: 100,
+    };
+
+    beforeEach(() => {
+      mockVenueService.getVenueById.mockResolvedValue(mixedVenue());
+      mockPriceCalculator.resolveUnitForDate.mockImplementation((_prices, date: Date) =>
+        date.getUTCDay() === 5 ? 'HOUR' : 'DAY',
+      );
+      mockPriceCalculator.calculateRange.mockReturnValue({
+        basePrice: 280,
+        appliedPrice: 3140,
+        totalPrice: 3140,
+        depositAmount: 942,
+        days: [
+          { date: '2026-09-18', matchedPriceType: 'BASE', unit: 'HOUR', appliedPrice: 2240 },
+          { date: '2026-09-19', matchedPriceType: 'WEEKEND', unit: 'DAY', appliedPrice: 900 },
+        ],
+      });
+      mockBookingRepository.create.mockResolvedValue(
+        makeBooking({ eventDate: new Date('2026-09-18'), endDate: new Date('2026-09-19') }),
+      );
+    });
+
+    it('builds one BookingDate per day with its own resolved start/end time', async () => {
+      await service.requestBooking('venue-1', 'client-1', {
+        ...mixedDto,
+        dailySchedule: [{ date: '2026-09-18', startTime: '18:00', endTime: '21:00' }],
+      });
+
+      const createCallArg = mockBookingRepository.create.mock.calls[0][0];
+      expect(createCallArg.dailyBreakdown).toEqual([
+        expect.objectContaining({ startTime: '18:00', endTime: '21:00' }),
+        expect.objectContaining({ startTime: '10:00', endTime: '20:00' }), // Saturday: venue opening hours (DAY unit)
+      ]);
+    });
+
+    it('falls back to the global startTime/endTime for HOUR days when no dailySchedule is sent', async () => {
+      await service.requestBooking('venue-1', 'client-1', mixedDto);
+
+      const createCallArg = mockBookingRepository.create.mock.calls[0][0];
+      expect(createCallArg.dailyBreakdown[0]).toEqual(
+        expect.objectContaining({ startTime: '09:00', endTime: '22:00' }),
+      );
+    });
+
+    it('rejects an HOUR-day schedule outside the venue opening hours for that weekday', async () => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', {
+          ...mixedDto,
+          dailySchedule: [{ date: '2026-09-18', startTime: '07:00', endTime: '10:00' }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects when dailySchedule is missing an entry for a required HOUR day', async () => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', { ...mixedDto, dailySchedule: [] }),
+      ).rejects.toThrow(/Falta el horario/);
+    });
+
+    it('rejects when dailySchedule includes an entry for a day that does not need one', async () => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', {
+          ...mixedDto,
+          dailySchedule: [
+            { date: '2026-09-18', startTime: '18:00', endTime: '21:00' },
+            { date: '2026-09-19', startTime: '11:00', endTime: '15:00' },
+          ],
+        }),
+      ).rejects.toThrow(/no lo necesitan/);
     });
   });
 

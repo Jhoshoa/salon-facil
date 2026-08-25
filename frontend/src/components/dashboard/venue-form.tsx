@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
   createVenue,
   getAmenitiesCatalog,
+  getSeasonalEventsCatalog,
   getSpaceTypesCatalog,
   getUseTypesCatalog,
   updateVenue,
@@ -25,11 +26,65 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
-import type { Venue, VenueFormPayload } from '@/types/api';
+import { Button } from '@/components/ui/button';
+import type { PriceUnit, Venue, VenueFormPayload, VenuePriceInput } from '@/types/api';
 
 interface VenueFormProps {
   venue?: Venue;
 }
+
+type PricingMode = 'single' | 'weekday' | 'weekday_season';
+
+interface WeekdayRuleState {
+  dayOfWeek: number;
+  enabled: boolean;
+  unit: PriceUnit | '';
+  price: string;
+}
+
+interface SeasonRuleState {
+  key: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  price: string;
+  unit: PriceUnit | '';
+}
+
+const buildInitialWeekdayRules = (venue?: Venue): WeekdayRuleState[] => {
+  const byDay = new Map(
+    (venue?.prices ?? [])
+      .filter((p) => p.priceType === 'WEEKEND' && p.dayOfWeek != null)
+      .map((p) => [p.dayOfWeek as number, p]),
+  );
+  return Array.from({ length: 7 }).map((_, dayOfWeek) => {
+    const existing = byDay.get(dayOfWeek);
+    return {
+      dayOfWeek,
+      enabled: Boolean(existing),
+      unit: existing?.unit ?? '',
+      price: existing ? String(existing.price) : '',
+    };
+  });
+};
+
+const buildInitialSeasonRules = (venue?: Venue): SeasonRuleState[] =>
+  (venue?.prices ?? [])
+    .filter((p) => p.priceType === 'SEASON_HIGH' && p.startDate && p.endDate)
+    .map((p) => ({
+      key: p.id,
+      name: p.discountLabel ?? '',
+      startDate: p.startDate!.slice(0, 10),
+      endDate: p.endDate!.slice(0, 10),
+      price: String(p.price),
+      unit: p.unit ?? '',
+    }));
+
+const buildInitialPricingMode = (venue?: Venue): PricingMode => {
+  if (buildInitialSeasonRules(venue).length > 0) return 'weekday_season';
+  if (buildInitialWeekdayRules(venue).some((r) => r.enabled)) return 'weekday';
+  return 'single';
+};
 
 type TabKey = 'general' | 'location' | 'pricing' | 'amenities' | 'hours' | 'rules';
 
@@ -108,7 +163,11 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
   };
 };
 
-const toPayload = (values: VenueFormValues, existingVenue?: Venue): VenueFormPayload => ({
+const toPayload = (
+  values: VenueFormValues,
+  priceRules: VenuePriceInput[],
+  existingVenue?: Venue,
+): VenueFormPayload => ({
   name: values.name,
   description: values.description,
   shortDescription: values.shortDescription || undefined,
@@ -127,13 +186,14 @@ const toPayload = (values: VenueFormValues, existingVenue?: Venue): VenueFormPay
   allowsMultipleDays: values.allowsMultipleDays,
   rules: values.rules || undefined,
   cancellationPolicy: values.cancellationPolicy || undefined,
-  // The pricing tab only edits the BASE price; preserve any other pricing rules
-  // (weekend, season, early-bird, etc.) that already exist on the venue so saving
+  // BASE + the weekday/season rules edited on this tab (priceRules), plus any rule type not
+  // manageable from this UI yet (HOLIDAY, CUSTOM_DATE, EARLY_BIRD) preserved as-is so saving
   // this form doesn't wipe them out.
   prices: [
     { priceType: 'BASE', price: values.basePrice },
+    ...priceRules,
     ...(existingVenue?.prices ?? [])
-      .filter((price) => price.priceType !== 'BASE')
+      .filter((price) => !['BASE', 'WEEKEND', 'SEASON_HIGH'].includes(price.priceType))
       .map((price) => ({
         priceType: price.priceType,
         dayOfWeek: price.dayOfWeek ?? undefined,
@@ -141,6 +201,7 @@ const toPayload = (values: VenueFormValues, existingVenue?: Venue): VenueFormPay
         startDate: price.startDate ?? undefined,
         endDate: price.endDate ?? undefined,
         price: Number(price.price),
+        unit: price.unit ?? undefined,
         discountPercent: price.discountPercent != null ? Number(price.discountPercent) : undefined,
         discountLabel: price.discountLabel ?? undefined,
       })),
@@ -165,6 +226,14 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
     defaultValues: venue ? venueToFormValues(venue) : venueFormDefaults,
   });
 
+  const [pricingMode, setPricingMode] = useState<PricingMode>(() => buildInitialPricingMode(venue));
+  const [weekdayRules, setWeekdayRules] = useState<WeekdayRuleState[]>(() =>
+    buildInitialWeekdayRules(venue),
+  );
+  const [seasonRules, setSeasonRules] = useState<SeasonRuleState[]>(() =>
+    buildInitialSeasonRules(venue),
+  );
+
   const amenitiesQuery = useQuery({ queryKey: ['venue-catalog', 'amenities'], queryFn: getAmenitiesCatalog });
   const spaceTypesQuery = useQuery({
     queryKey: ['venue-catalog', 'space-types'],
@@ -174,10 +243,114 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
     queryKey: ['venue-catalog', 'use-types'],
     queryFn: getUseTypesCatalog,
   });
+  const seasonalEventsQuery = useQuery({
+    queryKey: ['venue-catalog', 'seasonal-events'],
+    queryFn: getSeasonalEventsCatalog,
+    enabled: pricingMode === 'weekday_season',
+  });
+
+  const updateWeekdayRule = (dayOfWeek: number, patch: Partial<WeekdayRuleState>) => {
+    setWeekdayRules((prev) =>
+      prev.map((rule) => (rule.dayOfWeek === dayOfWeek ? { ...rule, ...patch } : rule)),
+    );
+  };
+
+  const addSeasonRule = () => {
+    setSeasonRules((prev) => [
+      ...prev,
+      {
+        key: `new-${Date.now()}`,
+        name: '',
+        startDate: '',
+        endDate: '',
+        price: '',
+        unit: '',
+      },
+    ]);
+  };
+
+  const applySeasonSuggestion = (key: string, eventId: string) => {
+    const event = seasonalEventsQuery.data?.find((e) => e.id === eventId);
+    if (!event) return;
+    setSeasonRules((prev) =>
+      prev.map((rule) =>
+        rule.key === key
+          ? {
+              ...rule,
+              name: event.name,
+              startDate: event.startDate.slice(0, 10),
+              endDate: event.endDate.slice(0, 10),
+            }
+          : rule,
+      ),
+    );
+  };
+
+  const updateSeasonRule = (key: string, patch: Partial<SeasonRuleState>) => {
+    setSeasonRules((prev) => prev.map((rule) => (rule.key === key ? { ...rule, ...patch } : rule)));
+  };
+
+  const removeSeasonRule = (key: string) => {
+    setSeasonRules((prev) => prev.filter((rule) => rule.key !== key));
+  };
+
+  /** Returns an error message if invalid, or null. Runs before submit since these rules
+   * live outside react-hook-form (they're a variable-length, mode-dependent structure). */
+  const validatePriceRules = (): string | null => {
+    if (pricingMode === 'single') return null;
+
+    const enabledWeekdays = weekdayRules.filter((r) => r.enabled);
+    for (const rule of enabledWeekdays) {
+      if (!rule.price || Number(rule.price) < 0) {
+        return `Falta el precio para ${dayLabels[rule.dayOfWeek]}`;
+      }
+    }
+
+    if (pricingMode === 'weekday_season') {
+      for (const rule of seasonRules) {
+        if (!rule.name.trim()) return 'Cada temporada necesita un nombre';
+        if (!rule.startDate || !rule.endDate) return `Faltan fechas para "${rule.name || 'temporada'}"`;
+        if (rule.endDate < rule.startDate) {
+          return `"${rule.name}": la fecha de fin debe ser igual o posterior a la de inicio`;
+        }
+        if (!rule.price || Number(rule.price) < 0) return `Falta el precio para "${rule.name}"`;
+      }
+    }
+
+    return null;
+  };
+
+  const buildPriceRulesPayload = (): VenuePriceInput[] => {
+    if (pricingMode === 'single') return [];
+
+    const rules: VenuePriceInput[] = weekdayRules
+      .filter((r) => r.enabled)
+      .map((r) => ({
+        priceType: 'WEEKEND',
+        dayOfWeek: r.dayOfWeek,
+        price: Number(r.price),
+        unit: r.unit || undefined,
+      }));
+
+    if (pricingMode === 'weekday_season') {
+      rules.push(
+        ...seasonRules.map((r) => ({
+          priceType: 'SEASON_HIGH' as const,
+          startDate: r.startDate,
+          endDate: r.endDate,
+          price: Number(r.price),
+          unit: r.unit || undefined,
+          discountLabel: r.name,
+        })),
+      );
+    }
+
+    return rules;
+  };
 
   const mutation = useMutation({
     mutationFn: (values: VenueFormValues) => {
-      const payload = toPayload(values, venue);
+      const payload = toPayload(values, buildPriceRulesPayload(), venue);
       return isEdit ? updateVenue(venue!.id, payload) : createVenue(payload);
     },
     onSuccess: (savedVenue) => {
@@ -235,8 +408,18 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
     });
   };
 
+  const onValid = (values: VenueFormValues) => {
+    const priceRuleError = validatePriceRules();
+    if (priceRuleError) {
+      setActiveTab('pricing');
+      toast.error('Revisa los precios configurados', { description: priceRuleError });
+      return;
+    }
+    mutation.mutate(values);
+  };
+
   return (
-    <form className="space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values), onInvalid)}>
+    <form className="space-y-5" onSubmit={form.handleSubmit(onValid, onInvalid)}>
       <div className="flex flex-wrap gap-2 border-b pb-3">
         {tabs.map((tab) => (
           <button
@@ -425,6 +608,180 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                   <input type="checkbox" className="h-4 w-4" {...form.register('allowsMultipleDays')} />
                   Permite eventos de varios dias
                 </label>
+              </div>
+
+              <div className="space-y-4 border-t pt-5">
+                <div>
+                  <Label>Modo de precio</Label>
+                  <p className="text-sm text-muted-foreground">
+                    El precio y unidad de arriba son el default del local. Estas opciones
+                    permiten agregar excepciones por dia de semana y/o por temporada.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {(
+                    [
+                      { value: 'single', label: 'Un solo precio y unidad para todo el local' },
+                      { value: 'weekday', label: 'Reglas por dia de la semana' },
+                      { value: 'weekday_season', label: 'Reglas por dia de la semana + temporadas' },
+                    ] as { value: PricingMode; label: string }[]
+                  ).map((option) => (
+                    <label key={option.value} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="pricingMode"
+                        className="h-4 w-4"
+                        checked={pricingMode === option.value}
+                        onChange={() => setPricingMode(option.value)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+
+                {pricingMode !== 'single' ? (
+                  <div className="space-y-2">
+                    {weekdayRules.map((rule) => (
+                      <div
+                        key={rule.dayOfWeek}
+                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3"
+                      >
+                        <label className="flex w-36 items-center gap-2 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={rule.enabled}
+                            onChange={(e) =>
+                              updateWeekdayRule(rule.dayOfWeek, { enabled: e.target.checked })
+                            }
+                          />
+                          {dayLabels[rule.dayOfWeek]}
+                        </label>
+                        {rule.enabled ? (
+                          <>
+                            <Select
+                              className="w-40"
+                              value={rule.unit}
+                              onChange={(e) =>
+                                updateWeekdayRule(rule.dayOfWeek, {
+                                  unit: e.target.value as PriceUnit | '',
+                                })
+                              }
+                            >
+                              <option value="">Hereda unidad del local</option>
+                              {Object.entries(priceUnitLabels).map(([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                            </Select>
+                            <Input
+                              type="number"
+                              min={0}
+                              placeholder="Precio (Bs)"
+                              className="w-32"
+                              value={rule.price}
+                              onChange={(e) =>
+                                updateWeekdayRule(rule.dayOfWeek, { price: e.target.value })
+                              }
+                            />
+                          </>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            Usa el precio base
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {pricingMode === 'weekday_season' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Precios por temporada</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={addSeasonRule}>
+                        Agregar temporada
+                      </Button>
+                    </div>
+
+                    {seasonRules.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Sin temporadas configuradas todavia.
+                      </p>
+                    ) : null}
+
+                    {seasonRules.map((rule) => (
+                      <div key={rule.key} className="space-y-3 rounded-[var(--radius)] border p-3">
+                        {seasonalEventsQuery.data && seasonalEventsQuery.data.length > 0 ? (
+                          <Select
+                            value=""
+                            onChange={(e) =>
+                              e.target.value && applySeasonSuggestion(rule.key, e.target.value)
+                            }
+                          >
+                            <option value="">Usar una sugerencia...</option>
+                            {seasonalEventsQuery.data.map((event) => (
+                              <option key={event.id} value={event.id}>
+                                {event.name}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : null}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Input
+                            placeholder="Nombre (ej. Fin de año)"
+                            value={rule.name}
+                            onChange={(e) => updateSeasonRule(rule.key, { name: e.target.value })}
+                          />
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder="Precio (Bs)"
+                            value={rule.price}
+                            onChange={(e) => updateSeasonRule(rule.key, { price: e.target.value })}
+                          />
+                          <Input
+                            type="date"
+                            value={rule.startDate}
+                            onChange={(e) =>
+                              updateSeasonRule(rule.key, { startDate: e.target.value })
+                            }
+                          />
+                          <Input
+                            type="date"
+                            value={rule.endDate}
+                            onChange={(e) => updateSeasonRule(rule.key, { endDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <Select
+                            className="w-48"
+                            value={rule.unit}
+                            onChange={(e) =>
+                              updateSeasonRule(rule.key, { unit: e.target.value as PriceUnit | '' })
+                            }
+                          >
+                            <option value="">Hereda unidad del local</option>
+                            {Object.entries(priceUnitLabels).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </Select>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => removeSeasonRule(rule.key)}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

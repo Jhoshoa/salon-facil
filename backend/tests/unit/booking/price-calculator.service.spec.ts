@@ -162,6 +162,7 @@ describe('PriceCalculatorService', () => {
   describe('calculateRange', () => {
     // Friday, Saturday, Sunday — exercises the WEEKEND override landing in the middle of a range.
     const friSatSun = [new Date('2026-09-11'), new Date('2026-09-12'), new Date('2026-09-13')];
+    const toDays = (dates: Date[], hours: number) => dates.map((date) => ({ date, hours }));
 
     it('DAY unit: sums the applicable price per day, honoring weekend overrides', () => {
       const prices = [
@@ -169,7 +170,7 @@ describe('PriceCalculatorService', () => {
         makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
       ];
 
-      const result = service.calculateRange(prices, friSatSun, PriceUnit.DAY, 1);
+      const result = service.calculateRange(prices, PriceUnit.DAY, toDays(friSatSun, 1));
 
       expect(result.days.map((d) => d.appliedPrice)).toEqual([280, 350, 280]);
       expect(result.totalPrice).toBe(910);
@@ -177,13 +178,13 @@ describe('PriceCalculatorService', () => {
       expect(result.depositAmount).toBe(273);
     });
 
-    it('HOUR unit: multiplies each day rate by hoursPerDay', () => {
+    it('HOUR unit: multiplies each day rate by that day\'s hours', () => {
       const prices = [
         makePrice({ priceType: PriceType.BASE, price: 280 }),
         makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
       ];
 
-      const result = service.calculateRange(prices, friSatSun, PriceUnit.HOUR, 8);
+      const result = service.calculateRange(prices, PriceUnit.HOUR, toDays(friSatSun, 8));
 
       expect(result.days.map((d) => d.appliedPrice)).toEqual([2240, 2800, 2240]);
       expect(result.totalPrice).toBe(7280);
@@ -192,7 +193,7 @@ describe('PriceCalculatorService', () => {
     it('EVENT unit: one flat total resolved from the start date, not multiplied by days', () => {
       const prices = [makePrice({ priceType: PriceType.BASE, price: 5000 })];
 
-      const result = service.calculateRange(prices, friSatSun, PriceUnit.EVENT, 8);
+      const result = service.calculateRange(prices, PriceUnit.EVENT, toDays(friSatSun, 8));
 
       expect(result.totalPrice).toBe(5000);
       expect(result.days[0].appliedPrice).toBe(5000);
@@ -207,7 +208,7 @@ describe('PriceCalculatorService', () => {
       ];
 
       for (const unit of [PriceUnit.EVENT, PriceUnit.DAY, PriceUnit.HOUR]) {
-        const result = service.calculateRange(prices, friSatSun, unit, 8);
+        const result = service.calculateRange(prices, unit, toDays(friSatSun, 8));
         const sum = result.days.reduce((total, day) => total + day.appliedPrice, 0);
         expect(sum).toBe(result.totalPrice);
       }
@@ -217,14 +218,47 @@ describe('PriceCalculatorService', () => {
       const prices = [makePrice({ priceType: PriceType.BASE, price: 5000 })];
       const single = service.calculate(prices, new Date('2026-03-15'));
 
-      const result = service.calculateRange(prices, [new Date('2026-03-15')], PriceUnit.DAY, 4);
+      const result = service.calculateRange(
+        prices,
+        PriceUnit.DAY,
+        toDays([new Date('2026-03-15')], 4),
+      );
 
       expect(result.totalPrice).toBe(single.totalPrice);
       expect(result.depositAmount).toBe(single.depositAmount);
     });
 
     it('throws when given an empty date array', () => {
-      expect(() => service.calculateRange([], [], PriceUnit.DAY, 4)).toThrow();
+      expect(() => service.calculateRange([], PriceUnit.DAY, [])).toThrow();
+    });
+
+    it('per-rule unit override wins over the venue default for the days it covers', () => {
+      // Venue defaults to HOUR, but Saturday has its own DAY-priced rule (a common
+      // "por hora entre semana, por dia el fin de semana" configuration).
+      const prices = [
+        makePrice({ priceType: PriceType.BASE, price: 280, unit: null }),
+        makePrice({
+          id: 'price-2',
+          priceType: PriceType.WEEKEND,
+          dayOfWeek: 6,
+          price: 900,
+          unit: PriceUnit.DAY,
+        }),
+      ];
+
+      const result = service.calculateRange(prices, PriceUnit.HOUR, toDays(friSatSun, 8));
+
+      expect(result.days.map((d) => d.unit)).toEqual([PriceUnit.HOUR, PriceUnit.DAY, PriceUnit.HOUR]);
+      // Friday/Sunday: 280 * 8h = 2240 (HOUR). Saturday: flat 900 (DAY, ignores hours).
+      expect(result.days.map((d) => d.appliedPrice)).toEqual([2240, 900, 2240]);
+      expect(result.totalPrice).toBe(5380);
+    });
+
+    it('throws a clear error when a HOUR day has no hours provided', () => {
+      const prices = [makePrice({ priceType: PriceType.BASE, price: 280 })];
+      expect(() =>
+        service.calculateRange(prices, PriceUnit.HOUR, [{ date: new Date('2026-09-11') }]),
+      ).toThrow(/horas/i);
     });
   });
 });

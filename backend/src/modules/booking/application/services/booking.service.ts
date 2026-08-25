@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PriceUnit } from '@prisma/client';
 import {
   BOOKING_REPOSITORY,
   IBookingRepository,
@@ -14,6 +15,7 @@ import {
 } from '../../domain/repositories/booking.repository.interface';
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
+import { VenueEntity } from '../../../venue/domain/entities/venue.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import { PriceCalculatorService, RangePriceCalculationResult } from './price-calculator.service';
 import { AvailabilityService } from './availability.service';
@@ -21,6 +23,20 @@ import { UserRole } from '../../../auth/domain/entities/user.entity';
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
 const MAX_BOOKING_RANGE_DAYS = 30;
+
+interface DailyScheduleEntry {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+interface ResolvedDay {
+  date: Date;
+  unit: PriceUnit;
+  hours?: number;
+  startTime: string;
+  endTime: string;
+}
 
 @Injectable()
 export class BookingService {
@@ -43,6 +59,7 @@ export class BookingService {
       endTime: string;
       guestCount: number;
       specialRequests?: string;
+      dailySchedule?: DailyScheduleEntry[];
     },
   ): Promise<{ booking: BookingEntity; priceCalculation: RangePriceCalculationResult }> {
     const venue = await this.venueService.getVenueById(venueId);
@@ -102,12 +119,11 @@ export class BookingService {
       );
     }
 
-    const hoursPerDay = this.computeHoursBetween(dto.startTime, dto.endTime);
+    const schedule = this.resolveDailySchedule(venue, dates, dto);
     const priceCalculation = this.priceCalculator.calculateRange(
       venue.prices ?? [],
-      dates,
       venue.priceUnit,
-      hoursPerDay,
+      schedule.map((day) => ({ date: day.date, hours: day.hours })),
     );
 
     const bookingData: CreateBookingData = {
@@ -124,9 +140,11 @@ export class BookingService {
       totalPrice: priceCalculation.totalPrice,
       depositAmount: priceCalculation.depositAmount,
       specialRequests: dto.specialRequests,
-      dailyBreakdown: priceCalculation.days.map((day) => ({
+      dailyBreakdown: priceCalculation.days.map((day, index) => ({
         date: new Date(day.date),
         appliedPrice: day.appliedPrice,
+        startTime: schedule[index].startTime,
+        endTime: schedule[index].endTime,
       })),
     };
 
@@ -148,7 +166,13 @@ export class BookingService {
   /** Read-only price preview (no availability check, no write) so the client can see the total before submitting. */
   async previewPrice(
     venueId: string,
-    dto: { eventDate: string; endDate?: string; startTime: string; endTime: string },
+    dto: {
+      eventDate: string;
+      endDate?: string;
+      startTime: string;
+      endTime: string;
+      dailySchedule?: DailyScheduleEntry[];
+    },
   ): Promise<RangePriceCalculationResult> {
     const venue = await this.venueService.getVenueById(venueId);
 
@@ -173,12 +197,11 @@ export class BookingService {
       );
     }
 
-    const hoursPerDay = this.computeHoursBetween(dto.startTime, dto.endTime);
+    const schedule = this.resolveDailySchedule(venue, dates, dto);
     return this.priceCalculator.calculateRange(
       venue.prices ?? [],
-      dates,
       venue.priceUnit,
-      hoursPerDay,
+      schedule.map((day) => ({ date: day.date, hours: day.hours })),
     );
   }
 
@@ -198,6 +221,88 @@ export class BookingService {
     const [endHour, endMinute] = endTime.split(':').map(Number);
     const minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
     return Math.round((minutes / 60) * 100) / 100;
+  }
+
+  /**
+   * Resolves the effective unit, hours (for HOUR days) and start/end time for every day in
+   * the range. Days whose unit resolves to HOUR require a schedule — from `dto.dailySchedule`
+   * if the client sent one (validated to cover exactly those days, see below), otherwise the
+   * booking's global startTime/endTime is used for all of them (single-day bookings, and
+   * multi-day bookings where every HOUR day shares the same time, never need to send one).
+   * DAY/EVENT days use the venue's opening hours for that weekday as an informative time
+   * range (never affects price); if the venue hasn't configured hours for that weekday, the
+   * global startTime/endTime is used as a fallback so the day still has *some* recorded time.
+   */
+  private resolveDailySchedule(
+    venue: VenueEntity,
+    dates: Date[],
+    dto: { startTime: string; endTime: string; dailySchedule?: DailyScheduleEntry[] },
+  ): ResolvedDay[] {
+    const prices = venue.prices ?? [];
+    const openingByWeekday = new Map((venue.openingHours ?? []).map((h) => [h.dayOfWeek, h]));
+    const scheduleByDate = new Map((dto.dailySchedule ?? []).map((entry) => [entry.date, entry]));
+
+    if (dto.dailySchedule) {
+      const hourDateKeys = new Set(
+        dates
+          .filter(
+            (date) =>
+              this.priceCalculator.resolveUnitForDate(prices, date, venue.priceUnit) ===
+              PriceUnit.HOUR,
+          )
+          .map((date) => this.toDateOnly(date)),
+      );
+      const providedKeys = dto.dailySchedule.map((entry) => entry.date);
+      const duplicates = providedKeys.filter((key, index) => providedKeys.indexOf(key) !== index);
+      if (duplicates.length > 0) {
+        throw new BadRequestException(`Horario duplicado para: ${[...new Set(duplicates)].join(', ')}`);
+      }
+      const providedSet = new Set(providedKeys);
+      const missing = [...hourDateKeys].filter((key) => !providedSet.has(key));
+      const extra = providedKeys.filter((key) => !hourDateKeys.has(key));
+      if (missing.length > 0) {
+        throw new BadRequestException(`Falta el horario para: ${missing.join(', ')}`);
+      }
+      if (extra.length > 0) {
+        throw new BadRequestException(
+          `Se envio horario para dias que no lo necesitan o fuera del rango: ${extra.join(', ')}`,
+        );
+      }
+    }
+
+    return dates.map((date) => {
+      const dateKey = this.toDateOnly(date);
+      const unit = this.priceCalculator.resolveUnitForDate(prices, date, venue.priceUnit);
+      const opening = openingByWeekday.get(date.getUTCDay());
+
+      if (unit === PriceUnit.HOUR) {
+        const entry = scheduleByDate.get(dateKey) ?? { startTime: dto.startTime, endTime: dto.endTime };
+        if (entry.startTime >= entry.endTime) {
+          throw new BadRequestException(
+            `La hora de inicio debe ser anterior a la de fin (${dateKey})`,
+          );
+        }
+        if (!opening || opening.isClosed) {
+          throw new BadRequestException(`El local esta cerrado el ${dateKey}`);
+        }
+        if (entry.startTime < opening.opensAt || entry.endTime > opening.closesAt) {
+          throw new BadRequestException(
+            `El ${dateKey} el local abre de ${opening.opensAt} a ${opening.closesAt}`,
+          );
+        }
+        return {
+          date,
+          unit,
+          hours: this.computeHoursBetween(entry.startTime, entry.endTime),
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+        };
+      }
+
+      const startTime = opening && !opening.isClosed ? opening.opensAt : dto.startTime;
+      const endTime = opening && !opening.isClosed ? opening.closesAt : dto.endTime;
+      return { date, unit, startTime, endTime };
+    });
   }
 
   async getBookingById(id: string, userId?: string, userRole?: UserRole): Promise<BookingEntity> {

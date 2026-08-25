@@ -30,6 +30,24 @@ export interface CatalogItemInput {
   sortOrder?: number;
 }
 
+export interface SeasonalEventCatalogItem {
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  note: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface SeasonalEventInput {
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  note?: string;
+  sortOrder?: number;
+}
+
 export interface IVenueRepository {
   findById(id: string): Promise<VenueEntity | null>;
   findBySlug(slug: string): Promise<VenueEntity | null>;
@@ -57,6 +75,12 @@ export interface IVenueRepository {
     id: string,
     data: Partial<CatalogItemInput> & { isActive?: boolean },
   ): Promise<CatalogItem>;
+  findSeasonalEvents(includeInactive?: boolean): Promise<SeasonalEventCatalogItem[]>;
+  createSeasonalEvent(data: SeasonalEventInput): Promise<SeasonalEventCatalogItem>;
+  updateSeasonalEvent(
+    id: string,
+    data: Partial<SeasonalEventInput> & { isActive?: boolean },
+  ): Promise<SeasonalEventCatalogItem>;
   create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity>;
   update(id: string, data: Record<string, unknown>): Promise<VenueEntity>;
   updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity>;

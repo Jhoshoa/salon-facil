@@ -3,14 +3,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CalendarCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { createBooking, previewBookingPrice } from '@/lib/api/bookings.api';
-import { formatCurrency, formatDateInput } from '@/lib/formatters';
+import { formatCurrency, formatDateInput, formatTime12h } from '@/lib/formatters';
 import { bookingSchema, type BookingFormValues } from '@/lib/validators/booking.schema';
 import { useAuthStore } from '@/stores/auth.store';
-import type { Venue } from '@/types/api';
+import type { DailyScheduleEntry, Venue } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +53,8 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
   }, [selectedRange, form]);
 
   const mutation = useMutation({
-    mutationFn: (values: BookingFormValues) => createBooking(venue.id, values),
+    mutationFn: (values: BookingFormValues & { dailySchedule?: DailyScheduleEntry[] }) =>
+      createBooking(venue.id, values),
     onSuccess: (response) => {
       toast.success('Reserva solicitada', {
         description: `Sena requerida: ${formatCurrency(response.booking.depositAmount)}`,
@@ -69,7 +70,6 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
   });
 
   const values = form.watch();
-  const canSubmit = form.formState.isValid && !mutation.isPending;
   const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
 
   const canPreview =
@@ -80,6 +80,20 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
     TIME_PATTERN.test(values.endTime ?? '') &&
     values.startTime < values.endTime;
 
+  const isMultiDay = values.eventDate && values.endDate && values.eventDate !== values.endDate;
+
+  // Per-day time overrides, only used for days whose effective unit resolves to HOUR in a
+  // mixed range (some days billed per-hour, others per-day) — see docs/fase-1 §6.2. Keyed by
+  // date; seeded (and re-seeded) from the preview's resolved HOUR days once known below.
+  const [dailySchedule, setDailySchedule] = useState<Record<string, { startTime: string; endTime: string }>>(
+    {},
+  );
+
+  const dailyScheduleEntries = useMemo<DailyScheduleEntry[] | undefined>(() => {
+    const entries = Object.entries(dailySchedule).map(([date, t]) => ({ date, ...t }));
+    return entries.length > 0 ? entries : undefined;
+  }, [dailySchedule]);
+
   const previewQuery = useQuery({
     queryKey: [
       'booking-price-preview',
@@ -88,6 +102,7 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
       values.endDate,
       values.startTime,
       values.endTime,
+      dailyScheduleEntries,
     ],
     queryFn: () =>
       previewBookingPrice(venue.id, {
@@ -95,15 +110,52 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
         endDate: values.endDate,
         startTime: values.startTime,
         endTime: values.endTime,
+        dailySchedule: dailyScheduleEntries,
       }),
     enabled: canPreview,
   });
 
-  const isMultiDay = values.eventDate && values.endDate && values.eventDate !== values.endDate;
+  const openingHourByWeekday = useMemo(
+    () => new Map((venue.openingHours ?? []).map((h) => [h.dayOfWeek, h])),
+    [venue.openingHours],
+  );
+
+  const previewDays = previewQuery.data?.days ?? [];
+  const isMixedUnits = Boolean(isMultiDay) && new Set(previewDays.map((d) => d.unit)).size > 1;
+
+  // Once we know which days resolved to HOUR in a mixed range, seed a per-day override for
+  // each (defaulting to the global start/end time) so the user can adjust them individually.
+  // Re-syncs whenever the resolved HOUR-day set actually changes; a no-op JSON compare avoids
+  // refetch loops (this effect's own state feeds back into the query key above).
+  useEffect(() => {
+    if (!isMixedUnits) {
+      if (Object.keys(dailySchedule).length > 0) setDailySchedule({});
+      return;
+    }
+    const hourDates = previewDays.filter((d) => d.unit === 'HOUR').map((d) => d.date);
+    const next: Record<string, { startTime: string; endTime: string }> = {};
+    for (const date of hourDates) {
+      next[date] = dailySchedule[date] ?? { startTime: values.startTime, endTime: values.endTime };
+    }
+    if (JSON.stringify(next) !== JSON.stringify(dailySchedule)) {
+      setDailySchedule(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMixedUnits, previewQuery.data]);
+
+  const updateDailySchedule = (date: string, patch: Partial<{ startTime: string; endTime: string }>) => {
+    setDailySchedule((prev) => ({ ...prev, [date]: { ...prev[date], ...patch } }));
+  };
 
   const handleConfirm = () => {
-    mutation.mutate(form.getValues());
+    mutation.mutate({ ...form.getValues(), dailySchedule: dailyScheduleEntries });
   };
+
+  const previewError = previewQuery.isError
+    ? ((previewQuery.error as { message?: string })?.message ?? 'Revisa las fechas y horarios elegidos.')
+    : null;
+
+  const canSubmit = form.formState.isValid && !mutation.isPending && !previewError;
 
   return (
     <div className="sf-card-strong overflow-hidden">
@@ -134,6 +186,11 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
             </ul>
           ) : null}
         </div>
+        {previewError ? (
+          <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {previewError}
+          </p>
+        ) : null}
       </div>
 
       {!isAuthenticated ? (
@@ -218,7 +275,7 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="startTime">Inicio</Label>
+            <Label htmlFor="startTime">{isMixedUnits ? 'Horario por defecto' : 'Inicio'}</Label>
             <Input
               id="startTime"
               type="time"
@@ -230,14 +287,66 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
             ) : null}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="endTime">Fin</Label>
+            <Label htmlFor="endTime">{isMixedUnits ? ' ' : 'Fin'}</Label>
             <Input id="endTime" type="time" className="sf-surface" {...form.register('endTime')} />
             {form.formState.errors.endTime ? (
               <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
             ) : null}
           </div>
         </div>
-        {venue.allowsMultipleDays && isMultiDay ? (
+
+        {isMixedUnits ? (
+          <div className="space-y-2 rounded-[var(--radius)] border p-3">
+            <p className="text-xs text-muted-foreground">
+              Este local cobra por hora algunos dias del rango elegido y por dia completo otros.
+              Ajusta el horario solo en los dias que lo necesitan.
+            </p>
+            {previewDays.map((day) => {
+              const dayOfWeek = new Date(`${day.date}T00:00:00Z`).getUTCDay();
+              const opening = openingHourByWeekday.get(dayOfWeek);
+              const schedule = dailySchedule[day.date];
+
+              return (
+                <div
+                  key={day.date}
+                  className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-2 text-sm"
+                >
+                  <span className="w-28 font-medium">{day.date}</span>
+                  {day.unit === 'HOUR' && schedule ? (
+                    <>
+                      <Input
+                        type="time"
+                        className="sf-surface w-32"
+                        value={schedule.startTime}
+                        onChange={(e) => updateDailySchedule(day.date, { startTime: e.target.value })}
+                      />
+                      <span className="text-muted-foreground">a</span>
+                      <Input
+                        type="time"
+                        className="sf-surface w-32"
+                        value={schedule.endTime}
+                        onChange={(e) => updateDailySchedule(day.date, { endTime: e.target.value })}
+                      />
+                      {opening && !opening.isClosed ? (
+                        <span className="text-xs text-muted-foreground">
+                          (horario del local: {formatTime12h(opening.opensAt)} -{' '}
+                          {formatTime12h(opening.closesAt)})
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Dia completo
+                      {opening && !opening.isClosed
+                        ? ` (horario del local: ${formatTime12h(opening.opensAt)} - ${formatTime12h(opening.closesAt)})`
+                        : ''}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : venue.allowsMultipleDays && isMultiDay ? (
           <p className="text-xs text-muted-foreground">
             Este horario se aplica a todos los dias del rango seleccionado.
           </p>

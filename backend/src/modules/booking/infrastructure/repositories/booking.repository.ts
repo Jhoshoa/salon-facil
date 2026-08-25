@@ -157,13 +157,15 @@ export class BookingRepository implements IBookingRepository {
       // One row per day; the (venueId, date) unique constraint is what actually
       // prevents a double booking under concurrent requests — this insert either
       // succeeds for every day atomically or the whole transaction rolls back.
+      // Each day carries its own start/end time (a DAY-unit day uses the venue's opening
+      // hours, an HOUR-unit day uses whatever the client picked for that specific day).
       await tx.bookingDate.createMany({
         data: data.dailyBreakdown.map((day) => ({
           bookingId: created.id,
           venueId: data.venueId,
           date: day.date,
-          startTime,
-          endTime,
+          startTime: this.timeToDate(day.startTime),
+          endTime: this.timeToDate(day.endTime),
           appliedPrice: new Prisma.Decimal(day.appliedPrice),
         })),
       });

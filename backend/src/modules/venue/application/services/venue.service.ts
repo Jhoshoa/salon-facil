@@ -188,6 +188,37 @@ export class VenueService {
     return this.venueRepository.updateUseType(id, data);
   }
 
+  getSeasonalEventsCatalog() {
+    return this.venueRepository.findSeasonalEvents();
+  }
+
+  getAdminSeasonalEventsCatalog() {
+    return this.venueRepository.findSeasonalEvents(true);
+  }
+
+  createSeasonalEvent(data: Parameters<IVenueRepository['createSeasonalEvent']>[0]) {
+    this.validateSeasonalEventDates(data.startDate, data.endDate);
+    return this.venueRepository.createSeasonalEvent(data);
+  }
+
+  updateSeasonalEvent(id: string, data: Parameters<IVenueRepository['updateSeasonalEvent']>[1]) {
+    if (data.startDate || data.endDate) {
+      // Partial updates might only touch one bound; re-derive the other from... we don't have
+      // it here without a read, so this check only fires when both are sent together (the UI
+      // always sends both since it's a single date-range field pair).
+      if (data.startDate && data.endDate) {
+        this.validateSeasonalEventDates(data.startDate, data.endDate);
+      }
+    }
+    return this.venueRepository.updateSeasonalEvent(id, data);
+  }
+
+  private validateSeasonalEventDates(startDate: Date, endDate: Date): void {
+    if (endDate < startDate) {
+      throw new BadRequestException('endDate debe ser igual o posterior a startDate');
+    }
+  }
+
   async addVenueMedia(
     id: string,
     userId: string,

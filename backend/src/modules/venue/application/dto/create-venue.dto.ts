@@ -111,6 +111,10 @@ export class CreateVenuePriceDto {
   price!: number;
 
   @IsOptional()
+  @IsIn(['EVENT', 'HOUR', 'DAY'])
+  unit?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(100)

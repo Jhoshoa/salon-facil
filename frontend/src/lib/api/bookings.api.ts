@@ -5,6 +5,7 @@ import type {
   Booking,
   CreateBookingPayload,
   CreateBookingResponse,
+  DailyScheduleEntry,
   RangePriceCalculation,
 } from '@/types/api';
 
@@ -40,13 +41,22 @@ export const checkAvailabilityRange = async (
 
 export const previewBookingPrice = async (
   venueId: string,
-  params: { eventDate: string; endDate?: string; startTime: string; endTime: string },
+  params: {
+    eventDate: string;
+    endDate?: string;
+    startTime: string;
+    endTime: string;
+    dailySchedule?: DailyScheduleEntry[];
+  },
 ): Promise<RangePriceCalculation> => {
   const search = new URLSearchParams({
     eventDate: params.eventDate,
     startTime: params.startTime,
     endTime: params.endTime,
     ...(params.endDate ? { endDate: params.endDate } : {}),
+    ...(params.dailySchedule?.length
+      ? { dailySchedule: JSON.stringify(params.dailySchedule) }
+      : {}),
   });
   return apiRequest<RangePriceCalculation>(
     `/venues/${venueId}/bookings/preview-price?${search.toString()}`,

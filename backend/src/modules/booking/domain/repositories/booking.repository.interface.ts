@@ -63,7 +63,7 @@ export interface CreateBookingData {
   depositAmount: number;
   specialRequests?: string;
   /** One entry per day in [startDate, endDate], used to create the BookingDate rows. */
-  dailyBreakdown: { date: Date; appliedPrice: number }[];
+  dailyBreakdown: { date: Date; appliedPrice: number; startTime: string; endTime: string }[];
 }
 
 export interface CreateCalendarBlockData {

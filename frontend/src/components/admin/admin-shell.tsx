@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarCheck, LayoutGrid, Menu, ShieldCheck, Sparkles, Tag } from 'lucide-react';
+import { CalendarCheck, CalendarRange, LayoutGrid, Menu, ShieldCheck, Sparkles, Tag } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ const navItems = [
   { href: '/admin/catalog/space-types', label: 'Tipos de espacio', icon: LayoutGrid },
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },
   { href: '/admin/catalog/amenities', label: 'Comodidades', icon: Tag },
+  { href: '/admin/catalog/seasonal-events', label: 'Feriados y temporadas', icon: CalendarRange },
 ];
 
 interface AdminShellProps {

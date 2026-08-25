@@ -25,8 +25,10 @@ import { VenueFilterDto } from '../application/dto/venue-filter.dto';
 import {
   CreateAmenityDto,
   CreateCatalogItemDto,
+  CreateSeasonalEventDto,
   UpdateAmenityDto,
   UpdateCatalogItemDto,
+  UpdateSeasonalEventDto,
 } from '../application/dto/catalog.dto';
 import { VenueService } from '../application/services/venue.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
@@ -115,6 +117,14 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Tipos de evento disponibles' })
   getUseTypesCatalog() {
     return this.venueService.getUseTypesCatalog();
+  }
+
+  @Get('catalog/seasonal-events')
+  @Public()
+  @ApiOperation({ summary: 'Obtener feriados y temporadas sugeridas por el admin' })
+  @ApiResponse({ status: 200, description: 'Catalogo de feriados/temporadas activos' })
+  getSeasonalEventsCatalog() {
+    return this.venueService.getSeasonalEventsCatalog();
   }
 
   @Get(':slug/similar')
@@ -388,5 +398,48 @@ export class VenueController {
   @ApiOperation({ summary: 'Actualizar o desactivar una comodidad (ADMIN)' })
   async updateAmenity(@Param('catalogId') catalogId: string, @Body() dto: UpdateAmenityDto) {
     return this.venueService.updateAmenity(catalogId, dto);
+  }
+
+  // --- Catalog management: suggested seasonal events (feriados/temporadas) ---
+
+  @Get('admin/catalog/seasonal-events')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar feriados/temporadas sugeridas, incluyendo inactivas (ADMIN)' })
+  async getAdminSeasonalEvents() {
+    return this.venueService.getAdminSeasonalEventsCatalog();
+  }
+
+  @Post('admin/catalog/seasonal-events')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Crear un feriado/temporada sugerida (ADMIN)' })
+  async createSeasonalEvent(@Body() dto: CreateSeasonalEventDto) {
+    return this.venueService.createSeasonalEvent({
+      name: dto.name,
+      startDate: new Date(dto.startDate),
+      endDate: new Date(dto.endDate),
+      note: dto.note,
+      sortOrder: dto.sortOrder,
+    });
+  }
+
+  @Put('admin/catalog/seasonal-events/:catalogId')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar o desactivar un feriado/temporada sugerida (ADMIN)' })
+  async updateSeasonalEvent(
+    @Param('catalogId') catalogId: string,
+    @Body() dto: UpdateSeasonalEventDto,
+  ) {
+    return this.venueService.updateSeasonalEvent(catalogId, {
+      name: dto.name,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+      note: dto.note,
+      sortOrder: dto.sortOrder,
+      isActive: dto.isActive,
+    });
   }
 }

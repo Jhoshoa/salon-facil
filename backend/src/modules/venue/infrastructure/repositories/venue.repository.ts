@@ -5,6 +5,8 @@ import {
   CatalogItem,
   CatalogItemInput,
   IVenueRepository,
+  SeasonalEventCatalogItem,
+  SeasonalEventInput,
 } from '../../domain/repositories/venue.repository.interface';
 import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
@@ -447,6 +449,32 @@ export class VenueRepository implements IVenueRepository {
     return this.prisma.useType.update({ where: { id }, data });
   }
 
+  async findSeasonalEvents(includeInactive = false): Promise<SeasonalEventCatalogItem[]> {
+    return this.prisma.suggestedSeasonalEvent.findMany({
+      where: includeInactive ? undefined : { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { startDate: 'asc' }],
+    });
+  }
+
+  async createSeasonalEvent(data: SeasonalEventInput): Promise<SeasonalEventCatalogItem> {
+    return this.prisma.suggestedSeasonalEvent.create({
+      data: {
+        name: data.name,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        note: data.note,
+        sortOrder: data.sortOrder ?? 0,
+      },
+    });
+  }
+
+  async updateSeasonalEvent(
+    id: string,
+    data: Partial<SeasonalEventInput> & { isActive?: boolean },
+  ): Promise<SeasonalEventCatalogItem> {
+    return this.prisma.suggestedSeasonalEvent.update({ where: { id }, data });
+  }
+
   async findByStatus(status: string): Promise<VenueEntity[]> {
     const venues = await this.prisma.venue.findMany({
       where: { status: status as VenueStatus },
@@ -531,6 +559,7 @@ export class VenueRepository implements IVenueRepository {
           startDate: p.startDate ? new Date(p.startDate as string) : undefined,
           endDate: p.endDate ? new Date(p.endDate as string) : undefined,
           price: new Prisma.Decimal(p.price as number),
+          unit: (p.unit as PriceUnit | undefined) ?? undefined,
           discountPercent:
             p.discountPercent != null ? new Prisma.Decimal(p.discountPercent as number) : undefined,
           discountLabel: p.discountLabel as string | undefined,
@@ -682,6 +711,7 @@ export class VenueRepository implements IVenueRepository {
           startDate: p.startDate ? new Date(p.startDate as string) : undefined,
           endDate: p.endDate ? new Date(p.endDate as string) : undefined,
           price: new Prisma.Decimal(p.price as number),
+          unit: (p.unit as PriceUnit | undefined) ?? undefined,
           discountPercent:
             p.discountPercent != null ? new Prisma.Decimal(p.discountPercent as number) : undefined,
           discountLabel: (p.discountLabel as string) ?? undefined,

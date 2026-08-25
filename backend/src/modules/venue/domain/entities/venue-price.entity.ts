@@ -1,3 +1,5 @@
+import { PriceUnit } from '@prisma/client';
+
 export enum PriceType {
   BASE = 'BASE',
   WEEKEND = 'WEEKEND',
@@ -17,6 +19,8 @@ export class VenuePriceEntity {
   endDate: Date | null = null;
   price!: number;
   currency: string = 'BOB';
+  /** null = hereda Venue.priceUnit; con valor, esta regla fuerza esa unidad para los dias que cubre. */
+  unit: PriceUnit | null = null;
   discountPercent: number | null = null;
   discountLabel: string | null = null;
   isActive: boolean = true;

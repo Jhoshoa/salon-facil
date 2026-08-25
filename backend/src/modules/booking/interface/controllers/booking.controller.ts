@@ -38,6 +38,7 @@ export class BookingController {
       endTime: dto.endTime,
       guestCount: dto.guestCount,
       specialRequests: dto.specialRequests,
+      dailySchedule: dto.dailySchedule,
     });
   }
 

@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -12,8 +13,46 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { BookingStatus } from '../../domain/entities/booking.entity';
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** `dailySchedule` arrives as a real array in a JSON POST body, but as a JSON-encoded
+ * string in GET query params (preview-price) — parse it back into an array either way. */
+function parseDailyScheduleArray(value: unknown): unknown {
+  let parsedValue = value;
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      parsedValue = JSON.parse(value) as unknown;
+    } catch {
+      return value;
+    }
+  }
+
+  if (!Array.isArray(parsedValue)) {
+    return value;
+  }
+
+  return parsedValue.map((item) => Object.assign(new DailyScheduleEntryDto(), item));
+}
+
+/** Horario para un dia especifico del rango cuya unidad efectiva resulto ser HOUR. */
+export class DailyScheduleEntryDto {
+  @IsDateString({}, { message: 'La fecha del horario debe ser valida' })
+  date!: string;
+
+  @IsString({ message: 'La hora de inicio es requerida' })
+  @Matches(TIME_PATTERN, { message: 'La hora de inicio debe tener formato HH:MM' })
+  startTime!: string;
+
+  @IsString({ message: 'La hora de fin es requerida' })
+  @Matches(TIME_PATTERN, { message: 'La hora de fin debe tener formato HH:MM' })
+  endTime!: string;
+}
 
 export class CreateBookingDto {
   @IsString({ message: 'El tipo de evento es requerido' })
@@ -50,6 +89,13 @@ export class CreateBookingDto {
   @IsString()
   @MaxLength(1000)
   specialRequests?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => parseDailyScheduleArray(value))
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DailyScheduleEntryDto)
+  dailySchedule?: DailyScheduleEntryDto[];
 }
 
 export class CheckAvailabilityDto {
@@ -92,6 +138,13 @@ export class PreviewPriceDto {
     message: 'La hora de fin debe tener formato HH:MM',
   })
   endTime!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => parseDailyScheduleArray(value))
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DailyScheduleEntryDto)
+  dailySchedule?: DailyScheduleEntryDto[];
 }
 
 export class UpdateBookingStatusDto {
