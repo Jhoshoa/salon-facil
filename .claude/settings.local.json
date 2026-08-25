@@ -30,7 +30,10 @@
       "Bash(docker compose *)",
       "Bash(netstat -ano)",
       "Bash(npx prisma *)",
-      "Bash(rm -f /tmp/set_completed.js 2>/dev/null; echo done)"
+      "Bash(rm -f /tmp/set_completed.js 2>/dev/null; echo done)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(git add *)"
     ]
   }
 }

@@ -110,24 +110,27 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             ))}
           </div>
         ) : null}
-      </div>
 
-      <div className="sf-result-price-box">
-        <div>
-          <p className="sf-price-label">Desde</p>
-          <p className="sf-price">{basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}</p>
-          <p className="sf-price-unit">por {priceUnitLabel[venue.priceUnit] ?? 'evento'}</p>
-          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
-            Min. {venue.minimumHours} h
-          </p>
+        <div className="sf-result-footer">
+          <div>
+            <p className="text-lg font-semibold leading-tight">
+              {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                por {priceUnitLabel[venue.priceUnit] ?? 'evento'}
+              </span>
+            </p>
+            <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              Min. {venue.minimumHours} h
+            </p>
+          </div>
+          <Button asChild size="sm">
+            <Link href={`/venues/${venue.slug}`}>
+              Ver detalles
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
-        <Button asChild className="w-full">
-          <Link href={`/venues/${venue.slug}`}>
-            Ver disponibilidad
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
       </div>
     </article>
   );

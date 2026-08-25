@@ -301,7 +301,7 @@
 
   @media (min-width: 768px) {
     .sf-result-card {
-      @apply grid-cols-[280px_1fr_200px];
+      @apply grid-cols-[280px_1fr];
     }
   }
 
@@ -309,8 +309,8 @@
     @apply relative aspect-[4/3] overflow-hidden rounded-lg bg-muted md:aspect-auto md:min-h-[200px];
   }
 
-  .sf-result-price-box {
-    @apply sf-surface flex flex-col justify-between gap-4 border p-4 md:text-right;
+  .sf-result-footer {
+    @apply flex items-center justify-between gap-3 border-t pt-3;
   }
 
   /* --- Carousel Cards --- */
