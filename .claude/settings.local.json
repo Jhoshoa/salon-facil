@@ -25,7 +25,8 @@
       "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npm run test:e2e -- venue.e2e-spec.ts auth.e2e-spec.ts)",
       "Bash(npm run *)",
       "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" node cleanup-test-data.js)",
-      "Bash(ls \"/c/Users/josoe/.claude/projects/C--Users-josoe-Documents-salon-facil/memory/\" 2>&1)"
+      "Bash(ls \"/c/Users/josoe/.claude/projects/C--Users-josoe-Documents-salon-facil/memory/\" 2>&1)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" node check-user.js)"
     ]
   }
 }

@@ -42,6 +42,34 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'rules', label: 'Reglas' },
 ];
 
+// Maps each schema field to the tab it's rendered on, so a failed submit can jump the user
+// to the first tab containing an error instead of silently doing nothing (errors on a hidden
+// tab are otherwise invisible since only the active tab's fields are rendered).
+const fieldTab: Record<keyof VenueFormValues, TabKey> = {
+  name: 'general',
+  description: 'general',
+  shortDescription: 'general',
+  spaceType: 'general',
+  address: 'location',
+  district: 'location',
+  city: 'location',
+  latitude: 'location',
+  longitude: 'location',
+  capacityMin: 'pricing',
+  capacityMax: 'pricing',
+  squareMeters: 'pricing',
+  priceUnit: 'pricing',
+  minimumHours: 'pricing',
+  instantBooking: 'pricing',
+  allowsMultipleDays: 'pricing',
+  basePrice: 'pricing',
+  amenityIds: 'amenities',
+  useTypes: 'general',
+  openingHours: 'hours',
+  rules: 'rules',
+  cancellationPolicy: 'rules',
+};
+
 const venueToFormValues = (venue: Venue): VenueFormValues => {
   const basePrice = venue.prices?.find((p) => p.priceType === 'BASE')?.price ?? 0;
   const hoursByDay = new Map((venue.openingHours ?? []).map((h) => [h.dayOfWeek, h]));
@@ -194,25 +222,37 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
   };
 
   const errors = form.formState.errors;
+  const tabsWithErrors = new Set(
+    Object.keys(errors).map((field) => fieldTab[field as keyof VenueFormValues]),
+  );
+
+  const onInvalid = (formErrors: typeof errors) => {
+    const firstErrorField = Object.keys(formErrors)[0] as keyof VenueFormValues | undefined;
+    const firstErrorTab = firstErrorField ? fieldTab[firstErrorField] : undefined;
+    if (firstErrorTab) setActiveTab(firstErrorTab);
+    toast.error('Revisa los campos marcados', {
+      description: 'Falta completar informacion en una o mas pestanas.',
+    });
+  };
 
   return (
-    <form
-      className="space-y-5"
-      onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-    >
+    <form className="space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values), onInvalid)}>
       <div className="flex flex-wrap gap-2 border-b pb-3">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
             {tab.label}
+            {tabsWithErrors.has(tab.key) ? (
+              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-destructive" />
+            ) : null}
           </button>
         ))}
       </div>
