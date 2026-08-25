@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+export const timeToMinutes = (time: string): number => {
+  const [hour, minute] = time.split(':').map(Number);
+  return hour * 60 + minute;
+};
+
+/** "00:00" as an end time means "midnight, end of day" (see booking.service.ts on the
+ * backend), not "the very start of the day" — treat it as 24:00 for comparison. */
+export const endTimeToMinutes = (time: string): number =>
+  time === '00:00' ? 24 * 60 : timeToMinutes(time);
+
 export const bookingSchema = z
   .object({
     eventType: z.string().min(2, 'Indica el tipo de evento').max(100),
@@ -10,7 +20,7 @@ export const bookingSchema = z
     guestCount: z.coerce.number().min(1, 'Debe haber al menos 1 invitado').max(5000),
     specialRequests: z.string().max(1000).optional(),
   })
-  .refine((data) => data.startTime < data.endTime, {
+  .refine((data) => timeToMinutes(data.startTime) < endTimeToMinutes(data.endTime), {
     path: ['endTime'],
     message: 'La hora de fin debe ser posterior al inicio',
   })

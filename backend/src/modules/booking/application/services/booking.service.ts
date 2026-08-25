@@ -70,7 +70,7 @@ export class BookingService {
       );
     }
 
-    if (dto.startTime >= dto.endTime) {
+    if (this.timeToMinutes(dto.startTime) >= this.endTimeToMinutes(dto.endTime)) {
       throw new BadRequestException('La hora de inicio debe ser anterior a la hora de fin');
     }
 
@@ -176,7 +176,7 @@ export class BookingService {
   ): Promise<RangePriceCalculationResult> {
     const venue = await this.venueService.getVenueById(venueId);
 
-    if (dto.startTime >= dto.endTime) {
+    if (this.timeToMinutes(dto.startTime) >= this.endTimeToMinutes(dto.endTime)) {
       throw new BadRequestException('La hora de inicio debe ser anterior a la hora de fin');
     }
 
@@ -217,10 +217,19 @@ export class BookingService {
   }
 
   private computeHoursBetween(startTime: string, endTime: string): number {
-    const [startHour, startMinute] = startTime.split(':').map(Number);
-    const [endHour, endMinute] = endTime.split(':').map(Number);
-    const minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+    const minutes = this.endTimeToMinutes(endTime) - this.timeToMinutes(startTime);
     return Math.round((minutes / 60) * 100) / 100;
+  }
+
+  private timeToMinutes(time: string): number {
+    const [hour, minute] = time.split(':').map(Number);
+    return hour * 60 + minute;
+  }
+
+  /** Same as timeToMinutes, except "00:00" is treated as 24:00 (end of day) — the only sane
+   * reading when it appears as an end-of-range value (a closing time or a booking's end time). */
+  private endTimeToMinutes(time: string): number {
+    return time === '00:00' ? 24 * 60 : this.timeToMinutes(time);
   }
 
   /**
@@ -277,15 +286,25 @@ export class BookingService {
 
       if (unit === PriceUnit.HOUR) {
         const entry = scheduleByDate.get(dateKey) ?? { startTime: dto.startTime, endTime: dto.endTime };
-        if (entry.startTime >= entry.endTime) {
+        if (!opening || opening.isClosed) {
+          throw new BadRequestException(`El local esta cerrado el ${dateKey}`);
+        }
+        // "00:00" as a closing/end time means "open until midnight" (end of day), not "closes
+        // right at the start of the day" — compare in minutes-since-midnight with that one
+        // value promoted to 24:00 so it always reads as the *latest* possible time, not the
+        // earliest. Only applies to end-of-range values (closesAt / entry.endTime); a start
+        // time of "00:00" is genuinely midnight and needs no such treatment.
+        const startMinutes = this.timeToMinutes(entry.startTime);
+        const endMinutes = this.endTimeToMinutes(entry.endTime);
+        const opensMinutes = this.timeToMinutes(opening.opensAt);
+        const closesMinutes = this.endTimeToMinutes(opening.closesAt);
+
+        if (startMinutes >= endMinutes) {
           throw new BadRequestException(
             `La hora de inicio debe ser anterior a la de fin (${dateKey})`,
           );
         }
-        if (!opening || opening.isClosed) {
-          throw new BadRequestException(`El local esta cerrado el ${dateKey}`);
-        }
-        if (entry.startTime < opening.opensAt || entry.endTime > opening.closesAt) {
+        if (startMinutes < opensMinutes || endMinutes > closesMinutes) {
           throw new BadRequestException(
             `El ${dateKey} el local abre de ${opening.opensAt} a ${opening.closesAt}`,
           );

@@ -8,7 +8,12 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { createBooking, previewBookingPrice } from '@/lib/api/bookings.api';
 import { formatCurrency, formatDate, formatDateInput, formatTime12h } from '@/lib/formatters';
-import { bookingSchema, type BookingFormValues } from '@/lib/validators/booking.schema';
+import {
+  bookingSchema,
+  endTimeToMinutes,
+  timeToMinutes,
+  type BookingFormValues,
+} from '@/lib/validators/booking.schema';
 import { useAuthStore } from '@/stores/auth.store';
 import type { DailyScheduleEntry, Venue } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -24,12 +29,32 @@ interface BookingFormProps {
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const FALLBACK_SCHEDULE = { startTime: '18:00', endTime: '23:00' };
+
+/** A sensible startTime/endTime to preload the form with — the venue's own opening hours for
+ * that weekday, rather than an arbitrary fixed range that may fall outside them (a HOUR-unit
+ * venue would otherwise show a "horario invalido" error before the client has touched anything).
+ * "00:00" as a closing time means "open until midnight" (see booking.service.ts); a real time
+ * input can't represent 24:00, so it's mapped to 23:59 for the default. */
+const computeDefaultSchedule = (venue: Venue, dateStr: string): { startTime: string; endTime: string } => {
+  const hours = venue.openingHours;
+  if (!hours?.length) return FALLBACK_SCHEDULE;
+
+  const dayOfWeek = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
+  const entry = hours.find((h) => h.dayOfWeek === dayOfWeek && !h.isClosed) ?? hours.find((h) => !h.isClosed);
+  if (!entry) return FALLBACK_SCHEDULE;
+
+  const startTime = entry.opensAt;
+  const endTime = entry.closesAt === '00:00' ? '23:59' : entry.closesAt;
+  return timeToMinutes(startTime) < endTimeToMinutes(endTime) ? { startTime, endTime } : FALLBACK_SCHEDULE;
+};
 
 export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingFormProps) => {
   const { isAuthenticated } = useAuthStore();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const defaultDate = formatDateInput(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const defaultSchedule = computeDefaultSchedule(venue, defaultDate);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -39,8 +64,8 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
       eventType: '',
       eventDate: defaultDate,
       endDate: defaultDate,
-      startTime: '18:00',
-      endTime: '23:00',
+      startTime: defaultSchedule.startTime,
+      endTime: defaultSchedule.endTime,
       guestCount: Math.min(venue.capacityMax, 100),
       specialRequests: '',
     },
@@ -78,7 +103,7 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
     values.endDate >= values.eventDate &&
     TIME_PATTERN.test(values.startTime ?? '') &&
     TIME_PATTERN.test(values.endTime ?? '') &&
-    values.startTime < values.endTime;
+    timeToMinutes(values.startTime) < endTimeToMinutes(values.endTime);
 
   const isMultiDay = values.eventDate && values.endDate && values.eventDate !== values.endDate;
 

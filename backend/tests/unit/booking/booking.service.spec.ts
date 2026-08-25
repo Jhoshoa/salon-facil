@@ -394,6 +394,48 @@ describe('BookingService', () => {
     });
   });
 
+  describe('requestBooking — opening hours that close at midnight ("00:00")', () => {
+    // A closesAt of "00:00" means "open until midnight", not "closes at the start of the
+    // day" — naive string comparison ("23:00" > "00:00") used to reject perfectly valid
+    // bookings inside a venue's own hours. Regression coverage for that fix.
+    const midnightVenue = () =>
+      makeVenue({
+        priceUnit: 'HOUR' as never,
+        openingHours: [{ id: 'oh-fri', dayOfWeek: 5, opensAt: '10:00', closesAt: '00:00', isClosed: false }],
+      });
+    const midnightDto = {
+      eventType: 'Rodaje',
+      eventDate: '2026-09-18', // Friday
+      startTime: '18:00',
+      endTime: '23:00',
+      guestCount: 50,
+    };
+
+    beforeEach(() => {
+      mockVenueService.getVenueById.mockResolvedValue(midnightVenue());
+      mockPriceCalculator.resolveUnitForDate.mockReturnValue('HOUR');
+      mockBookingRepository.create.mockResolvedValue(makeBooking());
+    });
+
+    it('accepts a schedule that ends before midnight, within a venue open until 00:00', async () => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', midnightDto),
+      ).resolves.toBeDefined();
+    });
+
+    it('accepts a schedule ending exactly at midnight', async () => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', { ...midnightDto, endTime: '00:00' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('still rejects a schedule starting before the venue opens', async () => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', { ...midnightDto, startTime: '08:00' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('getBookingById', () => {
     it('should return a booking by id', async () => {
       mockBookingRepository.findById.mockResolvedValue(makeBooking());
