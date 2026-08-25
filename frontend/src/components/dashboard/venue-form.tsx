@@ -425,6 +425,15 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
   const defaultPriceUnit = form.watch('priceUnit');
   const defaultBasePrice = form.watch('basePrice');
 
+  // "Horas minimas de alquiler" only means something for hourly bookings — show it only when
+  // an HOUR unit is actually in play somewhere (the default, a weekday rule, or a season rule).
+  const anyHourPricing =
+    defaultPriceUnit === 'HOUR' ||
+    (pricingMode !== 'single' &&
+      weekdayRules.some((rule) => rule.enabled && (rule.unit || defaultPriceUnit) === 'HOUR')) ||
+    (pricingMode === 'weekday_season' &&
+      seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR'));
+
   const toggleAmenity = (id: string) => {
     const next = amenityIds.includes(id)
       ? amenityIds.filter((item) => item !== id)
@@ -620,52 +629,12 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                 </div>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="sf-form-group">
-                  <Label htmlFor="basePrice">Precio base (Bs)</Label>
-                  <Input id="basePrice" type="number" min={1} {...form.register('basePrice')} />
-                  {errors.basePrice ? <p className="sf-form-error">{errors.basePrice.message}</p> : null}
-                </div>
-                <div className="sf-form-group">
-                  <Label htmlFor="priceUnit">Unidad de precio</Label>
-                  <Select id="priceUnit" {...form.register('priceUnit')}>
-                    {Object.entries(priceUnitLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="sf-form-group">
-                  <Label htmlFor="minimumHours">Horas minimas de alquiler</Label>
-                  <Input id="minimumHours" type="number" min={1} max={24} {...form.register('minimumHours')} />
-                </div>
-                <div className="sf-form-group">
-                  <Label htmlFor="squareMeters">Metros cuadrados (opcional)</Label>
-                  <Input id="squareMeters" type="number" min={1} {...form.register('squareMeters')} />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-6">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="h-4 w-4" {...form.register('instantBooking')} />
-                  Reserva inmediata
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="h-4 w-4" {...form.register('allowsMultipleDays')} />
-                  Permite eventos de varios dias
-                </label>
-              </div>
-
               <div className="space-y-4 border-t pt-5">
                 <div>
                   <Label>Modo de precio</Label>
                   <p className="text-sm text-muted-foreground">
-                    El precio y unidad de arriba son el default del local. Estas opciones
-                    permiten agregar excepciones por dia de semana y/o por temporada.
+                    Elegi como se calculan los precios de este local antes de configurar el
+                    monto — las opciones de abajo cambian segun lo que elijas aca.
                   </p>
                 </div>
                 <div className="space-y-3">
@@ -674,13 +643,13 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                       {
                         value: 'single',
                         label: 'Un solo precio y unidad para todo el local',
-                        description: 'Todos los dias se cobran igual, con el precio y la unidad de arriba.',
+                        description: 'Todos los dias se cobran igual, con el precio y la unidad de abajo.',
                       },
                       {
                         value: 'weekday',
                         label: 'Reglas por dia de la semana',
                         description:
-                          'Elegi que dias se cobran por hora y cuales por dia completo (ej. entre semana por hora, fin de semana solo dia completo). Los dias sin regla propia usan el precio base.',
+                          'Elegi que dias se cobran por hora y cuales por dia completo (ej. entre semana por hora, fin de semana solo dia completo). Los dias sin regla propia usan el precio por defecto.',
                       },
                       {
                         value: 'weekday_season',
@@ -705,8 +674,41 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                     </label>
                   ))}
                 </div>
+              </div>
 
+              <div className="space-y-2 border-t pt-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="sf-form-group">
+                    <Label htmlFor="basePrice">
+                      {pricingMode === 'single' ? 'Precio base (Bs)' : 'Precio por defecto (Bs)'}
+                    </Label>
+                    <Input id="basePrice" type="number" min={1} {...form.register('basePrice')} />
+                    {errors.basePrice ? <p className="sf-form-error">{errors.basePrice.message}</p> : null}
+                  </div>
+                  <div className="sf-form-group">
+                    <Label htmlFor="priceUnit">
+                      {pricingMode === 'single' ? 'Unidad de precio' : 'Unidad por defecto'}
+                    </Label>
+                    <Select id="priceUnit" {...form.register('priceUnit')}>
+                      {Object.entries(priceUnitLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
                 {pricingMode !== 'single' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Se usa en los dias de la semana{pricingMode === 'weekday_season' ? ' y fechas de temporada' : ''} que
+                    no tengan su propia regla mas abajo.
+                  </p>
+                ) : null}
+              </div>
+
+              {pricingMode !== 'single' ? (
+                <div className="space-y-2 border-t pt-5">
+                  <Label>Reglas por dia de la semana</Label>
                   <div className="space-y-2">
                     {weekdayRules.map((rule) => {
                       const hint = rule.enabled ? weekdayPricingHint(rule) : null;
@@ -758,7 +760,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                               </>
                             ) : (
                               <span className="text-sm text-muted-foreground">
-                                Usa el precio base
+                                Usa el precio por defecto
                               </span>
                             )}
                           </div>
@@ -767,24 +769,25 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                       );
                     })}
                   </div>
-                ) : null}
+                </div>
+              ) : null}
 
-                {pricingMode === 'weekday_season' ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Precios por temporada</Label>
-                      <Button type="button" size="sm" variant="outline" onClick={addSeasonRule}>
-                        Agregar temporada
-                      </Button>
-                    </div>
+              {pricingMode === 'weekday_season' ? (
+                <div className="space-y-3 border-t pt-5">
+                  <div className="flex items-center justify-between">
+                    <Label>Precios por temporada</Label>
+                    <Button type="button" size="sm" variant="outline" onClick={addSeasonRule}>
+                      Agregar temporada
+                    </Button>
+                  </div>
 
-                    {seasonRules.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Sin temporadas configuradas todavia.
-                      </p>
-                    ) : null}
+                  {seasonRules.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Sin temporadas configuradas todavia.
+                    </p>
+                  ) : null}
 
-                    {seasonRules.map((rule) => (
+                  {seasonRules.map((rule) => (
                       <div key={rule.key} className="space-y-3 rounded-[var(--radius)] border p-3">
                         {seasonalEventsQuery.data && seasonalEventsQuery.data.length > 0 ? (
                           <Select
@@ -851,13 +854,46 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                             Eliminar
                           </Button>
                         </div>
-                        {seasonPricingHint(rule) ? (
-                          <p className="text-xs text-muted-foreground">{seasonPricingHint(rule)}</p>
-                        ) : null}
-                      </div>
-                    ))}
+                      {seasonPricingHint(rule) ? (
+                        <p className="text-xs text-muted-foreground">{seasonPricingHint(rule)}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div
+                className={
+                  anyHourPricing ? 'grid gap-5 border-t pt-5 sm:grid-cols-2' : 'grid gap-5 border-t pt-5'
+                }
+              >
+                {anyHourPricing ? (
+                  <div className="sf-form-group">
+                    <Label htmlFor="minimumHours">Horas minimas de alquiler</Label>
+                    <Input
+                      id="minimumHours"
+                      type="number"
+                      min={1}
+                      max={24}
+                      {...form.register('minimumHours')}
+                    />
                   </div>
                 ) : null}
+                <div className="sf-form-group">
+                  <Label htmlFor="squareMeters">Metros cuadrados (opcional)</Label>
+                  <Input id="squareMeters" type="number" min={1} {...form.register('squareMeters')} />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-6">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4" {...form.register('instantBooking')} />
+                  Reserva inmediata
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4" {...form.register('allowsMultipleDays')} />
+                  Permite eventos de varios dias
+                </label>
               </div>
             </div>
           ) : null}
