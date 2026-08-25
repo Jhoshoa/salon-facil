@@ -31,6 +31,14 @@ interface BookingFormProps {
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const FALLBACK_SCHEDULE = { startTime: '18:00', endTime: '23:00' };
 
+const unitLabels: Record<'EVENT' | 'HOUR' | 'DAY', string> = {
+  EVENT: 'por evento',
+  HOUR: 'por hora',
+  DAY: 'por dia',
+};
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
 /** A sensible startTime/endTime to preload the form with — the venue's own opening hours for
  * that weekday, rather than an arbitrary fixed range that may fall outside them (a HOUR-unit
  * venue would otherwise show a "horario invalido" error before the client has touched anything).
@@ -146,7 +154,22 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
   );
 
   const previewDays = previewQuery.data?.days ?? [];
-  const isMixedUnits = Boolean(isMultiDay) && new Set(previewDays.map((d) => d.unit)).size > 1;
+  const previewUnits = new Set(previewDays.map((d) => d.unit));
+  const isMixedUnits = Boolean(isMultiDay) && previewUnits.size > 1;
+
+  // How the total was actually charged — a single unit ("Por hora"), or a mix across days
+  // ("Combinado: por hora y por dia") when the venue configures different units per weekday.
+  const pricingModeLabel =
+    previewUnits.size === 1
+      ? capitalize(unitLabels[[...previewUnits][0]])
+      : previewUnits.size > 1
+        ? `Combinado: ${[...previewUnits].map((u) => unitLabels[u]).join(' y ')}`
+        : null;
+
+  const singleDayHours =
+    !isMultiDay && previewDays[0]?.unit === 'HOUR'
+      ? Math.round(((endTimeToMinutes(values.endTime) - timeToMinutes(values.startTime)) / 60) * 10) / 10
+      : null;
 
   // Once we know which days resolved to HOUR in a mixed range, seed a per-day override for
   // each (defaulting to the global start/end time) so the user can adjust them individually.
@@ -200,11 +223,21 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
                 ? formatCurrency(basePrice)
                 : 'Consultar'}
           </p>
+          {previewQuery.data && pricingModeLabel ? (
+            <p className="sf-glass-muted mt-0.5 text-xs">
+              {pricingModeLabel}
+              {singleDayHours != null ? ` · ${singleDayHours} ${singleDayHours === 1 ? 'hora' : 'horas'}` : ''}
+            </p>
+          ) : !previewQuery.data && basePrice > 0 ? (
+            <p className="sf-glass-muted mt-0.5 text-xs">{capitalize(unitLabels[venue.priceUnit])}</p>
+          ) : null}
           {previewQuery.data && isMultiDay ? (
-            <ul className="sf-glass-muted mt-2 space-y-0.5 text-xs">
+            <ul className="sf-glass-muted mt-2 space-y-1 text-xs">
               {previewQuery.data.days.map((day) => (
                 <li key={day.date} className="flex items-center justify-between gap-3">
-                  <span>{day.date}</span>
+                  <span>
+                    {day.date} <span className="opacity-70">({unitLabels[day.unit]})</span>
+                  </span>
                   <span>{formatCurrency(day.appliedPrice)}</span>
                 </li>
               ))}
