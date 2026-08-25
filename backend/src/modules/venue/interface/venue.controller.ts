@@ -22,6 +22,12 @@ import { UserRole } from '../../auth/domain/entities/user.entity';
 import { CreateVenueDto } from '../application/dto/create-venue.dto';
 import { UpdateVenueDto } from '../application/dto/update-venue.dto';
 import { VenueFilterDto } from '../application/dto/venue-filter.dto';
+import {
+  CreateAmenityDto,
+  CreateCatalogItemDto,
+  UpdateAmenityDto,
+  UpdateCatalogItemDto,
+} from '../application/dto/catalog.dto';
 import { VenueService } from '../application/services/venue.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
 import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slug.use-case';
@@ -292,5 +298,95 @@ export class VenueController {
     @CurrentUser() user: { id: string },
   ) {
     return this.venueService.verifyVenue(id, user.id, approve);
+  }
+
+  @Get('admin/pending')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cola de locales pendientes de revision (ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Locales con estado PENDING' })
+  async getPendingVenues() {
+    return this.venueService.getVenuesByStatus('PENDING');
+  }
+
+  // --- Catalog management: space types ---
+
+  @Get('admin/catalog/space-types')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar tipos de espacio, incluyendo inactivos (ADMIN)' })
+  async getAdminSpaceTypes() {
+    return this.venueService.getAdminSpaceTypesCatalog();
+  }
+
+  @Post('admin/catalog/space-types')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Crear tipo de espacio (ADMIN)' })
+  async createSpaceType(@Body() dto: CreateCatalogItemDto) {
+    return this.venueService.createSpaceType(dto);
+  }
+
+  @Put('admin/catalog/space-types/:catalogId')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar o desactivar un tipo de espacio (ADMIN)' })
+  async updateSpaceType(@Param('catalogId') catalogId: string, @Body() dto: UpdateCatalogItemDto) {
+    return this.venueService.updateSpaceType(catalogId, dto);
+  }
+
+  // --- Catalog management: use types ("ideal para") ---
+
+  @Get('admin/catalog/use-types')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar tipos de evento, incluyendo inactivos (ADMIN)' })
+  async getAdminUseTypes() {
+    return this.venueService.getAdminUseTypesCatalog();
+  }
+
+  @Post('admin/catalog/use-types')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Crear tipo de evento (ADMIN)' })
+  async createUseType(@Body() dto: CreateCatalogItemDto) {
+    return this.venueService.createUseType(dto);
+  }
+
+  @Put('admin/catalog/use-types/:catalogId')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar o desactivar un tipo de evento (ADMIN)' })
+  async updateUseType(@Param('catalogId') catalogId: string, @Body() dto: UpdateCatalogItemDto) {
+    return this.venueService.updateUseType(catalogId, dto);
+  }
+
+  // --- Catalog management: amenities ---
+
+  @Get('admin/catalog/amenities')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar comodidades, incluyendo inactivas (ADMIN)' })
+  async getAdminAmenities() {
+    return this.venueService.getAdminAmenitiesCatalog();
+  }
+
+  @Post('admin/catalog/amenities')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Crear comodidad (ADMIN)' })
+  async createAmenity(@Body() dto: CreateAmenityDto) {
+    return this.venueService.createAmenity(dto);
+  }
+
+  @Put('admin/catalog/amenities/:catalogId')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar o desactivar una comodidad (ADMIN)' })
+  async updateAmenity(@Param('catalogId') catalogId: string, @Body() dto: UpdateAmenityDto) {
+    return this.venueService.updateAmenity(catalogId, dto);
   }
 }

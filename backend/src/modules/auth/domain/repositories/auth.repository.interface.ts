@@ -16,6 +16,19 @@ export interface IAuthRepository {
     district?: string;
   }): Promise<UserEntity>;
   updateLastLogin(id: string): Promise<void>;
+  updateProfile(
+    id: string,
+    data: Partial<{
+      fullName: string;
+      city: string;
+      district: string;
+      avatarUrl: string;
+      whatsappPhone: string;
+      facebookUrl: string;
+      instagramUrl: string;
+      tiktokUrl: string;
+    }>,
+  ): Promise<UserEntity>;
   exists(email: string, phone: string): Promise<boolean>;
   createRefreshToken(data: { userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
   findActiveRefreshToken(tokenHash: string): Promise<{

@@ -1,12 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
 import { CalendarCheck, LayoutDashboard, LogIn, LogOut, Menu, UserPlus } from 'lucide-react';
-import { toast } from 'sonner';
-import { logout as logoutRequest } from '@/lib/api/auth.api';
 import { useAuthHydrated, useAuthStore } from '@/stores/auth.store';
+import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
 
 const roleLabels: Record<string, string> = {
@@ -16,22 +13,12 @@ const roleLabels: Record<string, string> = {
 };
 
 export const SiteHeader = () => {
-  const router = useRouter();
   const hydrated = useAuthHydrated();
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.role);
-  const refreshToken = useAuthStore((state) => state.refreshToken);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const storeLogout = useAuthStore((state) => state.logout);
 
-  const logoutMutation = useMutation({
-    mutationFn: () => logoutRequest(refreshToken ?? undefined),
-    onSettled: () => {
-      storeLogout();
-      toast.success('Sesion cerrada');
-      router.push('/');
-    },
-  });
+  const logoutMutation = useLogout();
 
   const showAuthed = hydrated && isAuthenticated;
   const showGuest = hydrated && !isAuthenticated;
@@ -57,6 +44,11 @@ export const SiteHeader = () => {
           {showAuthed && canManageVenues ? (
             <Link href="/dashboard" className="sf-nav-link">
               Panel owner
+            </Link>
+          ) : null}
+          {showAuthed && role === 'ADMIN' ? (
+            <Link href="/admin" className="sf-nav-link">
+              Panel admin
             </Link>
           ) : null}
           {showGuest ? (

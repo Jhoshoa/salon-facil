@@ -1,12 +1,14 @@
 import { VenueServiceEntity } from './venue-service.entity';
 import { VenuePriceEntity } from './venue-price.entity';
-import {
-  AmenityCategory,
-  PriceUnit,
-  VenueMediaType,
-  VenueSpaceType,
-  VenueUseType,
-} from '@prisma/client';
+import { AmenityCategory, PriceUnit, VenueMediaType } from '@prisma/client';
+
+/** Shared shape for the admin-managed catalogs (space types, use types). */
+export interface CatalogItemEntity {
+  id: string;
+  key: string;
+  name: string;
+  icon: string | null;
+}
 
 export enum VenueStatus {
   DRAFT = 'DRAFT',
@@ -32,7 +34,7 @@ export class VenueEntity {
   longitude: number | null = null;
   capacityMin: number = 0;
   capacityMax!: number;
-  spaceType: VenueSpaceType | null = null;
+  spaceTypeId: string | null = null;
   minimumHours: number = 4;
   priceUnit: PriceUnit = PriceUnit.EVENT;
   instantBooking: boolean = false;
@@ -57,6 +59,7 @@ export class VenueEntity {
   prices?: VenuePriceEntity[];
   amenities?: VenueAmenityEntity[];
   uses?: VenueUseEntity[];
+  spaceType?: CatalogItemEntity | null;
   openingHours?: VenueOpeningHourEntity[];
   media?: VenueMediaEntity[];
   owner?: { id: string; fullName: string; phone: string; avatarUrl: string | null };
@@ -100,7 +103,8 @@ export interface VenueAmenityEntity {
 
 export interface VenueUseEntity {
   id: string;
-  useType: VenueUseType;
+  useTypeId: string;
+  useType: CatalogItemEntity;
   isPrimary: boolean;
 }
 

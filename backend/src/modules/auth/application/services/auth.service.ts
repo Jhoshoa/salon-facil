@@ -15,6 +15,7 @@ import { TokenService } from './token.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -107,6 +108,10 @@ export class AuthService {
     return this.authRepository.findById(userId);
   }
 
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<UserEntity> {
+    return this.authRepository.updateProfile(userId, dto);
+  }
+
   async logout(userId: string, refreshToken?: string): Promise<{ message: string }> {
     if (!refreshToken) {
       await this.authRepository.revokeAllRefreshTokens(userId);
@@ -163,6 +168,10 @@ export class AuthService {
         avatarUrl: user.avatarUrl,
         city: user.city,
         district: user.district,
+        whatsappPhone: user.whatsappPhone,
+        facebookUrl: user.facebookUrl,
+        instagramUrl: user.instagramUrl,
+        tiktokUrl: user.tiktokUrl,
       },
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,

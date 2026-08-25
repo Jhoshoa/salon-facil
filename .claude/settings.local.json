@@ -5,7 +5,27 @@
       "Bash(npm run build:*)",
       "Bash(npx tsc:*)",
       "Bash(git -C \"C:/Users/josoe/Documents/salon-facil\" log --all --oneline --grep=\"Sprint\\\\|venue.*edit\\\\|owner.*onboard\")",
-      "Bash(git -C \"C:/Users/josoe/Documents/salon-facil\" log --all --oneline)"
+      "Bash(git -C \"C:/Users/josoe/Documents/salon-facil\" log --all --oneline)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npx prisma migrate dev --name convert_space_use_types_to_tables)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npx prisma migrate dev --name convert_space_use_types_to_tables --create-only)",
+      "Bash(DATABASE_URL=postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev node -e ' *)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npx prisma db push --accept-data-loss)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npx prisma generate)",
+      "PowerShell(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq \"node.exe\" } | Select-Object ProcessId, CommandLine)",
+      "Bash(DATABASE_URL=postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --script)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npx prisma migrate resolve --applied 20260824120000_convert_space_use_types_to_tables)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npx prisma migrate status)",
+      "Bash(npx eslint *)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npm run prisma:seed)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='node.exe'\")",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" nohup npm run start:dev)",
+      "Bash(disown)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npm run test:e2e -- venue.e2e-spec.ts)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npm run test:e2e -- auth.e2e-spec.ts)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" npm run test:e2e -- venue.e2e-spec.ts auth.e2e-spec.ts)",
+      "Bash(npm run *)",
+      "Bash(DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_dev\" node cleanup-test-data.js)",
+      "Bash(ls \"/c/Users/josoe/.claude/projects/C--Users-josoe-Documents-salon-facil/memory/\" 2>&1)"
     ]
   }
 }

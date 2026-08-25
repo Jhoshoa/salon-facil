@@ -1,14 +1,18 @@
 import { apiRequest, buildQueryString } from './client';
 import type {
+  Amenity,
   AmenityCatalog,
+  CatalogAmenityInput,
+  CatalogItem,
+  CatalogItemInput,
   PaginatedResponse,
+  UpdateCatalogAmenityPayload,
+  UpdateCatalogItemPayload,
   Venue,
   VenueCompletion,
   VenueFormPayload,
   VenueMedia,
   VenueSearchParams,
-  VenueSpaceType,
-  VenueUseType,
 } from '@/types/api';
 
 const buildVenueFormData = (payload: VenueFormPayload, files: File[] = []): FormData => {
@@ -50,12 +54,12 @@ export const getAmenitiesCatalog = async (): Promise<AmenityCatalog> => {
   return apiRequest<AmenityCatalog>('/venues/catalog/amenities', { auth: false });
 };
 
-export const getSpaceTypesCatalog = async (): Promise<VenueSpaceType[]> => {
-  return apiRequest<VenueSpaceType[]>('/venues/catalog/space-types', { auth: false });
+export const getSpaceTypesCatalog = async (): Promise<CatalogItem[]> => {
+  return apiRequest<CatalogItem[]>('/venues/catalog/space-types', { auth: false });
 };
 
-export const getUseTypesCatalog = async (): Promise<VenueUseType[]> => {
-  return apiRequest<VenueUseType[]>('/venues/catalog/use-types', { auth: false });
+export const getUseTypesCatalog = async (): Promise<CatalogItem[]> => {
+  return apiRequest<CatalogItem[]>('/venues/catalog/use-types', { auth: false });
 };
 
 export const getMyVenues = async (): Promise<Venue[]> => {
@@ -114,5 +118,81 @@ export const reorderVenueMedia = async (
   return apiRequest<VenueMedia[]>(`/venues/${id}/media/order`, {
     method: 'PUT',
     body: JSON.stringify({ order, coverId }),
+  });
+};
+
+export const verifyVenue = async (id: string, approve: boolean): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/${id}/verify`, {
+    method: 'PUT',
+    body: JSON.stringify({ approve }),
+  });
+};
+
+// ========== ADMIN ==========
+
+export const getPendingVenues = async (): Promise<Venue[]> => {
+  return apiRequest<Venue[]>('/venues/admin/pending');
+};
+
+export const getAdminSpaceTypes = async (): Promise<CatalogItem[]> => {
+  return apiRequest<CatalogItem[]>('/venues/admin/catalog/space-types');
+};
+
+export const createAdminSpaceType = async (data: CatalogItemInput): Promise<CatalogItem> => {
+  return apiRequest<CatalogItem>('/venues/admin/catalog/space-types', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAdminSpaceType = async (
+  id: string,
+  data: UpdateCatalogItemPayload,
+): Promise<CatalogItem> => {
+  return apiRequest<CatalogItem>(`/venues/admin/catalog/space-types/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const getAdminUseTypes = async (): Promise<CatalogItem[]> => {
+  return apiRequest<CatalogItem[]>('/venues/admin/catalog/use-types');
+};
+
+export const createAdminUseType = async (data: CatalogItemInput): Promise<CatalogItem> => {
+  return apiRequest<CatalogItem>('/venues/admin/catalog/use-types', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAdminUseType = async (
+  id: string,
+  data: UpdateCatalogItemPayload,
+): Promise<CatalogItem> => {
+  return apiRequest<CatalogItem>(`/venues/admin/catalog/use-types/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const getAdminAmenities = async (): Promise<Amenity[]> => {
+  return apiRequest<Amenity[]>('/venues/admin/catalog/amenities');
+};
+
+export const createAdminAmenity = async (data: CatalogAmenityInput): Promise<Amenity> => {
+  return apiRequest<Amenity>('/venues/admin/catalog/amenities', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAdminAmenity = async (
+  id: string,
+  data: UpdateCatalogAmenityPayload,
+): Promise<Amenity> => {
+  return apiRequest<Amenity>(`/venues/admin/catalog/amenities/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 };

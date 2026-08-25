@@ -6,23 +6,26 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { createVenue, getAmenitiesCatalog, updateVenue } from '@/lib/api/venues.api';
+import {
+  createVenue,
+  getAmenitiesCatalog,
+  getSpaceTypesCatalog,
+  getUseTypesCatalog,
+  updateVenue,
+} from '@/lib/api/venues.api';
 import {
   dayLabels,
   venueFormDefaults,
   venueFormSchema,
   type VenueFormValues,
 } from '@/lib/validators/venue.schema';
-import { priceUnitLabels, spaceTypeLabels, useTypeLabels } from '@/components/venues/venue-filter-labels';
+import { priceUnitLabels } from '@/components/venues/venue-filter-labels';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
-import type { Venue, VenueFormPayload, VenueSpaceType, VenueUseType } from '@/types/api';
-
-const spaceTypeOptions = Object.keys(spaceTypeLabels) as VenueSpaceType[];
-const useTypeOptions = Object.keys(useTypeLabels) as VenueUseType[];
+import type { Venue, VenueFormPayload } from '@/types/api';
 
 interface VenueFormProps {
   venue?: Venue;
@@ -55,7 +58,7 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     capacityMin: venue.capacityMin,
     capacityMax: venue.capacityMax,
     squareMeters: venue.squareMeters ?? '',
-    spaceType: venue.spaceType ?? '',
+    spaceType: venue.spaceTypeId ?? '',
     priceUnit: venue.priceUnit,
     minimumHours: venue.minimumHours,
     instantBooking: venue.instantBooking,
@@ -64,7 +67,7 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     cancellationPolicy: venue.cancellationPolicy ?? '',
     basePrice,
     amenityIds: (venue.amenities ?? []).map((a) => a.amenity.id),
-    useTypes: (venue.uses ?? []).map((u) => u.useType),
+    useTypes: (venue.uses ?? []).map((u) => u.useTypeId),
     openingHours: Array.from({ length: 7 }).map((_, dayOfWeek) => {
       const existing = hoursByDay.get(dayOfWeek);
       return {
@@ -89,7 +92,7 @@ const toPayload = (values: VenueFormValues, existingVenue?: Venue): VenueFormPay
   capacityMax: values.capacityMax,
   capacityMin: values.capacityMin,
   squareMeters: values.squareMeters === '' ? undefined : Number(values.squareMeters),
-  spaceType: values.spaceType ? (values.spaceType as VenueFormPayload['spaceType']) : undefined,
+  spaceTypeId: values.spaceType || undefined,
   priceUnit: values.priceUnit,
   minimumHours: values.minimumHours,
   instantBooking: values.instantBooking,
@@ -115,8 +118,8 @@ const toPayload = (values: VenueFormValues, existingVenue?: Venue): VenueFormPay
       })),
   ],
   amenities: values.amenityIds.map((amenityId) => ({ amenityId, isIncluded: true })),
-  useTypes: values.useTypes.map((useType, index) => ({
-    useType: useType as VenueUseType,
+  useTypes: values.useTypes.map((useTypeId, index) => ({
+    useTypeId,
     isPrimary: index === 0,
   })),
   openingHours: values.openingHours,
@@ -135,6 +138,14 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
   });
 
   const amenitiesQuery = useQuery({ queryKey: ['venue-catalog', 'amenities'], queryFn: getAmenitiesCatalog });
+  const spaceTypesQuery = useQuery({
+    queryKey: ['venue-catalog', 'space-types'],
+    queryFn: getSpaceTypesCatalog,
+  });
+  const useTypesQuery = useQuery({
+    queryKey: ['venue-catalog', 'use-types'],
+    queryFn: getUseTypesCatalog,
+  });
 
   const mutation = useMutation({
     mutationFn: (values: VenueFormValues) => {
@@ -161,6 +172,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
   const amenityIds = form.watch('amenityIds');
   const useTypes = form.watch('useTypes');
   const openingHours = form.watch('openingHours');
+  const spaceType = form.watch('spaceType');
 
   const toggleAmenity = (id: string) => {
     const next = amenityIds.includes(id)
@@ -243,11 +255,16 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
 
               <div className="sf-form-group">
                 <Label htmlFor="spaceType">Tipo de espacio</Label>
-                <Select id="spaceType" {...form.register('spaceType')}>
+                <Select
+                  id="spaceType"
+                  value={spaceType}
+                  onChange={(event) => form.setValue('spaceType', event.target.value, { shouldDirty: true })}
+                  disabled={spaceTypesQuery.isLoading}
+                >
                   <option value="">Selecciona un tipo</option>
-                  {spaceTypeOptions.map((type) => (
-                    <option key={type} value={type}>
-                      {spaceTypeLabels[type]}
+                  {(spaceTypesQuery.data ?? []).map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
                     </option>
                   ))}
                 </Select>
@@ -256,17 +273,21 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
               <div className="sf-form-group">
                 <p className="sf-filter-title">Ideal para</p>
                 <div className="flex flex-wrap gap-2">
-                  {useTypeOptions.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => toggleUseType(type)}
-                      className="sf-filter-chip"
-                      data-active={useTypes.includes(type)}
-                    >
-                      {useTypeLabels[type]}
-                    </button>
-                  ))}
+                  {useTypesQuery.isLoading ? (
+                    <p className="text-sm text-muted-foreground">Cargando tipos de evento...</p>
+                  ) : (
+                    (useTypesQuery.data ?? []).map((type) => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => toggleUseType(type.id)}
+                        className="sf-filter-chip"
+                        data-active={useTypes.includes(type.id)}
+                      >
+                        {type.name}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

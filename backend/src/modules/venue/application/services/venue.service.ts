@@ -137,11 +137,55 @@ export class VenueService {
   }
 
   getSpaceTypesCatalog() {
-    return this.venueRepository.getSpaceTypes();
+    return this.venueRepository.findSpaceTypes();
   }
 
   getUseTypesCatalog() {
-    return this.venueRepository.getUseTypes();
+    return this.venueRepository.findUseTypes();
+  }
+
+  async getVenuesByStatus(status: string): Promise<VenueEntity[]> {
+    return this.venueRepository.findByStatus(status);
+  }
+
+  // ===== Admin catalog management (space types / use types / amenities) =====
+  // Deliberately admin-only governance (confirmed with the platform owner): owners pick from
+  // these lists but never create entries themselves, to avoid duplicate/messy taxonomy.
+
+  getAdminAmenitiesCatalog() {
+    return this.venueRepository.findAmenities(true);
+  }
+
+  createAmenity(data: Parameters<IVenueRepository['createAmenity']>[0]) {
+    return this.venueRepository.createAmenity(data);
+  }
+
+  updateAmenity(id: string, data: Parameters<IVenueRepository['updateAmenity']>[1]) {
+    return this.venueRepository.updateAmenity(id, data);
+  }
+
+  getAdminSpaceTypesCatalog() {
+    return this.venueRepository.findSpaceTypes(true);
+  }
+
+  createSpaceType(data: Parameters<IVenueRepository['createSpaceType']>[0]) {
+    return this.venueRepository.createSpaceType(data);
+  }
+
+  updateSpaceType(id: string, data: Parameters<IVenueRepository['updateSpaceType']>[1]) {
+    return this.venueRepository.updateSpaceType(id, data);
+  }
+
+  getAdminUseTypesCatalog() {
+    return this.venueRepository.findUseTypes(true);
+  }
+
+  createUseType(data: Parameters<IVenueRepository['createUseType']>[0]) {
+    return this.venueRepository.createUseType(data);
+  }
+
+  updateUseType(id: string, data: Parameters<IVenueRepository['updateUseType']>[1]) {
+    return this.venueRepository.updateUseType(id, data);
   }
 
   async addVenueMedia(

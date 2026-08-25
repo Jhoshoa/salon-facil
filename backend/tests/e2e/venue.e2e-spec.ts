@@ -433,4 +433,91 @@ describe('Venues (e2e)', () => {
         });
     });
   });
+
+  // ===== Admin pending queue =====
+  describe('GET /api/v1/venues/admin/pending', () => {
+    it('should return only PENDING venues and be reachable by ADMIN', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/venues/admin/pending')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      for (const venue of res.body) {
+        expect(venue.status).toBe('PENDING');
+      }
+    });
+
+    it('should return 403 when OWNER requests the pending queue', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/venues/admin/pending')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(403);
+    });
+
+    it('should return 403 when CLIENT requests the pending queue', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/venues/admin/pending')
+        .set('Authorization', `Bearer ${clientToken}`)
+        .expect(403);
+    });
+  });
+
+  // ===== Admin catalog CRUD =====
+  describe('Admin catalog endpoints', () => {
+    const resources = ['space-types', 'use-types', 'amenities'] as const;
+
+    for (const resource of resources) {
+      describe(`/api/v1/venues/admin/catalog/${resource}`, () => {
+        const basePayload =
+          resource === 'amenities'
+            ? {
+                key: `test_${resource}_${uniqueId}`,
+                name: `Test ${resource} ${uniqueId}`,
+                category: 'FACILITY',
+              }
+            : { key: `TEST_${resource}_${uniqueId}`, name: `Test ${resource} ${uniqueId}` };
+
+        it('should return 403 for OWNER on GET', () => {
+          return request(app.getHttpServer())
+            .get(`/api/v1/venues/admin/catalog/${resource}`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .expect(403);
+        });
+
+        it('should return 403 for CLIENT on POST', () => {
+          return request(app.getHttpServer())
+            .post(`/api/v1/venues/admin/catalog/${resource}`)
+            .set('Authorization', `Bearer ${clientToken}`)
+            .send(basePayload)
+            .expect(403);
+        });
+
+        it('should return 401 without a token', () => {
+          return request(app.getHttpServer())
+            .get(`/api/v1/venues/admin/catalog/${resource}`)
+            .expect(401);
+        });
+
+        it('should allow ADMIN to create and update a catalog item', async () => {
+          const createRes = await request(app.getHttpServer())
+            .post(`/api/v1/venues/admin/catalog/${resource}`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send(basePayload)
+            .expect(201);
+
+          expect(createRes.body).toHaveProperty('id');
+          expect(createRes.body.isActive).toBe(true);
+
+          const updateRes = await request(app.getHttpServer())
+            .put(`/api/v1/venues/admin/catalog/${resource}/${createRes.body.id}`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ isActive: false })
+            .expect(200);
+
+          expect(updateRes.body.isActive).toBe(false);
+        });
+      });
+    }
+  });
 });

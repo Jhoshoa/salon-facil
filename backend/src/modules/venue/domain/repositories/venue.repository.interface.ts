@@ -1,27 +1,62 @@
 import { VenueEntity, VenueMediaEntity } from '../entities/venue.entity';
 import { VenueFilterDto } from '../../application/dto/venue-filter.dto';
-import { AmenityCategory, VenueSpaceType, VenueUseType } from '@prisma/client';
+import { AmenityCategory } from '@prisma/client';
 
 export const VENUE_REPOSITORY = Symbol('VENUE_REPOSITORY');
+
+export interface CatalogItem {
+  id: string;
+  key: string;
+  name: string;
+  icon: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface AmenityCatalogItem {
+  id: string;
+  key: string;
+  name: string;
+  category: AmenityCategory;
+  icon: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface CatalogItemInput {
+  key: string;
+  name: string;
+  icon?: string;
+  sortOrder?: number;
+}
 
 export interface IVenueRepository {
   findById(id: string): Promise<VenueEntity | null>;
   findBySlug(slug: string): Promise<VenueEntity | null>;
   findByOwner(ownerId: string): Promise<VenueEntity[]>;
+  findByStatus(status: string): Promise<VenueEntity[]>;
   search(filters: VenueFilterDto): Promise<{ venues: VenueEntity[]; total: number }>;
   findSimilar(venue: VenueEntity, limit: number): Promise<VenueEntity[]>;
-  findAmenities(): Promise<
-    Array<{
-      id: string;
-      key: string;
-      name: string;
-      category: AmenityCategory;
-      icon: string | null;
-      sortOrder: number;
-    }>
-  >;
-  getSpaceTypes(): VenueSpaceType[];
-  getUseTypes(): VenueUseType[];
+  findAmenities(includeInactive?: boolean): Promise<AmenityCatalogItem[]>;
+  createAmenity(
+    data: CatalogItemInput & { category: AmenityCategory },
+  ): Promise<AmenityCatalogItem>;
+  updateAmenity(
+    id: string,
+    data: Partial<CatalogItemInput> & { category?: AmenityCategory; isActive?: boolean },
+  ): Promise<AmenityCatalogItem>;
+  findSpaceTypes(includeInactive?: boolean): Promise<CatalogItem[]>;
+  createSpaceType(data: CatalogItemInput): Promise<CatalogItem>;
+  updateSpaceType(
+    id: string,
+    data: Partial<CatalogItemInput> & { isActive?: boolean },
+  ): Promise<CatalogItem>;
+  findUseTypes(includeInactive?: boolean): Promise<CatalogItem[]>;
+  createUseType(data: CatalogItemInput): Promise<CatalogItem>;
+  updateUseType(
+    id: string,
+    data: Partial<CatalogItemInput> & { isActive?: boolean },
+  ): Promise<CatalogItem>;
   create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity>;
   update(id: string, data: Record<string, unknown>): Promise<VenueEntity>;
   updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity>;

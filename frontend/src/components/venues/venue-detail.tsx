@@ -12,7 +12,7 @@ import { ErrorState } from '@/components/shared/error-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AmenityCategory, Venue } from '@/types/api';
-import { priceUnitLabels, spaceTypeLabels, useTypeLabels } from './venue-filter-labels';
+import { priceUnitLabels } from './venue-filter-labels';
 import { VenueSimilarCard } from './venue-similar-card';
 
 interface VenueDetailProps {
@@ -135,7 +135,7 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
             <div>
               <div className="flex flex-wrap gap-2">
                 {venue.spaceType ? (
-                  <Badge variant="secondary">{spaceTypeLabels[venue.spaceType]}</Badge>
+                  <Badge variant="secondary">{venue.spaceType.name}</Badge>
                 ) : null}
                 {venue.instantBooking ? <Badge>Reserva inmediata</Badge> : null}
                 {venue.isVerified ? (
@@ -196,7 +196,7 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
             <div className="flex flex-wrap gap-2">
               {[...primaryUses, ...secondaryUses].map((item) => (
                 <Badge key={item.id} variant={item.isPrimary ? 'secondary' : 'outline'}>
-                  {useTypeLabels[item.useType]}
+                  {item.useType.name}
                 </Badge>
               ))}
             </div>

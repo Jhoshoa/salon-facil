@@ -9,6 +9,10 @@ export class AuthResponseDto {
     avatarUrl: string | null;
     city: string | null;
     district: string | null;
+    whatsappPhone: string | null;
+    facebookUrl: string | null;
+    instagramUrl: string | null;
+    tiktokUrl: string | null;
   };
   accessToken!: string;
   refreshToken!: string;

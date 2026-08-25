@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { PriceUnit, VenueSpaceType, VenueUseType } from '@prisma/client';
+import { PriceUnit } from '@prisma/client';
 
 export enum SortField {
   FEATURED = 'featured',
@@ -124,15 +124,15 @@ export class VenueFilterDto {
 
   @IsOptional()
   @IsArray()
-  @IsEnum(VenueSpaceType, { each: true })
+  @IsString({ each: true })
   @Transform(({ value }) => toStringArray(value))
-  spaceTypes?: VenueSpaceType[];
+  spaceTypes?: string[];
 
   @IsOptional()
   @IsArray()
-  @IsEnum(VenueUseType, { each: true })
+  @IsString({ each: true })
   @Transform(({ value }) => toStringArray(value))
-  useTypes?: VenueUseType[];
+  useTypes?: string[];
 
   @IsOptional()
   @IsArray()

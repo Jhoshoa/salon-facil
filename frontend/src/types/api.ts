@@ -23,6 +23,21 @@ export interface AuthUser {
   avatarUrl: string | null;
   city: string | null;
   district: string | null;
+  whatsappPhone: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
+}
+
+export interface UpdateProfilePayload {
+  fullName?: string;
+  city?: string;
+  district?: string;
+  avatarUrl?: string;
+  whatsappPhone?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
 }
 
 export type UserRole = 'CLIENT' | 'OWNER' | 'ADMIN';
@@ -75,30 +90,28 @@ export interface VenuePrice {
   isActive: boolean;
 }
 
-export type VenueSpaceType =
-  | 'EVENT_HALL'
-  | 'GARDEN'
-  | 'TERRACE'
-  | 'RESTAURANT'
-  | 'BAR'
-  | 'AUDITORIUM'
-  | 'CONFERENCE_ROOM'
-  | 'PHOTO_STUDIO'
-  | 'MULTIPURPOSE'
-  | 'OUTDOOR_SPACE';
+export interface CatalogItem {
+  id: string;
+  key: string;
+  name: string;
+  icon: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
 
-export type VenueUseType =
-  | 'WEDDING'
-  | 'BIRTHDAY'
-  | 'CORPORATE_EVENT'
-  | 'PRIVATE_PARTY'
-  | 'GRADUATION'
-  | 'CONFERENCE'
-  | 'WORKSHOP'
-  | 'PHOTO_SHOOT'
-  | 'FILMING'
-  | 'POP_UP'
-  | 'TEAM_BUILDING';
+export interface CatalogItemInput {
+  key: string;
+  name: string;
+  icon?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateCatalogItemPayload {
+  name?: string;
+  icon?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}
 
 export type AmenityCategory =
   | 'FACILITY'
@@ -120,6 +133,15 @@ export interface Amenity {
   category: AmenityCategory;
   icon: string | null;
   sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface CatalogAmenityInput extends CatalogItemInput {
+  category: AmenityCategory;
+}
+
+export interface UpdateCatalogAmenityPayload extends UpdateCatalogItemPayload {
+  category?: AmenityCategory;
 }
 
 export type AmenityCatalog = Partial<Record<AmenityCategory, Amenity[]>>;
@@ -134,7 +156,8 @@ export interface VenueAmenity {
 
 export interface VenueUse {
   id: string;
-  useType: VenueUseType;
+  useTypeId: string;
+  useType: CatalogItem;
   isPrimary: boolean;
 }
 
@@ -170,7 +193,8 @@ export interface Venue {
   capacityMin: number;
   capacityMax: number;
   squareMeters: number | null;
-  spaceType: VenueSpaceType | null;
+  spaceTypeId: string | null;
+  spaceType: CatalogItem | null;
   minimumHours: number;
   priceUnit: PriceUnit;
   instantBooking: boolean;
@@ -212,7 +236,7 @@ export interface VenueAmenityInput {
 }
 
 export interface VenueUseInput {
-  useType: VenueUseType;
+  useTypeId: string;
   isPrimary?: boolean;
 }
 
@@ -235,7 +259,7 @@ export interface VenueFormPayload {
   capacityMax: number;
   capacityMin?: number;
   squareMeters?: number;
-  spaceType?: VenueSpaceType;
+  spaceTypeId?: string;
   priceUnit?: PriceUnit;
   minimumHours?: number;
   instantBooking?: boolean;
@@ -271,8 +295,8 @@ export interface VenueSearchParams {
   startTime?: string;
   endTime?: string;
   amenities?: string[];
-  spaceTypes?: VenueSpaceType[];
-  useTypes?: VenueUseType[];
+  spaceTypes?: string[];
+  useTypes?: string[];
   hasParking?: boolean;
   parkingCapacity?: number;
   hasCatering?: boolean;

@@ -255,6 +255,85 @@ describe('Auth (e2e)', () => {
     });
   });
 
+  describe('PUT /api/v1/auth/me', () => {
+    let userAToken: string;
+    let userAId: string;
+    let userBToken: string;
+
+    beforeAll(async () => {
+      const resA = await request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({
+          email: `update-me-a-${uniqueId}@email.com`,
+          password: 'Password123!',
+          phone: phoneFor(20),
+          fullName: 'Update Me User A',
+          role: 'OWNER',
+        });
+      userAToken = resA.body.accessToken;
+      userAId = resA.body.user.id;
+
+      const resB = await request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({
+          email: `update-me-b-${uniqueId}@email.com`,
+          password: 'Password123!',
+          phone: phoneFor(21),
+          fullName: 'Update Me User B',
+          role: 'OWNER',
+        });
+      userBToken = resB.body.accessToken;
+    });
+
+    it('should update the authenticated user profile and social fields', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${userAToken}`)
+        .send({
+          fullName: 'Updated Name A',
+          city: 'El Alto',
+          whatsappPhone: '+59171112222',
+          facebookUrl: 'https://facebook.com/user-a',
+          instagramUrl: 'https://instagram.com/user-a',
+          tiktokUrl: 'https://tiktok.com/@user-a',
+        })
+        .expect(200);
+
+      expect(res.body.id).toBe(userAId);
+      expect(res.body.fullName).toBe('Updated Name A');
+      expect(res.body.city).toBe('El Alto');
+      expect(res.body.whatsappPhone).toBe('+59171112222');
+      expect(res.body.facebookUrl).toBe('https://facebook.com/user-a');
+      expect(res.body.instagramUrl).toBe('https://instagram.com/user-a');
+      expect(res.body.tiktokUrl).toBe('https://tiktok.com/@user-a');
+    });
+
+    it('should not let a different user be affected by another user update', async () => {
+      const before = await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${userBToken}`)
+        .expect(200);
+
+      expect(before.body.fullName).toBe('Update Me User B');
+      expect(before.body.id).not.toBe(userAId);
+    });
+
+    it('should return 401 without a token', () => {
+      return request(app.getHttpServer())
+        .put('/api/v1/auth/me')
+        .send({ fullName: 'No Auth Update' })
+        .expect(401);
+    });
+
+    it('should return 400 for an invalid social URL', () => {
+      return request(app.getHttpServer())
+        .put('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${userAToken}`)
+        .send({ facebookUrl: 'not-a-valid-url' })
+        .expect(400);
+    });
+  });
+
   describe('POST /api/v1/auth/refresh', () => {
     let accessToken: string;
     let refreshToken: string;

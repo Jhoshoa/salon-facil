@@ -1,16 +1,34 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Put } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../shared/decorators/public.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { RegisterUseCase } from '../application/use-cases/register.use-case';
 import { LoginUseCase } from '../application/use-cases/login.use-case';
 import { RefreshTokenUseCase } from '../application/use-cases/refresh-token.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
+import { AuthService } from '../application/services/auth.service';
 import { RegisterDto } from '../application/dto/register.dto';
 import { LoginDto } from '../application/dto/login.dto';
 import { RefreshTokenDto } from '../application/dto/refresh-token.dto';
+import { UpdateProfileDto } from '../application/dto/update-profile.dto';
 import { AuthResponseDto } from '../application/dto/auth-response.dto';
 import { UserEntity } from '../domain/entities/user.entity';
+
+const toProfileDto = (user: UserEntity) => ({
+  id: user.id,
+  email: user.email,
+  phone: user.phone,
+  fullName: user.fullName,
+  role: user.role,
+  status: user.status,
+  avatarUrl: user.avatarUrl,
+  city: user.city,
+  district: user.district,
+  whatsappPhone: user.whatsappPhone,
+  facebookUrl: user.facebookUrl,
+  instagramUrl: user.instagramUrl,
+  tiktokUrl: user.tiktokUrl,
+});
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -20,6 +38,7 @@ export class AuthController {
     private readonly loginUseCase: LoginUseCase,
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly authService: AuthService,
   ) {}
 
   @Public()
@@ -69,16 +88,16 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Datos del usuario actual' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   async me(@CurrentUser() user: UserEntity) {
-    return {
-      id: user.id,
-      email: user.email,
-      phone: user.phone,
-      fullName: user.fullName,
-      role: user.role,
-      status: user.status,
-      avatarUrl: user.avatarUrl,
-      city: user.city,
-      district: user.district,
-    };
+    return toProfileDto(user);
+  }
+
+  @Put('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar el perfil del usuario autenticado' })
+  @ApiResponse({ status: 200, description: 'Perfil actualizado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  async updateMe(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
+    const user = await this.authService.updateProfile(userId, dto);
+    return toProfileDto(user);
   }
 }

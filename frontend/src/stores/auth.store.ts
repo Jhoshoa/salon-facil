@@ -12,6 +12,7 @@ interface AuthState {
   isAuthenticated: boolean;
   role: UserRole | null;
   setSession: (session: AuthResponse) => void;
+  updateUser: (user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -31,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           role: session.user.role,
         }),
+      updateUser: (user) => set({ user, role: user.role }),
       logout: () =>
         set({
           user: null,

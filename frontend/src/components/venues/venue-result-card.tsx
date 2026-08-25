@@ -20,14 +20,6 @@ const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
   DAY: 'dia',
 };
 
-const spaceTypeLabel: Partial<Record<NonNullable<Venue['spaceType']>, string>> = {
-  EVENT_HALL: 'Salon de eventos',
-  GARDEN: 'Jardin',
-  TERRACE: 'Terraza',
-  PHOTO_STUDIO: 'Estudio',
-  MULTIPURPOSE: 'Multiproposito',
-  OUTDOOR_SPACE: 'Exterior',
-};
 
 export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
   const photo =
@@ -96,9 +88,7 @@ export const VenueResultCard = ({ venue }: VenueResultCardProps) => {
             <Users className="h-3.5 w-3.5" />
             {venue.capacityMin}-{venue.capacityMax} personas
           </Badge>
-          {venue.spaceType ? (
-            <Badge variant="accent">{spaceTypeLabel[venue.spaceType] ?? venue.spaceType}</Badge>
-          ) : null}
+          {venue.spaceType ? <Badge variant="accent">{venue.spaceType.name}</Badge> : null}
         </div>
 
         {amenities.length ? (

@@ -1,19 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { IVenueRepository } from '../../domain/repositories/venue.repository.interface';
+import {
+  AmenityCatalogItem,
+  CatalogItem,
+  CatalogItemInput,
+  IVenueRepository,
+} from '../../domain/repositories/venue.repository.interface';
 import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
-import {
-  AmenityCategory,
-  Prisma,
-  PriceType,
-  PriceUnit,
-  VenueMediaType,
-  VenueSpaceType,
-  VenueUseType,
-} from '@prisma/client';
+import { AmenityCategory, Prisma, PriceType, PriceUnit, VenueMediaType } from '@prisma/client';
 
 interface RawVenueAmenity {
   id: string;
@@ -29,9 +26,17 @@ interface RawVenueAmenity {
   };
 }
 
+interface RawCatalogItem {
+  id: string;
+  key: string;
+  name: string;
+  icon: string | null;
+}
+
 interface RawVenueUse {
   id: string;
-  useType: VenueUseType;
+  useTypeId: string;
+  useType: RawCatalogItem;
   isPrimary: boolean;
 }
 
@@ -63,7 +68,11 @@ export class VenueRepository implements IVenueRepository {
       include: { amenity: true },
       orderBy: { amenity: { sortOrder: 'asc' as const } },
     },
-    uses: { orderBy: [{ isPrimary: 'desc' as const }, { useType: 'asc' as const }] },
+    uses: {
+      include: { useType: true },
+      orderBy: [{ isPrimary: 'desc' as const }, { useType: { name: 'asc' as const } }],
+    },
+    spaceType: true,
     openingHours: { orderBy: { dayOfWeek: 'asc' as const } },
     media: { orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }] },
     owner: {
@@ -164,11 +173,11 @@ export class VenueRepository implements IVenueRepository {
     }
 
     if (filters.spaceTypes?.length) {
-      where.spaceType = { in: filters.spaceTypes };
+      where.spaceTypeId = { in: filters.spaceTypes };
     }
 
     if (filters.useTypes?.length) {
-      where.uses = { some: { useType: { in: filters.useTypes } } };
+      where.uses = { some: { useTypeId: { in: filters.useTypes } } };
     }
 
     if (filters.amenities?.length) {
@@ -347,7 +356,11 @@ export class VenueRepository implements IVenueRepository {
         id: { not: venue.id },
         status: VenueStatus.ACTIVE,
         isVerified: true,
-        OR: [{ spaceType: venue.spaceType }, { district: venue.district }, { city: venue.city }],
+        OR: [
+          { spaceTypeId: venue.spaceTypeId },
+          { district: venue.district },
+          { city: venue.city },
+        ],
       },
       include: this.venueInclude,
       orderBy: [{ isFeatured: 'desc' }, { viewCount: 'desc' }],
@@ -357,9 +370,9 @@ export class VenueRepository implements IVenueRepository {
     return venues.map((v) => this.toEntity(v));
   }
 
-  async findAmenities() {
+  async findAmenities(includeInactive = false): Promise<AmenityCatalogItem[]> {
     return this.prisma.amenity.findMany({
-      where: { isActive: true },
+      where: includeInactive ? undefined : { isActive: true },
       select: {
         id: true,
         key: true,
@@ -367,17 +380,80 @@ export class VenueRepository implements IVenueRepository {
         category: true,
         icon: true,
         sortOrder: true,
+        isActive: true,
       },
       orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
   }
 
-  getSpaceTypes(): VenueSpaceType[] {
-    return Object.values(VenueSpaceType);
+  async createAmenity(
+    data: CatalogItemInput & { category: AmenityCategory },
+  ): Promise<AmenityCatalogItem> {
+    return this.prisma.amenity.create({
+      data: {
+        key: data.key,
+        name: data.name,
+        category: data.category,
+        icon: data.icon,
+        sortOrder: data.sortOrder ?? 0,
+      },
+    });
   }
 
-  getUseTypes(): VenueUseType[] {
-    return Object.values(VenueUseType);
+  async updateAmenity(
+    id: string,
+    data: Partial<CatalogItemInput> & { category?: AmenityCategory; isActive?: boolean },
+  ): Promise<AmenityCatalogItem> {
+    return this.prisma.amenity.update({ where: { id }, data });
+  }
+
+  async findSpaceTypes(includeInactive = false): Promise<CatalogItem[]> {
+    return this.prisma.spaceType.findMany({
+      where: includeInactive ? undefined : { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async createSpaceType(data: CatalogItemInput): Promise<CatalogItem> {
+    return this.prisma.spaceType.create({
+      data: { key: data.key, name: data.name, icon: data.icon, sortOrder: data.sortOrder ?? 0 },
+    });
+  }
+
+  async updateSpaceType(
+    id: string,
+    data: Partial<CatalogItemInput> & { isActive?: boolean },
+  ): Promise<CatalogItem> {
+    return this.prisma.spaceType.update({ where: { id }, data });
+  }
+
+  async findUseTypes(includeInactive = false): Promise<CatalogItem[]> {
+    return this.prisma.useType.findMany({
+      where: includeInactive ? undefined : { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async createUseType(data: CatalogItemInput): Promise<CatalogItem> {
+    return this.prisma.useType.create({
+      data: { key: data.key, name: data.name, icon: data.icon, sortOrder: data.sortOrder ?? 0 },
+    });
+  }
+
+  async updateUseType(
+    id: string,
+    data: Partial<CatalogItemInput> & { isActive?: boolean },
+  ): Promise<CatalogItem> {
+    return this.prisma.useType.update({ where: { id }, data });
+  }
+
+  async findByStatus(status: string): Promise<VenueEntity[]> {
+    const venues = await this.prisma.venue.findMany({
+      where: { status: status as VenueStatus },
+      include: this.venueInclude,
+      orderBy: { createdAt: 'asc' },
+    });
+    return venues.map((v) => this.toEntity(v));
   }
 
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {
@@ -406,7 +482,9 @@ export class VenueRepository implements IVenueRepository {
       capacityMax: venueData.capacityMax as number,
       capacityMin: (venueData.capacityMin as number) ?? 0,
       squareMeters: venueData.squareMeters as number | undefined,
-      spaceType: venueData.spaceType as VenueSpaceType | undefined,
+      spaceType: venueData.spaceTypeId
+        ? { connect: { id: venueData.spaceTypeId as string } }
+        : undefined,
       priceUnit: venueData.priceUnit as PriceUnit | undefined,
       minimumHours: venueData.minimumHours as number | undefined,
       instantBooking: venueData.instantBooking as boolean | undefined,
@@ -474,7 +552,7 @@ export class VenueRepository implements IVenueRepository {
     if (Array.isArray(rawUseTypes) && rawUseTypes.length > 0) {
       createData.uses = {
         create: rawUseTypes.map((u) => ({
-          useType: u.useType as VenueUseType,
+          useType: { connect: { id: u.useTypeId as string } },
           isPrimary: (u.isPrimary as boolean) ?? false,
         })),
       };
@@ -525,7 +603,9 @@ export class VenueRepository implements IVenueRepository {
     if (venueData.capacityMax != null) updateInput.capacityMax = venueData.capacityMax;
     if (venueData.capacityMin != null) updateInput.capacityMin = venueData.capacityMin;
     if (venueData.squareMeters != null) updateInput.squareMeters = venueData.squareMeters;
-    if (venueData.spaceType != null) updateInput.spaceType = venueData.spaceType as VenueSpaceType;
+    if (venueData.spaceTypeId != null) {
+      updateInput.spaceType = { connect: { id: venueData.spaceTypeId as string } };
+    }
     if (venueData.priceUnit != null) updateInput.priceUnit = venueData.priceUnit as PriceUnit;
     if (venueData.minimumHours != null) updateInput.minimumHours = venueData.minimumHours as number;
     if (venueData.instantBooking != null)
@@ -557,7 +637,7 @@ export class VenueRepository implements IVenueRepository {
       updateInput.uses = {
         deleteMany: {},
         create: rawUseTypes.map((u: Record<string, unknown>) => ({
-          useType: u.useType as VenueUseType,
+          useType: { connect: { id: u.useTypeId as string } },
           isPrimary: (u.isPrimary as boolean) ?? false,
         })),
       };
@@ -838,7 +918,15 @@ export class VenueRepository implements IVenueRepository {
       longitude: raw.longitude != null ? Number(raw.longitude) : null,
       capacityMin: raw.capacityMin,
       capacityMax: raw.capacityMax,
-      spaceType: raw.spaceType,
+      spaceTypeId: raw.spaceTypeId,
+      spaceType: raw.spaceType
+        ? {
+            id: raw.spaceType.id,
+            key: raw.spaceType.key,
+            name: raw.spaceType.name,
+            icon: raw.spaceType.icon,
+          }
+        : null,
       minimumHours: raw.minimumHours,
       priceUnit: raw.priceUnit,
       instantBooking: raw.instantBooking,
@@ -900,7 +988,13 @@ export class VenueRepository implements IVenueRepository {
       })),
       uses: raw.uses?.map((item: RawVenueUse) => ({
         id: item.id,
-        useType: item.useType,
+        useTypeId: item.useTypeId,
+        useType: {
+          id: item.useType.id,
+          key: item.useType.key,
+          name: item.useType.name,
+          icon: item.useType.icon,
+        },
         isPrimary: item.isPrimary,
       })),
       openingHours: raw.openingHours?.map((item: RawVenueOpeningHour) => ({

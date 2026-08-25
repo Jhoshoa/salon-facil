@@ -16,7 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { PriceUnit, VenueSpaceType, VenueUseType } from '@prisma/client';
+import { PriceUnit } from '@prisma/client';
 
 type Constructor<T extends object> = new () => T;
 
@@ -140,8 +140,8 @@ export class CreateVenueAmenityDto {
 }
 
 export class CreateVenueUseDto {
-  @IsIn(Object.values(VenueUseType))
-  useType!: VenueUseType;
+  @IsUUID()
+  useTypeId!: string;
 
   @IsOptional()
   @IsBoolean()
@@ -218,8 +218,8 @@ export class CreateVenueDto {
   squareMeters?: number;
 
   @IsOptional()
-  @IsIn(Object.values(VenueSpaceType))
-  spaceType?: VenueSpaceType;
+  @IsUUID()
+  spaceTypeId?: string;
 
   @IsOptional()
   @IsIn(Object.values(PriceUnit))

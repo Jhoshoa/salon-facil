@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { AuthResponse, LoginPayload, RegisterPayload } from '@/types/api';
+import type { AuthResponse, AuthUser, LoginPayload, RegisterPayload, UpdateProfilePayload } from '@/types/api';
 
 export const login = async (payload: LoginPayload): Promise<AuthResponse> => {
   return apiRequest<AuthResponse>('/auth/login', {
@@ -21,5 +21,16 @@ export const logout = async (refreshToken?: string): Promise<{ message: string }
   return apiRequest<{ message: string }>('/auth/logout', {
     method: 'POST',
     body: JSON.stringify({ refreshToken }),
+  });
+};
+
+export const getMe = async (): Promise<AuthUser> => {
+  return apiRequest<AuthUser>('/auth/me');
+};
+
+export const updateProfile = async (payload: UpdateProfilePayload): Promise<AuthUser> => {
+  return apiRequest<AuthUser>('/auth/me', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   });
 };

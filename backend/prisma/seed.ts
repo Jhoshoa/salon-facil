@@ -12,9 +12,7 @@ import {
   UserRole,
   UserStatus,
   VenueMediaType,
-  VenueSpaceType,
   VenueStatus,
-  VenueUseType,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
@@ -35,6 +33,8 @@ async function cleanDatabase(): Promise<void> {
   await prisma.venuePrice.deleteMany();
   await prisma.venueService.deleteMany();
   await prisma.venue.deleteMany();
+  await prisma.spaceType.deleteMany();
+  await prisma.useType.deleteMany();
   await prisma.user.deleteMany();
 }
 
@@ -153,12 +153,89 @@ async function main(): Promise<void> {
 
   console.log('Created users');
 
+  const spaceTypeSeed = [
+    { key: 'EVENT_HALL', name: 'Salon de eventos', icon: 'Building2', sortOrder: 1 },
+    { key: 'GARDEN', name: 'Jardin', icon: 'Trees', sortOrder: 2 },
+    { key: 'TERRACE', name: 'Terraza', icon: 'Sun', sortOrder: 3 },
+    { key: 'RESTAURANT', name: 'Restaurante', icon: 'UtensilsCrossed', sortOrder: 4 },
+    { key: 'BAR', name: 'Bar', icon: 'Wine', sortOrder: 5 },
+    { key: 'AUDITORIUM', name: 'Auditorio', icon: 'Presentation', sortOrder: 6 },
+    { key: 'CONFERENCE_ROOM', name: 'Sala de reuniones', icon: 'Users', sortOrder: 7 },
+    { key: 'PHOTO_STUDIO', name: 'Estudio fotografico', icon: 'Camera', sortOrder: 8 },
+    { key: 'MULTIPURPOSE', name: 'Multiproposito', icon: 'LayoutGrid', sortOrder: 9 },
+    { key: 'OUTDOOR_SPACE', name: 'Espacio exterior', icon: 'MapPin', sortOrder: 10 },
+  ];
+
+  await prisma.spaceType.createMany({ data: spaceTypeSeed });
+  const spaceTypes = await prisma.spaceType.findMany();
+  const spaceTypeByKey = new Map(spaceTypes.map((item) => [item.key, item.id]));
+  const getSpaceTypeId = (key: string) => {
+    const id = spaceTypeByKey.get(key);
+    if (!id) throw new Error(`Missing space type '${key}'`);
+    return id;
+  };
+
+  const useTypeSeed = [
+    { key: 'WEDDING', name: 'Boda', icon: 'Heart', sortOrder: 1 },
+    { key: 'BIRTHDAY', name: 'Cumpleanos', icon: 'PartyPopper', sortOrder: 2 },
+    { key: 'CORPORATE_EVENT', name: 'Corporativo', icon: 'Briefcase', sortOrder: 3 },
+    { key: 'PRIVATE_PARTY', name: 'Fiesta privada', icon: 'Sparkles', sortOrder: 4 },
+    { key: 'GRADUATION', name: 'Graduacion', icon: 'GraduationCap', sortOrder: 5 },
+    { key: 'CONFERENCE', name: 'Conferencia', icon: 'Presentation', sortOrder: 6 },
+    { key: 'WORKSHOP', name: 'Workshop', icon: 'Wrench', sortOrder: 7 },
+    { key: 'PHOTO_SHOOT', name: 'Sesion de fotos', icon: 'Camera', sortOrder: 8 },
+    { key: 'FILMING', name: 'Rodaje', icon: 'Video', sortOrder: 9 },
+    { key: 'POP_UP', name: 'Pop up', icon: 'Store', sortOrder: 10 },
+    { key: 'TEAM_BUILDING', name: 'Team building', icon: 'Users', sortOrder: 11 },
+  ];
+
+  await prisma.useType.createMany({ data: useTypeSeed });
+  const useTypes = await prisma.useType.findMany();
+  const useTypeByKey = new Map(useTypes.map((item) => [item.key, item.id]));
+  const getUseTypeId = (key: string) => {
+    const id = useTypeByKey.get(key);
+    if (!id) throw new Error(`Missing use type '${key}'`);
+    return id;
+  };
+
+  console.log('Created space type and use type catalogs');
+
   const amenitySeed = [
-    { key: 'kitchen', name: 'Cocina equipada', category: AmenityCategory.FACILITY, icon: 'ChefHat', sortOrder: 1 },
-    { key: 'bathrooms', name: 'Banos', category: AmenityCategory.FACILITY, icon: 'Bath', sortOrder: 2 },
-    { key: 'stage', name: 'Escenario', category: AmenityCategory.FACILITY, icon: 'Mic2', sortOrder: 3 },
-    { key: 'garden', name: 'Jardin', category: AmenityCategory.FACILITY, icon: 'Trees', sortOrder: 4 },
-    { key: 'terrace', name: 'Terraza', category: AmenityCategory.FACILITY, icon: 'Sun', sortOrder: 5 },
+    {
+      key: 'kitchen',
+      name: 'Cocina equipada',
+      category: AmenityCategory.FACILITY,
+      icon: 'ChefHat',
+      sortOrder: 1,
+    },
+    {
+      key: 'bathrooms',
+      name: 'Banos',
+      category: AmenityCategory.FACILITY,
+      icon: 'Bath',
+      sortOrder: 2,
+    },
+    {
+      key: 'stage',
+      name: 'Escenario',
+      category: AmenityCategory.FACILITY,
+      icon: 'Mic2',
+      sortOrder: 3,
+    },
+    {
+      key: 'garden',
+      name: 'Jardin',
+      category: AmenityCategory.FACILITY,
+      icon: 'Trees',
+      sortOrder: 4,
+    },
+    {
+      key: 'terrace',
+      name: 'Terraza',
+      category: AmenityCategory.FACILITY,
+      icon: 'Sun',
+      sortOrder: 5,
+    },
     { key: 'wifi', name: 'Wi-Fi', category: AmenityCategory.COMFORT, icon: 'Wifi', sortOrder: 10 },
     {
       key: 'air-conditioning',
@@ -167,8 +244,20 @@ async function main(): Promise<void> {
       icon: 'Snowflake',
       sortOrder: 11,
     },
-    { key: 'furniture', name: 'Mobiliario', category: AmenityCategory.COMFORT, icon: 'Armchair', sortOrder: 12 },
-    { key: 'natural-light', name: 'Luz natural', category: AmenityCategory.COMFORT, icon: 'SunMedium', sortOrder: 13 },
+    {
+      key: 'furniture',
+      name: 'Mobiliario',
+      category: AmenityCategory.COMFORT,
+      icon: 'Armchair',
+      sortOrder: 12,
+    },
+    {
+      key: 'natural-light',
+      name: 'Luz natural',
+      category: AmenityCategory.COMFORT,
+      icon: 'SunMedium',
+      sortOrder: 13,
+    },
     {
       key: 'sound-system',
       name: 'Equipo de sonido',
@@ -176,8 +265,20 @@ async function main(): Promise<void> {
       icon: 'Speaker',
       sortOrder: 20,
     },
-    { key: 'microphones', name: 'Microfonos', category: AmenityCategory.AUDIO_VISUAL, icon: 'Mic', sortOrder: 21 },
-    { key: 'projector', name: 'Proyector', category: AmenityCategory.AUDIO_VISUAL, icon: 'Projector', sortOrder: 22 },
+    {
+      key: 'microphones',
+      name: 'Microfonos',
+      category: AmenityCategory.AUDIO_VISUAL,
+      icon: 'Mic',
+      sortOrder: 21,
+    },
+    {
+      key: 'projector',
+      name: 'Proyector',
+      category: AmenityCategory.AUDIO_VISUAL,
+      icon: 'Projector',
+      sortOrder: 22,
+    },
     {
       key: 'professional-lighting',
       name: 'Iluminacion profesional',
@@ -206,8 +307,20 @@ async function main(): Promise<void> {
       icon: 'Wine',
       sortOrder: 32,
     },
-    { key: 'bar', name: 'Barra incluida', category: AmenityCategory.CATERING_DRINKS, icon: 'Wine', sortOrder: 33 },
-    { key: 'private-parking', name: 'Parqueo privado', category: AmenityCategory.PARKING, icon: 'Car', sortOrder: 40 },
+    {
+      key: 'bar',
+      name: 'Barra incluida',
+      category: AmenityCategory.CATERING_DRINKS,
+      icon: 'Wine',
+      sortOrder: 33,
+    },
+    {
+      key: 'private-parking',
+      name: 'Parqueo privado',
+      category: AmenityCategory.PARKING,
+      icon: 'Car',
+      sortOrder: 40,
+    },
     {
       key: 'car-parking',
       name: 'Parqueo para autos',
@@ -229,7 +342,13 @@ async function main(): Promise<void> {
       icon: 'DoorOpen',
       sortOrder: 51,
     },
-    { key: 'security', name: 'Seguridad', category: AmenityCategory.SAFETY, icon: 'ShieldCheck', sortOrder: 60 },
+    {
+      key: 'security',
+      name: 'Seguridad',
+      category: AmenityCategory.SAFETY,
+      icon: 'ShieldCheck',
+      sortOrder: 60,
+    },
   ];
 
   await prisma.amenity.createMany({ data: amenitySeed });
@@ -253,7 +372,7 @@ async function main(): Promise<void> {
       capacityMin: 80,
       capacityMax: 250,
       squareMeters: 480,
-      spaceType: VenueSpaceType.EVENT_HALL,
+      spaceTypeId: getSpaceTypeId('EVENT_HALL'),
       minimumHours: 6,
       priceUnit: PriceUnit.EVENT,
       instantBooking: false,
@@ -291,7 +410,7 @@ async function main(): Promise<void> {
       capacityMin: 40,
       capacityMax: 120,
       squareMeters: 260,
-      spaceType: VenueSpaceType.MULTIPURPOSE,
+      spaceTypeId: getSpaceTypeId('MULTIPURPOSE'),
       minimumHours: 4,
       priceUnit: PriceUnit.EVENT,
       instantBooking: false,
@@ -327,7 +446,7 @@ async function main(): Promise<void> {
       capacityMin: 100,
       capacityMax: 300,
       squareMeters: 720,
-      spaceType: VenueSpaceType.GARDEN,
+      spaceTypeId: getSpaceTypeId('GARDEN'),
       minimumHours: 8,
       priceUnit: PriceUnit.EVENT,
       instantBooking: false,
@@ -365,7 +484,7 @@ async function main(): Promise<void> {
       capacityMin: 30,
       capacityMax: 140,
       squareMeters: 320,
-      spaceType: VenueSpaceType.TERRACE,
+      spaceTypeId: getSpaceTypeId('TERRACE'),
       minimumHours: 4,
       priceUnit: PriceUnit.HOUR,
       instantBooking: true,
@@ -404,7 +523,7 @@ async function main(): Promise<void> {
       capacityMin: 10,
       capacityMax: 70,
       squareMeters: 180,
-      spaceType: VenueSpaceType.PHOTO_STUDIO,
+      spaceTypeId: getSpaceTypeId('PHOTO_STUDIO'),
       minimumHours: 3,
       priceUnit: PriceUnit.HOUR,
       instantBooking: true,
@@ -414,7 +533,8 @@ async function main(): Promise<void> {
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-2.jpg',
         'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-3.jpg',
       ],
-      rules: 'Se permite mover mobiliario con supervision. No se permite pintar paredes sin autorizacion.',
+      rules:
+        'Se permite mover mobiliario con supervision. No se permite pintar paredes sin autorizacion.',
       cancellationPolicy: 'Reprogramacion gratuita con 72 horas de anticipacion.',
       status: VenueStatus.ACTIVE,
       isVerified: true,
@@ -528,7 +648,15 @@ async function main(): Promise<void> {
 
   await prisma.venueAmenity.createMany({
     data: [
-      ...['kitchen', 'bathrooms', 'stage', 'furniture', 'sound-system', 'private-parking', 'security'].map((key) => ({
+      ...[
+        'kitchen',
+        'bathrooms',
+        'stage',
+        'furniture',
+        'sound-system',
+        'private-parking',
+        'security',
+      ].map((key) => ({
         venueId: venueImperial.id,
         amenityId: getAmenityId(key),
       })),
@@ -556,11 +684,25 @@ async function main(): Promise<void> {
         venueId: venuePinos.id,
         amenityId: getAmenityId(key),
       })),
-      ...['terrace', 'bar', 'professional-lighting', 'sound-system', 'external-catering', 'alcohol-allowed'].map((key) => ({
+      ...[
+        'terrace',
+        'bar',
+        'professional-lighting',
+        'sound-system',
+        'external-catering',
+        'alcohol-allowed',
+      ].map((key) => ({
         venueId: venueMirador.id,
         amenityId: getAmenityId(key),
       })),
-      ...['natural-light', 'wifi', 'furniture', 'projector', 'sound-system', 'independent-entry'].map((key) => ({
+      ...[
+        'natural-light',
+        'wifi',
+        'furniture',
+        'projector',
+        'sound-system',
+        'independent-entry',
+      ].map((key) => ({
         venueId: venueEstudio.id,
         amenityId: getAmenityId(key),
       })),
@@ -569,21 +711,21 @@ async function main(): Promise<void> {
 
   await prisma.venueUse.createMany({
     data: [
-      { venueId: venueImperial.id, useType: VenueUseType.WEDDING, isPrimary: true },
-      { venueId: venueImperial.id, useType: VenueUseType.BIRTHDAY },
-      { venueId: venueImperial.id, useType: VenueUseType.GRADUATION },
-      { venueId: venueFiesta.id, useType: VenueUseType.BIRTHDAY, isPrimary: true },
-      { venueId: venueFiesta.id, useType: VenueUseType.PRIVATE_PARTY },
-      { venueId: venuePinos.id, useType: VenueUseType.WEDDING, isPrimary: true },
-      { venueId: venuePinos.id, useType: VenueUseType.CORPORATE_EVENT },
-      { venueId: venuePinos.id, useType: VenueUseType.PRIVATE_PARTY },
-      { venueId: venueMirador.id, useType: VenueUseType.CORPORATE_EVENT, isPrimary: true },
-      { venueId: venueMirador.id, useType: VenueUseType.PRIVATE_PARTY },
-      { venueId: venueMirador.id, useType: VenueUseType.POP_UP },
-      { venueId: venueEstudio.id, useType: VenueUseType.PHOTO_SHOOT, isPrimary: true },
-      { venueId: venueEstudio.id, useType: VenueUseType.FILMING },
-      { venueId: venueEstudio.id, useType: VenueUseType.WORKSHOP },
-      { venueId: venueEstudio.id, useType: VenueUseType.POP_UP },
+      { venueId: venueImperial.id, useTypeId: getUseTypeId('WEDDING'), isPrimary: true },
+      { venueId: venueImperial.id, useTypeId: getUseTypeId('BIRTHDAY') },
+      { venueId: venueImperial.id, useTypeId: getUseTypeId('GRADUATION') },
+      { venueId: venueFiesta.id, useTypeId: getUseTypeId('BIRTHDAY'), isPrimary: true },
+      { venueId: venueFiesta.id, useTypeId: getUseTypeId('PRIVATE_PARTY') },
+      { venueId: venuePinos.id, useTypeId: getUseTypeId('WEDDING'), isPrimary: true },
+      { venueId: venuePinos.id, useTypeId: getUseTypeId('CORPORATE_EVENT') },
+      { venueId: venuePinos.id, useTypeId: getUseTypeId('PRIVATE_PARTY') },
+      { venueId: venueMirador.id, useTypeId: getUseTypeId('CORPORATE_EVENT'), isPrimary: true },
+      { venueId: venueMirador.id, useTypeId: getUseTypeId('PRIVATE_PARTY') },
+      { venueId: venueMirador.id, useTypeId: getUseTypeId('POP_UP') },
+      { venueId: venueEstudio.id, useTypeId: getUseTypeId('PHOTO_SHOOT'), isPrimary: true },
+      { venueId: venueEstudio.id, useTypeId: getUseTypeId('FILMING') },
+      { venueId: venueEstudio.id, useTypeId: getUseTypeId('WORKSHOP') },
+      { venueId: venueEstudio.id, useTypeId: getUseTypeId('POP_UP') },
     ],
   });
 
@@ -600,9 +742,18 @@ async function main(): Promise<void> {
   await prisma.venueMedia.createMany({
     data: [
       ...[
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-1.jpg', 'Salon Imperial principal'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-2.jpg', 'Salon Imperial escenario'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-3.jpg', 'Salon Imperial montaje'],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-1.jpg',
+          'Salon Imperial principal',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-2.jpg',
+          'Salon Imperial escenario',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/imperial-3.jpg',
+          'Salon Imperial montaje',
+        ],
       ].map(([url, alt], index) => ({
         venueId: venueImperial.id,
         type: VenueMediaType.IMAGE,
@@ -612,8 +763,14 @@ async function main(): Promise<void> {
         isCover: index === 0,
       })),
       ...[
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-1.jpg', 'Espacio Fiesta salon'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-2.jpg', 'Espacio Fiesta mesas'],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-1.jpg',
+          'Espacio Fiesta salon',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/fiesta-2.jpg',
+          'Espacio Fiesta mesas',
+        ],
       ].map(([url, alt], index) => ({
         venueId: venueFiesta.id,
         type: VenueMediaType.IMAGE,
@@ -623,10 +780,22 @@ async function main(): Promise<void> {
         isCover: index === 0,
       })),
       ...[
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-1.jpg', 'Jardin Los Pinos exterior'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-2.jpg', 'Jardin Los Pinos salon'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-3.jpg', 'Jardin Los Pinos barra'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-4.jpg', 'Jardin Los Pinos montaje'],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-1.jpg',
+          'Jardin Los Pinos exterior',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-2.jpg',
+          'Jardin Los Pinos salon',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-3.jpg',
+          'Jardin Los Pinos barra',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/pinos-4.jpg',
+          'Jardin Los Pinos montaje',
+        ],
       ].map(([url, alt], index) => ({
         venueId: venuePinos.id,
         type: VenueMediaType.IMAGE,
@@ -636,9 +805,18 @@ async function main(): Promise<void> {
         isCover: index === 0,
       })),
       ...[
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-1.jpg', 'Terraza Mirador vista'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-2.jpg', 'Terraza Mirador barra'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-3.jpg', 'Terraza Mirador evento'],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-1.jpg',
+          'Terraza Mirador vista',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-2.jpg',
+          'Terraza Mirador barra',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/mirador-3.jpg',
+          'Terraza Mirador evento',
+        ],
       ].map(([url, alt], index) => ({
         venueId: venueMirador.id,
         type: VenueMediaType.IMAGE,
@@ -648,9 +826,18 @@ async function main(): Promise<void> {
         isCover: index === 0,
       })),
       ...[
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-1.jpg', 'Estudio Creativo luz natural'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-2.jpg', 'Estudio Creativo workshop'],
-        ['https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-3.jpg', 'Estudio Creativo montaje'],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-1.jpg',
+          'Estudio Creativo luz natural',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-2.jpg',
+          'Estudio Creativo workshop',
+        ],
+        [
+          'https://res.cloudinary.com/demo/image/upload/v1/salonfacil/estudio-3.jpg',
+          'Estudio Creativo montaje',
+        ],
       ].map(([url, alt], index) => ({
         venueId: venueEstudio.id,
         type: VenueMediaType.IMAGE,

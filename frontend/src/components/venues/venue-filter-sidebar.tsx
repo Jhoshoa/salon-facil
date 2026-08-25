@@ -4,8 +4,8 @@ import { Clock, SlidersHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AmenityCatalog, PriceUnit, VenueSpaceType, VenueUseType } from '@/types/api';
-import { priceUnitLabels, spaceTypeLabels, useTypeLabels } from './venue-filter-labels';
+import type { AmenityCatalog, CatalogItem, PriceUnit } from '@/types/api';
+import { priceUnitLabels } from './venue-filter-labels';
 
 export interface VenueFilterValues {
   district: string;
@@ -14,8 +14,8 @@ export interface VenueFilterValues {
   minCapacity: string;
   services: string[];
   amenities: string[];
-  spaceTypes: VenueSpaceType[];
-  useTypes: VenueUseType[];
+  spaceTypes: string[];
+  useTypes: string[];
   priceUnit: PriceUnit | '';
   instantBooking: boolean;
 }
@@ -24,8 +24,8 @@ interface VenueFilterSidebarProps {
   values: VenueFilterValues;
   onChange: (values: VenueFilterValues) => void;
   amenityCatalog?: AmenityCatalog;
-  spaceTypes?: VenueSpaceType[];
-  useTypes?: VenueUseType[];
+  spaceTypes?: CatalogItem[];
+  useTypes?: CatalogItem[];
   isCatalogLoading?: boolean;
 }
 
@@ -58,17 +58,17 @@ export const VenueFilterSidebar = ({
     onChange({ ...values, amenities });
   };
 
-  const toggleSpaceType = (spaceType: VenueSpaceType) => {
-    const nextSpaceTypes = values.spaceTypes.includes(spaceType)
-      ? values.spaceTypes.filter((item) => item !== spaceType)
-      : [...values.spaceTypes, spaceType];
+  const toggleSpaceType = (spaceTypeId: string) => {
+    const nextSpaceTypes = values.spaceTypes.includes(spaceTypeId)
+      ? values.spaceTypes.filter((item) => item !== spaceTypeId)
+      : [...values.spaceTypes, spaceTypeId];
     onChange({ ...values, spaceTypes: nextSpaceTypes });
   };
 
-  const toggleUseType = (useType: VenueUseType) => {
-    const nextUseTypes = values.useTypes.includes(useType)
-      ? values.useTypes.filter((item) => item !== useType)
-      : [...values.useTypes, useType];
+  const toggleUseType = (useTypeId: string) => {
+    const nextUseTypes = values.useTypes.includes(useTypeId)
+      ? values.useTypes.filter((item) => item !== useTypeId)
+      : [...values.useTypes, useTypeId];
     onChange({ ...values, useTypes: nextUseTypes });
   };
 
@@ -159,14 +159,14 @@ export const VenueFilterSidebar = ({
                 <Skeleton className="h-24 w-full" />
               ) : (
                 spaceTypes.map((spaceType) => (
-                  <label key={spaceType} className="sf-filter-option cursor-pointer">
+                  <label key={spaceType.id} className="sf-filter-option cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={values.spaceTypes.includes(spaceType)}
-                      onChange={() => toggleSpaceType(spaceType)}
+                      checked={values.spaceTypes.includes(spaceType.id)}
+                      onChange={() => toggleSpaceType(spaceType.id)}
                       className="h-4 w-4 rounded border-input accent-primary"
                     />
-                    {spaceTypeLabels[spaceType]}
+                    {spaceType.name}
                   </label>
                 ))
               )}
@@ -180,14 +180,14 @@ export const VenueFilterSidebar = ({
                 <Skeleton className="h-24 w-full" />
               ) : (
                 useTypes.slice(0, 8).map((useType) => (
-                  <label key={useType} className="sf-filter-option cursor-pointer">
+                  <label key={useType.id} className="sf-filter-option cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={values.useTypes.includes(useType)}
-                      onChange={() => toggleUseType(useType)}
+                      checked={values.useTypes.includes(useType.id)}
+                      onChange={() => toggleUseType(useType.id)}
                       className="h-4 w-4 rounded border-input accent-primary"
                     />
-                    {useTypeLabels[useType]}
+                    {useType.name}
                   </label>
                 ))
               )}

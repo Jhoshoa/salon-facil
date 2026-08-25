@@ -54,6 +54,23 @@ export class AuthRepository implements IAuthRepository {
     });
   }
 
+  async updateProfile(
+    id: string,
+    data: Partial<{
+      fullName: string;
+      city: string;
+      district: string;
+      avatarUrl: string;
+      whatsappPhone: string;
+      facebookUrl: string;
+      instagramUrl: string;
+      tiktokUrl: string;
+    }>,
+  ): Promise<UserEntity> {
+    const user = await this.prisma.user.update({ where: { id }, data });
+    return this.toEntity(user);
+  }
+
   async exists(email: string, phone: string): Promise<boolean> {
     const count = await this.prisma.user.count({
       where: { OR: [{ email }, { phone }] },
@@ -122,6 +139,10 @@ export class AuthRepository implements IAuthRepository {
       avatarUrl: prismaUser.avatarUrl ?? null,
       city: prismaUser.city ?? null,
       district: prismaUser.district ?? null,
+      whatsappPhone: prismaUser.whatsappPhone ?? null,
+      facebookUrl: prismaUser.facebookUrl ?? null,
+      instagramUrl: prismaUser.instagramUrl ?? null,
+      tiktokUrl: prismaUser.tiktokUrl ?? null,
       emailVerifiedAt: prismaUser.emailVerifiedAt ?? null,
       phoneVerifiedAt: prismaUser.phoneVerifiedAt ?? null,
       createdAt: prismaUser.createdAt,
