@@ -303,13 +303,15 @@ export const VenueDetail = ({ slug }: VenueDetailProps) => {
           )}
         </section>
 
-        <VenueReviews
-          venueId={venue.id}
-          averageRating={venue.averageRating}
-          reviewCount={venue.reviewCount}
-        />
-
         <AvailabilityCalendar venueId={venue.id} />
+
+        {venue.reviewCount ? (
+          <VenueReviews
+            venueId={venue.id}
+            averageRating={venue.averageRating}
+            reviewCount={venue.reviewCount}
+          />
+        ) : null}
       </div>
 
       <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px]">
