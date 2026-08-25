@@ -33,7 +33,11 @@
       "Bash(rm -f /tmp/set_completed.js 2>/dev/null; echo done)",
       "mcp__visualize__read_me",
       "mcp__visualize__show_widget",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npx jest *)",
+      "Bash(curl -s -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\" \"http://localhost:3001/api/v1/venues/61727353-5f60-47ed-a335-69e86c6dbfb6/calendar?startDate=2026-01-01&endDate=2027-01-01\")"
     ]
   }
 }

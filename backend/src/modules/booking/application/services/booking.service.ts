@@ -19,6 +19,8 @@ import { PriceCalculatorService, PriceCalculationResult } from './price-calculat
 import { AvailabilityService } from './availability.service';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 
+const MAX_CALENDAR_RANGE_DAYS = 120;
+
 @Injectable()
 export class BookingService {
   constructor(
@@ -315,6 +317,8 @@ export class BookingService {
       reason: string | null;
     }[];
   }> {
+    this.validateCalendarRange(startDate, endDate);
+
     const [bookings, blocks] = await Promise.all([
       this.bookingRepository.findActiveByVenueInRange(venueId, startDate, endDate),
       this.bookingRepository.getCalendarBlocks(venueId, startDate, endDate),
@@ -361,6 +365,23 @@ export class BookingService {
 
   private toDateOnly(date: Date): string {
     return date.toISOString().split('T')[0];
+  }
+
+  private validateCalendarRange(startDate: Date, endDate: Date): void {
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      throw new BadRequestException('Rango de fechas invalido');
+    }
+
+    if (endDate < startDate) {
+      throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio');
+    }
+
+    const rangeDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (rangeDays > MAX_CALENDAR_RANGE_DAYS) {
+      throw new BadRequestException(
+        `El rango de fechas no puede superar los ${MAX_CALENDAR_RANGE_DAYS} dias`,
+      );
+    }
   }
 
   private isUniqueCalendarBlockError(error: unknown): boolean {

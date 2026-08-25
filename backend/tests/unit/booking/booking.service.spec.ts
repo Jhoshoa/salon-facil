@@ -408,4 +408,57 @@ describe('BookingService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('getCalendar', () => {
+    it('should return bookings and blocks mapped to date-only entries', async () => {
+      mockBookingRepository.findActiveByVenueInRange.mockResolvedValue([
+        {
+          id: 'booking-1',
+          eventDate: new Date('2026-09-15T00:00:00.000Z'),
+          status: 'APPROVED',
+          eventType: 'Boda',
+        },
+      ]);
+      mockBookingRepository.getCalendarBlocks.mockResolvedValue([
+        { id: 'block-1', date: new Date('2026-09-20T00:00:00.000Z'), reason: 'Mantenimiento' },
+      ]);
+
+      const result = await service.getCalendar(
+        'venue-1',
+        new Date('2026-09-01'),
+        new Date('2026-09-30'),
+      );
+
+      expect(result.bookings).toEqual([
+        {
+          id: 'booking-1',
+          date: '2026-09-15',
+          type: 'booking',
+          status: 'APPROVED',
+          eventType: 'Boda',
+        },
+      ]);
+      expect(result.blocks).toEqual([
+        { id: 'block-1', date: '2026-09-20', type: 'block', reason: 'Mantenimiento' },
+      ]);
+    });
+
+    it('should throw BadRequestException when the range exceeds the max allowed days', async () => {
+      await expect(
+        service.getCalendar('venue-1', new Date('2026-01-01'), new Date('2027-01-01')),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when endDate is before startDate', async () => {
+      await expect(
+        service.getCalendar('venue-1', new Date('2026-09-30'), new Date('2026-09-01')),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when a date is invalid', async () => {
+      await expect(
+        service.getCalendar('venue-1', new Date('not-a-date'), new Date('2026-09-30')),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });
