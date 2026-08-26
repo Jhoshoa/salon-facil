@@ -5,6 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { NotificationType } from '@prisma/client';
 import { UserEntity, UserRole } from '../../domain/entities/user.entity';
@@ -17,7 +18,11 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 
 @Injectable()
 export class AuthService {
@@ -26,6 +31,7 @@ export class AuthService {
     private readonly authRepository: IAuthRepository,
     private readonly tokenService: TokenService,
     private readonly notificationService: NotificationService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
@@ -149,6 +155,60 @@ export class AuthService {
     }
 
     return { message: 'Sesion cerrada exitosamente' };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const message = 'Si el email existe, te enviamos un enlace para restablecer tu contrasena';
+    const user = await this.authRepository.findByEmail(dto.email);
+
+    // Same response whether or not the user exists, so this endpoint can't be used to
+    // enumerate registered emails.
+    if (!user) {
+      return { message };
+    }
+
+    const token = this.tokenService.generatePasswordResetToken();
+    await this.authRepository.createPasswordResetToken({
+      userId: user.id,
+      tokenHash: this.tokenService.hashToken(token),
+      expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+    });
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.PASSWORD_RESET,
+        title: 'Restablece tu contrasena en SalonFacil',
+        content: `Recibimos una solicitud para restablecer tu contrasena. Este enlace vence en 1 hora: ${resetUrl}. Si no fuiste vos, ignora este mensaje.`,
+        recipientEmail: user.email,
+      })
+      .catch(() => {
+        // Best-effort — the response above is generic regardless, so a failed send here
+        // is invisible to the client and only shows up as a failed notification row.
+      });
+
+    return { message };
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const tokenHash = this.tokenService.hashToken(dto.token);
+    const storedToken = await this.authRepository.findActivePasswordResetToken(tokenHash);
+
+    if (!storedToken || storedToken.usedAt || storedToken.expiresAt <= new Date()) {
+      throw new BadRequestException('El enlace de restablecimiento es invalido o expiro');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    await this.authRepository.updatePassword(storedToken.userId, passwordHash);
+    await this.authRepository.markPasswordResetTokenUsed(storedToken.id);
+    // Invalidate every existing session — a leaked/stale access token shouldn't survive a
+    // password reset.
+    await this.authRepository.revokeAllRefreshTokens(storedToken.userId);
+
+    return { message: 'Contrasena actualizada exitosamente' };
   }
 
   private async issueTokens(user: UserEntity): Promise<{

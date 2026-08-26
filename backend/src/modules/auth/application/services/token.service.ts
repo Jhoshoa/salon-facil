@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 
 export interface TokenPayload {
   sub: string;
@@ -89,6 +89,12 @@ export class TokenService {
 
   hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  /** Opaque, single-use token for the password-reset flow — not a JWT, since it carries no
+   * claims and is validated by DB lookup (hash) rather than by signature. */
+  generatePasswordResetToken(): string {
+    return randomBytes(32).toString('hex');
   }
 
   getRefreshTokenExpiresAt(token: string): Date {

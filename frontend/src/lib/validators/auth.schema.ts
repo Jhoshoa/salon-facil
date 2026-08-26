@@ -25,5 +25,15 @@ export const registerSchema = z.object({
   district: z.string().optional(),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Email invalido'),
+});
+
+export const resetPasswordSchema = z.object({
+  newPassword: z.string().regex(PASSWORD_REGEX, PASSWORD_HINT),
+});
+
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

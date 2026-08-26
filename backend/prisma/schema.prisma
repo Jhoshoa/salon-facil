@@ -103,6 +103,7 @@ enum NotificationType {
   REMINDER_1_DAY
   REVIEW_REQUEST
   WELCOME
+  PASSWORD_RESET
 }
 
 enum NotificationChannel {
@@ -139,6 +140,7 @@ model User {
   confirmedPayments Payment[]      @relation("PaymentConfirmedBy")
   notifications     Notification[]
   refreshTokens     RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@index([phone])
@@ -162,6 +164,21 @@ model RefreshToken {
   @@index([expiresAt])
   @@index([revokedAt])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Venue {

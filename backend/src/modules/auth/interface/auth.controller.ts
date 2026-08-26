@@ -11,6 +11,8 @@ import { RegisterDto } from '../application/dto/register.dto';
 import { LoginDto } from '../application/dto/login.dto';
 import { RefreshTokenDto } from '../application/dto/refresh-token.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
+import { ForgotPasswordDto } from '../application/dto/forgot-password.dto';
+import { ResetPasswordDto } from '../application/dto/reset-password.dto';
 import { AuthResponseDto } from '../application/dto/auth-response.dto';
 import { UserEntity } from '../domain/entities/user.entity';
 
@@ -81,6 +83,25 @@ export class AuthController {
     @Body() dto: Partial<RefreshTokenDto>,
   ): Promise<{ message: string }> {
     return this.logoutUseCase.execute(userId, dto.refreshToken);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Solicitar enlace de restablecimiento de contraseña' })
+  @ApiResponse({ status: 200, description: 'Enlace enviado si el email existe' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restablecer contraseña con el token recibido por email' })
+  @ApiResponse({ status: 200, description: 'Contraseña actualizada' })
+  @ApiResponse({ status: 400, description: 'Token inválido o expirado' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    return this.authService.resetPassword(dto);
   }
 
   @Get('me')

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from '../../../src/modules/auth/application/services/auth.service';
@@ -44,12 +45,17 @@ describe('AuthService', () => {
     markRefreshTokenUsed: jest.Mock;
     revokeRefreshToken: jest.Mock;
     revokeAllRefreshTokens: jest.Mock;
+    updatePassword: jest.Mock;
+    createPasswordResetToken: jest.Mock;
+    findActivePasswordResetToken: jest.Mock;
+    markPasswordResetTokenUsed: jest.Mock;
   };
   let mockTokenService: {
     generateTokens: jest.Mock;
     verifyRefreshToken: jest.Mock;
     hashToken: jest.Mock;
     getRefreshTokenExpiresAt: jest.Mock;
+    generatePasswordResetToken: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -64,6 +70,10 @@ describe('AuthService', () => {
       markRefreshTokenUsed: jest.fn(),
       revokeRefreshToken: jest.fn(),
       revokeAllRefreshTokens: jest.fn(),
+      updatePassword: jest.fn(),
+      createPasswordResetToken: jest.fn(),
+      findActivePasswordResetToken: jest.fn(),
+      markPasswordResetTokenUsed: jest.fn(),
     };
 
     mockTokenService = {
@@ -75,9 +85,11 @@ describe('AuthService', () => {
       verifyRefreshToken: jest.fn(),
       hashToken: jest.fn().mockReturnValue('mock-refresh-token-hash'),
       getRefreshTokenExpiresAt: jest.fn().mockReturnValue(new Date('2030-01-01T00:00:00.000Z')),
+      generatePasswordResetToken: jest.fn().mockReturnValue('mock-reset-token'),
     };
 
     const mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    const mockConfigService = { get: jest.fn().mockReturnValue('http://localhost:3000') };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -85,6 +97,7 @@ describe('AuthService', () => {
         { provide: AUTH_REPOSITORY, useValue: mockAuthRepository },
         { provide: TokenService, useValue: mockTokenService },
         { provide: NotificationService, useValue: mockNotificationService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
@@ -270,6 +283,88 @@ describe('AuthService', () => {
 
       expect(result.message).toBe('Sesion cerrada exitosamente');
       expect(mockAuthRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-123');
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('should create a reset token and enqueue an email for an existing user', async () => {
+      mockAuthRepository.findByEmail.mockResolvedValue(activeUser());
+
+      const result = await service.forgotPassword({ email: 'test@email.com' });
+
+      expect(result.message).toMatch(/enlace/i);
+      expect(mockAuthRepository.createPasswordResetToken).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123', tokenHash: 'mock-refresh-token-hash' }),
+      );
+    });
+
+    it('should return the same generic message when the email does not exist', async () => {
+      mockAuthRepository.findByEmail.mockResolvedValue(null);
+
+      const result = await service.forgotPassword({ email: 'unknown@email.com' });
+
+      expect(result.message).toMatch(/enlace/i);
+      expect(mockAuthRepository.createPasswordResetToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should update the password and revoke sessions for a valid token', async () => {
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+
+      const result = await service.resetPassword({
+        token: 'valid-reset-token',
+        newPassword: 'NewPassword123!',
+      });
+
+      expect(result.message).toMatch(/actualizada/i);
+      expect(mockAuthRepository.updatePassword).toHaveBeenCalledWith(
+        'user-123',
+        expect.any(String),
+      );
+      expect(mockAuthRepository.markPasswordResetTokenUsed).toHaveBeenCalledWith(
+        'reset-token-123',
+      );
+      expect(mockAuthRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-123');
+    });
+
+    it('should reject an unknown token', async () => {
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword({ token: 'unknown', newPassword: 'NewPassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject an already-used token', async () => {
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: new Date(),
+      });
+
+      await expect(
+        service.resetPassword({ token: 'used-token', newPassword: 'NewPassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject an expired token', async () => {
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+
+      await expect(
+        service.resetPassword({ token: 'expired-token', newPassword: 'NewPassword123!' }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

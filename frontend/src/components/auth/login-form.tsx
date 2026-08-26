@@ -61,7 +61,12 @@ export const LoginForm = () => {
       </div>
 
       <div className="sf-form-group">
-        <Label htmlFor="password">Contrasena</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Contrasena</Label>
+          <Link href="/forgot-password" className="sf-link text-sm">
+            Olvidaste tu contrasena?
+          </Link>
+        </div>
         <PasswordInput
           id="password"
           placeholder="Tu contrasena"

@@ -127,6 +127,45 @@ export class AuthRepository implements IAuthRepository {
     });
   }
 
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+  }
+
+  async createPasswordResetToken(data: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.prisma.passwordResetToken.create({ data });
+  }
+
+  async findActivePasswordResetToken(tokenHash: string): Promise<{
+    id: string;
+    userId: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+  } | null> {
+    return this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      select: {
+        id: true,
+        userId: true,
+        expiresAt: true,
+        usedAt: true,
+      },
+    });
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    await this.prisma.passwordResetToken.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  }
+
   private toEntity(prismaUser: PrismaUser): UserEntity {
     return new UserEntity({
       id: prismaUser.id,

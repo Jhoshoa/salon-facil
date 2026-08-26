@@ -40,4 +40,17 @@ export interface IAuthRepository {
   markRefreshTokenUsed(id: string): Promise<void>;
   revokeRefreshToken(id: string): Promise<void>;
   revokeAllRefreshTokens(userId: string): Promise<void>;
+  updatePassword(userId: string, passwordHash: string): Promise<void>;
+  createPasswordResetToken(data: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void>;
+  findActivePasswordResetToken(tokenHash: string): Promise<{
+    id: string;
+    userId: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+  } | null>;
+  markPasswordResetTokenUsed(id: string): Promise<void>;
 }

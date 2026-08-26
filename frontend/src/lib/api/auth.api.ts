@@ -34,3 +34,22 @@ export const updateProfile = async (payload: UpdateProfilePayload): Promise<Auth
     body: JSON.stringify(payload),
   });
 };
+
+export const forgotPassword = async (payload: { email: string }): Promise<{ message: string }> => {
+  return apiRequest<{ message: string }>('/auth/forgot-password', {
+    auth: false,
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const resetPassword = async (payload: {
+  token: string;
+  newPassword: string;
+}): Promise<{ message: string }> => {
+  return apiRequest<{ message: string }>('/auth/reset-password', {
+    auth: false,
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
