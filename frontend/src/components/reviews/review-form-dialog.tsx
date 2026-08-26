@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { createReview } from '@/lib/api/reviews.api';
+import { createReview, updateReview } from '@/lib/api/reviews.api';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -14,12 +14,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { StarRating } from './star-rating';
+import type { Review } from '@/types/api';
 
 interface ReviewFormDialogProps {
   bookingId: string;
   venueName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  existingReview?: Review | null;
 }
 
 export const ReviewFormDialog = ({
@@ -27,18 +29,28 @@ export const ReviewFormDialog = ({
   venueName,
   open,
   onOpenChange,
+  existingReview,
 }: ReviewFormDialogProps) => {
   const queryClient = useQueryClient();
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
+  const [rating, setRating] = useState(existingReview?.rating ?? 0);
+  const [comment, setComment] = useState(existingReview?.comment ?? '');
+  const isEditing = Boolean(existingReview);
+
+  useEffect(() => {
+    if (open) {
+      setRating(existingReview?.rating ?? 0);
+      setComment(existingReview?.comment ?? '');
+    }
+  }, [open, existingReview]);
 
   const mutation = useMutation({
-    mutationFn: () => createReview(bookingId, { rating, comment: comment.trim() || undefined }),
+    mutationFn: () =>
+      existingReview
+        ? updateReview(existingReview.id, { rating, comment: comment.trim() || undefined })
+        : createReview(bookingId, { rating, comment: comment.trim() || undefined }),
     onSuccess: async () => {
-      toast.success('Gracias por tu resena');
+      toast.success(isEditing ? 'Resena actualizada' : 'Gracias por tu resena');
       onOpenChange(false);
-      setRating(0);
-      setComment('');
       await queryClient.invalidateQueries({ queryKey: ['booking', bookingId, 'review'] });
     },
     onError: (error: { message?: string }) => {
@@ -50,7 +62,13 @@ export const ReviewFormDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{venueName ? `Calificar ${venueName}` : 'Calificar reserva'}</DialogTitle>
+          <DialogTitle>
+            {isEditing
+              ? 'Editar resena'
+              : venueName
+                ? `Calificar ${venueName}`
+                : 'Calificar reserva'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -78,7 +96,7 @@ export const ReviewFormDialog = ({
             onClick={() => mutation.mutate()}
             disabled={rating === 0 || mutation.isPending}
           >
-            Enviar resena
+            {isEditing ? 'Guardar cambios' : 'Enviar resena'}
           </Button>
         </DialogFooter>
       </DialogContent>

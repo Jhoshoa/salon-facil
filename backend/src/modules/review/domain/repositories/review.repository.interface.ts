@@ -12,10 +12,14 @@ export interface CreateReviewData {
 
 export interface IReviewRepository {
   create(data: CreateReviewData): Promise<ReviewEntity>;
+  findById(id: string): Promise<ReviewEntity | null>;
   findByBookingId(bookingId: string): Promise<ReviewEntity | null>;
   findByVenue(
     venueId: string,
     page: number,
     limit: number,
   ): Promise<{ items: ReviewEntity[]; total: number }>;
+  update(id: string, data: { rating?: number; comment?: string | null }): Promise<ReviewEntity>;
+  delete(id: string): Promise<void>;
+  setOwnerResponse(id: string, response: string): Promise<ReviewEntity>;
 }

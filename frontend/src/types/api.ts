@@ -392,6 +392,8 @@ export interface Review {
   rating: number;
   comment: string | null;
   isVerified: boolean;
+  ownerResponse: string | null;
+  ownerResponseAt: string | null;
   createdAt: string;
   client?: { id: string; fullName: string };
 }

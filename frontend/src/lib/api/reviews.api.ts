@@ -25,3 +25,24 @@ export const createReview = async (
     body: JSON.stringify(payload),
   });
 };
+
+export const updateReview = async (
+  reviewId: string,
+  payload: { rating?: number; comment?: string },
+): Promise<Review> => {
+  return apiRequest<Review>(`/reviews/${reviewId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteReview = async (reviewId: string): Promise<void> => {
+  return apiRequest<void>(`/reviews/${reviewId}`, { method: 'DELETE' });
+};
+
+export const respondToReview = async (reviewId: string, response: string): Promise<Review> => {
+  return apiRequest<Review>(`/reviews/${reviewId}/response`, {
+    method: 'POST',
+    body: JSON.stringify({ response }),
+  });
+};

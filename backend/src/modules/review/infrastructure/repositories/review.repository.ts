@@ -14,10 +14,14 @@ type RawReview = {
   rating: number;
   comment: string | null;
   isVerified: boolean;
+  ownerResponse: string | null;
+  ownerResponseAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  client?: { id: string; fullName: string } | null;
+  client?: { id: string; fullName: string; email: string } | null;
 };
+
+const reviewInclude = { client: { select: { id: true, fullName: true, email: true } } };
 
 @Injectable()
 export class ReviewRepository implements IReviewRepository {
@@ -33,15 +37,23 @@ export class ReviewRepository implements IReviewRepository {
         comment: data.comment,
         isVerified: true,
       },
-      include: { client: { select: { id: true, fullName: true } } },
+      include: reviewInclude,
     });
     return this.toEntity(review);
+  }
+
+  async findById(id: string): Promise<ReviewEntity | null> {
+    const review = await this.prisma.review.findUnique({
+      where: { id },
+      include: reviewInclude,
+    });
+    return review ? this.toEntity(review) : null;
   }
 
   async findByBookingId(bookingId: string): Promise<ReviewEntity | null> {
     const review = await this.prisma.review.findUnique({
       where: { bookingId },
-      include: { client: { select: { id: true, fullName: true } } },
+      include: reviewInclude,
     });
     return review ? this.toEntity(review) : null;
   }
@@ -54,7 +66,7 @@ export class ReviewRepository implements IReviewRepository {
     const [items, total] = await Promise.all([
       this.prisma.review.findMany({
         where: { venueId },
-        include: { client: { select: { id: true, fullName: true } } },
+        include: reviewInclude,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -63,6 +75,31 @@ export class ReviewRepository implements IReviewRepository {
     ]);
 
     return { items: items.map((item) => this.toEntity(item)), total };
+  }
+
+  async update(
+    id: string,
+    data: { rating?: number; comment?: string | null },
+  ): Promise<ReviewEntity> {
+    const review = await this.prisma.review.update({
+      where: { id },
+      data,
+      include: reviewInclude,
+    });
+    return this.toEntity(review);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.prisma.review.delete({ where: { id } });
+  }
+
+  async setOwnerResponse(id: string, response: string): Promise<ReviewEntity> {
+    const review = await this.prisma.review.update({
+      where: { id },
+      data: { ownerResponse: response, ownerResponseAt: new Date() },
+      include: reviewInclude,
+    });
+    return this.toEntity(review);
   }
 
   private toEntity(raw: RawReview): ReviewEntity {
@@ -74,6 +111,8 @@ export class ReviewRepository implements IReviewRepository {
       rating: raw.rating,
       comment: raw.comment,
       isVerified: raw.isVerified,
+      ownerResponse: raw.ownerResponse,
+      ownerResponseAt: raw.ownerResponseAt,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
       client: raw.client ?? undefined,

@@ -1,12 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CreditCard, Star, XCircle } from 'lucide-react';
+import { CreditCard, Pencil, Star, Trash2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cancelBooking, getBooking } from '@/lib/api/bookings.api';
 import { getBookingPayments } from '@/lib/api/payments.api';
-import { getBookingReview } from '@/lib/api/reviews.api';
+import { deleteReview, getBookingReview } from '@/lib/api/reviews.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
 import { PaymentProofDrawer } from '@/components/payments/payment-proof-drawer';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
@@ -31,6 +31,7 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [deleteReviewOpen, setDeleteReviewOpen] = useState(false);
 
   const bookingQuery = useQuery({
     queryKey: ['booking', bookingId],
@@ -47,6 +48,18 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
     queryKey: ['booking-payments', bookingId],
     queryFn: () => getBookingPayments(bookingId),
     enabled: Boolean(bookingQuery.data),
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: () => deleteReview(reviewQuery.data!.id),
+    onSuccess: async () => {
+      toast.success('Resena borrada');
+      setDeleteReviewOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['booking', bookingId, 'review'] });
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo borrar la resena', { description: error.message });
+    },
   });
 
   const cancelMutation = useMutation({
@@ -179,12 +192,32 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
 
       {reviewQuery.data ? (
         <section className="rounded-md border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold">Tu resena</h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="mb-3 text-base font-semibold">Tu resena</h2>
+            <div className="flex gap-2">
+              <Button size="icon-sm" variant="ghost" onClick={() => setReviewOpen(true)}>
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Editar resena</span>
+              </Button>
+              <Button size="icon-sm" variant="ghost" onClick={() => setDeleteReviewOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Borrar resena</span>
+              </Button>
+            </div>
+          </div>
           <StarRating value={reviewQuery.data.rating} size="sm" />
           {reviewQuery.data.comment ? (
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {reviewQuery.data.comment}
             </p>
+          ) : null}
+          {reviewQuery.data.ownerResponse ? (
+            <div className="mt-3 rounded-md bg-muted p-3">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Respuesta de {booking.venue?.name ?? 'el local'}
+              </p>
+              <p className="mt-1 text-sm leading-6">{reviewQuery.data.ownerResponse}</p>
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -195,6 +228,16 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
         venueName={booking.venue?.name}
         open={reviewOpen}
         onOpenChange={setReviewOpen}
+        existingReview={reviewQuery.data}
+      />
+      <ConfirmDialog
+        open={deleteReviewOpen}
+        title="Borrar resena"
+        description="Esta accion no se puede deshacer."
+        confirmLabel="Borrar"
+        isLoading={deleteReviewMutation.isPending}
+        onOpenChange={setDeleteReviewOpen}
+        onConfirm={() => deleteReviewMutation.mutate()}
       />
       <ConfirmDialog
         open={cancelOpen}

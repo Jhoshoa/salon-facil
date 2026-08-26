@@ -338,6 +338,7 @@ export const VenueDetail = ({ slug, initialStartDate, initialEndDate }: VenueDet
         {venue.reviewCount ? (
           <VenueReviews
             venueId={venue.id}
+            ownerId={venue.ownerId}
             averageRating={venue.averageRating}
             reviewCount={venue.reviewCount}
           />
