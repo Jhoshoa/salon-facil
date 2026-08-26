@@ -38,8 +38,8 @@ describe('VenueService', () => {
       findByOwner: jest.fn(),
       search: jest.fn(),
       findAmenities: jest.fn(),
-      getSpaceTypes: jest.fn(),
-      getUseTypes: jest.fn(),
+      findSpaceTypes: jest.fn(),
+      findUseTypes: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateStatus: jest.fn(),
@@ -304,8 +304,8 @@ describe('VenueService', () => {
     });
 
     it('should return space and use type catalogs', () => {
-      mockRepository.getSpaceTypes.mockReturnValue(['EVENT_HALL']);
-      mockRepository.getUseTypes.mockReturnValue(['WEDDING']);
+      mockRepository.findSpaceTypes.mockReturnValue(['EVENT_HALL']);
+      mockRepository.findUseTypes.mockReturnValue(['WEDDING']);
 
       expect(service.getSpaceTypesCatalog()).toEqual(['EVENT_HALL']);
       expect(service.getUseTypesCatalog()).toEqual(['WEDDING']);
