@@ -842,6 +842,16 @@ export class VenueRepository implements IVenueRepository {
     });
   }
 
+  async findOwnerContact(
+    venueId: string,
+  ): Promise<{ id: string; email: string; phone: string; fullName: string } | null> {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+      select: { owner: { select: { id: true, email: true, phone: true, fullName: true } } },
+    });
+    return venue?.owner ?? null;
+  }
+
   async existsBySlug(slug: string): Promise<boolean> {
     const venue = await this.prisma.venue.findUnique({
       where: { slug },

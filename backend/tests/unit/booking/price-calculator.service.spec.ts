@@ -178,7 +178,7 @@ describe('PriceCalculatorService', () => {
       expect(result.depositAmount).toBe(273);
     });
 
-    it('HOUR unit: multiplies each day rate by that day\'s hours', () => {
+    it("HOUR unit: multiplies each day rate by that day's hours", () => {
       const prices = [
         makePrice({ priceType: PriceType.BASE, price: 280 }),
         makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
@@ -248,7 +248,11 @@ describe('PriceCalculatorService', () => {
 
       const result = service.calculateRange(prices, PriceUnit.HOUR, toDays(friSatSun, 8));
 
-      expect(result.days.map((d) => d.unit)).toEqual([PriceUnit.HOUR, PriceUnit.DAY, PriceUnit.HOUR]);
+      expect(result.days.map((d) => d.unit)).toEqual([
+        PriceUnit.HOUR,
+        PriceUnit.DAY,
+        PriceUnit.HOUR,
+      ]);
       // Friday/Sunday: 280 * 8h = 2240 (HOUR). Saturday: flat 900 (DAY, ignores hours).
       expect(result.days.map((d) => d.appliedPrice)).toEqual([2240, 900, 2240]);
       expect(result.totalPrice).toBe(5380);

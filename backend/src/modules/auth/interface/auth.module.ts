@@ -11,9 +11,14 @@ import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { AuthRepository } from '../infrastructure/repositories/auth.repository';
 import { AUTH_REPOSITORY } from '../domain/repositories/auth.repository.interface';
 import { JwtStrategy } from '../infrastructure/strategies/jwt.strategy';
+import { NotificationModule } from '../../notification/interface/notification.module';
 
 @Module({
-  imports: [PassportModule.register({ defaultStrategy: 'jwt' }), JwtModule.register({})],
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.register({}),
+    NotificationModule,
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,

@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Express } from 'express';
+import { NotificationType } from '@prisma/client';
 import { BookingStatus } from '../../../booking/domain/entities/booking.entity';
 import {
   BOOKING_REPOSITORY,
@@ -14,6 +15,7 @@ import {
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
+import { NotificationService } from '../../../notification/application/services/notification.service';
 import { CreatePaymentDto } from '../dto/payment.dto';
 import { PaymentEntity, PaymentStatus, PaymentType } from '../../domain/entities/payment.entity';
 import {
@@ -34,7 +36,14 @@ export class PaymentService {
     private readonly bookingRepository: IBookingRepository,
     private readonly venueService: VenueService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly notificationService: NotificationService,
   ) {}
+
+  /** Fire-and-forget: a notification failing to send should never break the payment flow
+   * that triggered it (the row still lands in the recipient's in-app inbox either way). */
+  private notify(params: Parameters<NotificationService['enqueue']>[0]): void {
+    this.notificationService.enqueue(params).catch(() => {});
+  }
 
   async createPayment(
     bookingId: string,
@@ -89,7 +98,23 @@ export class PaymentService {
     }
 
     const upload = await this.cloudinaryService.uploadFile(file, `payments/${payment.bookingId}`);
-    return this.paymentRepository.uploadProof(paymentId, upload.url);
+    const updated = await this.paymentRepository.uploadProof(paymentId, upload.url);
+
+    if (payment.booking) {
+      const ownerContact = await this.venueService.getOwnerContact(payment.booking.venueId);
+      if (ownerContact) {
+        const venueName = payment.booking.venue?.name ?? 'tu local';
+        this.notify({
+          userId: ownerContact.id,
+          type: NotificationType.PAYMENT_RECEIVED,
+          title: `Comprobante recibido: ${venueName}`,
+          content: `El cliente subio un comprobante de Bs ${payment.amount} para la reserva del ${this.toDateOnly(payment.booking.eventDate)}. Revisalo en tu panel de pagos.`,
+          recipientEmail: ownerContact.email,
+        });
+      }
+    }
+
+    return updated;
   }
 
   async getMyPayments(clientId: string): Promise<PaymentEntity[]> {
@@ -137,7 +162,20 @@ export class PaymentService {
     }
 
     await this.assertCanManagePayment(payment, ownerId, userRole);
-    return this.paymentRepository.confirm(paymentId, ownerId, notes);
+    const updated = await this.paymentRepository.confirm(paymentId, ownerId, notes);
+
+    if (payment.booking?.client) {
+      const venueName = payment.booking.venue?.name ?? 'el local';
+      this.notify({
+        userId: payment.booking.client.id,
+        type: NotificationType.PAYMENT_RECEIVED,
+        title: `Tu pago en ${venueName} fue confirmado`,
+        content: `Confirmamos tu pago de Bs ${payment.amount}. Gracias por reservar con SalonFacil.`,
+        recipientEmail: payment.booking.client.email,
+      });
+    }
+
+    return updated;
   }
 
   async rejectPayment(
@@ -153,7 +191,20 @@ export class PaymentService {
     }
 
     await this.assertCanManagePayment(payment, ownerId, userRole);
-    return this.paymentRepository.reject(paymentId, reason);
+    const updated = await this.paymentRepository.reject(paymentId, reason);
+
+    if (payment.booking?.client) {
+      const venueName = payment.booking.venue?.name ?? 'el local';
+      this.notify({
+        userId: payment.booking.client.id,
+        type: NotificationType.PAYMENT_RECEIVED,
+        title: `Tu comprobante en ${venueName} fue rechazado`,
+        content: `El propietario rechazo tu comprobante de Bs ${payment.amount}. Motivo: ${reason}. Podes subir uno nuevo desde "Mis reservas".`,
+        recipientEmail: payment.booking.client.email,
+      });
+    }
+
+    return updated;
   }
 
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentEntity> {
@@ -177,6 +228,10 @@ export class PaymentService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para gestionar este pago');
     }
+  }
+
+  private toDateOnly(date: Date): string {
+    return new Date(date).toISOString().split('T')[0];
   }
 
   private validateProofFile(file?: Express.Multer.File): void {

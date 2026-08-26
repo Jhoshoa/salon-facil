@@ -65,7 +65,13 @@
       "Bash(curl -s -X PUT http://localhost:3001/api/v1/bookings/0e986bab-c112-4494-9858-1689607d3987/cancel -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>console.log\\(JSON.parse\\(d\\).status\\)\\)\")",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const v=JSON.parse\\(d\\);console.log\\(JSON.stringify\\(v.prices,null,2\\)\\);}\\)\")",
-      "Bash(grep -n \"AvailabilityCalendar$\\\\|AvailabilityCalendar\\\\s*$\\\\|onRangeSelect=\" C:/Users/josoe/Documents/salon-facil/frontend/src/components/venues/venue-detail.tsx)"
+      "Bash(grep -n \"AvailabilityCalendar$\\\\|AvailabilityCalendar\\\\s*$\\\\|onRangeSelect=\" C:/Users/josoe/Documents/salon-facil/frontend/src/components/venues/venue-detail.tsx)",
+      "Bash(node -e \"['2026-09-15','2026-09-16','2026-09-17','2026-09-18','2026-09-19'].forEach\\(d=>console.log\\(d, new Date\\(d+'T00:00:00.000Z'\\).getUTCDay\\(\\)\\)\\)\")",
+      "Bash(npx next *)",
+      "Bash(node scripts/_fix-booking-form.js)",
+      "Bash(rm scripts/_fix-booking-form.js)",
+      "Bash(node -e \"const {NotificationType, NotificationChannel} = require\\('@prisma/client'\\); console.log\\(NotificationType, NotificationChannel\\);\")",
+      "Bash(xargs grep -l \"createTestingModule\")"
     ]
   }
 }

@@ -8,10 +8,11 @@ import { AvailabilityService } from '../application/services/availability.servic
 import { BookingRepository } from '../infrastructure/repositories/booking.repository';
 import { BOOKING_REPOSITORY } from '../domain/repositories/booking.repository.interface';
 import { VenueModule } from '../../venue/interface/venue.module';
+import { NotificationModule } from '../../notification/interface/notification.module';
 import { PrismaModule } from '../../../prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, VenueModule],
+  imports: [PrismaModule, VenueModule, NotificationModule],
   controllers: [
     BookingController,
     BookingDetailController,

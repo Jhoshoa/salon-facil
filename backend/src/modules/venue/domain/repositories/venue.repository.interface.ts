@@ -90,4 +90,9 @@ export interface IVenueRepository {
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   existsBySlug(slug: string): Promise<boolean>;
+  /** Internal use only (notifications) — never serialize this beyond the triggering service.
+   * The public venue shape deliberately excludes the owner's email/phone from API responses. */
+  findOwnerContact(
+    venueId: string,
+  ): Promise<{ id: string; email: string; phone: string; fullName: string } | null>;
 }

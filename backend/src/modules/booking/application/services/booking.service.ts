@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PriceUnit } from '@prisma/client';
+import { NotificationType, PriceUnit } from '@prisma/client';
 import {
   BOOKING_REPOSITORY,
   IBookingRepository,
@@ -20,6 +20,7 @@ import { VenueService } from '../../../venue/application/services/venue.service'
 import { PriceCalculatorService, RangePriceCalculationResult } from './price-calculator.service';
 import { AvailabilityService } from './availability.service';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
+import { NotificationService } from '../../../notification/application/services/notification.service';
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
 const MAX_BOOKING_RANGE_DAYS = 30;
@@ -46,7 +47,14 @@ export class BookingService {
     private readonly venueService: VenueService,
     private readonly priceCalculator: PriceCalculatorService,
     private readonly availabilityService: AvailabilityService,
+    private readonly notificationService: NotificationService,
   ) {}
+
+  /** Fire-and-forget: a notification failing to send should never break the booking flow
+   * that triggered it (the row still lands in the recipient's in-app inbox either way). */
+  private notify(params: Parameters<NotificationService['enqueue']>[0]): void {
+    this.notificationService.enqueue(params).catch(() => {});
+  }
 
   async requestBooking(
     venueId: string,
@@ -160,6 +168,17 @@ export class BookingService {
       throw error;
     }
 
+    const ownerContact = await this.venueService.getOwnerContact(venueId);
+    if (ownerContact) {
+      this.notify({
+        userId: ownerContact.id,
+        type: NotificationType.BOOKING_REQUEST,
+        title: `Nueva solicitud de reserva: ${venue.name}`,
+        content: `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Revisala en tu panel de reservas.`,
+        recipientEmail: ownerContact.email,
+      });
+    }
+
     return { booking, priceCalculation };
   }
 
@@ -264,7 +283,9 @@ export class BookingService {
       const providedKeys = dto.dailySchedule.map((entry) => entry.date);
       const duplicates = providedKeys.filter((key, index) => providedKeys.indexOf(key) !== index);
       if (duplicates.length > 0) {
-        throw new BadRequestException(`Horario duplicado para: ${[...new Set(duplicates)].join(', ')}`);
+        throw new BadRequestException(
+          `Horario duplicado para: ${[...new Set(duplicates)].join(', ')}`,
+        );
       }
       const providedSet = new Set(providedKeys);
       const missing = [...hourDateKeys].filter((key) => !providedSet.has(key));
@@ -285,7 +306,10 @@ export class BookingService {
       const opening = openingByWeekday.get(date.getUTCDay());
 
       if (unit === PriceUnit.HOUR) {
-        const entry = scheduleByDate.get(dateKey) ?? { startTime: dto.startTime, endTime: dto.endTime };
+        const entry = scheduleByDate.get(dateKey) ?? {
+          startTime: dto.startTime,
+          endTime: dto.endTime,
+        };
         if (!opening || opening.isClosed) {
           throw new BadRequestException(`El local esta cerrado el ${dateKey}`);
         }
@@ -379,14 +403,24 @@ export class BookingService {
       throw new ForbiddenException('No tienes permiso para aprobar esta reserva');
     }
 
-    return this.bookingRepository.updateStatus(bookingId, BookingStatus.APPROVED);
+    const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.APPROVED);
+    if (booking.client) {
+      this.notify({
+        userId: booking.client.id,
+        type: NotificationType.BOOKING_CONFIRMED,
+        title: `Tu reserva en ${venue.name} fue aprobada`,
+        content: `El propietario aprobo tu solicitud para el ${this.toDateOnly(booking.eventDate)}. Ya podes subir el comprobante de la sena desde "Mis reservas".`,
+        recipientEmail: booking.client.email,
+      });
+    }
+    return updated;
   }
 
   async rejectBooking(
     bookingId: string,
     venueOwnerId: string,
     userRole: UserRole,
-    _reason?: string,
+    reason?: string,
   ): Promise<BookingEntity> {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) {
@@ -407,6 +441,18 @@ export class BookingService {
       BookingStatus.CANCELLED_BY_OWNER,
     );
     await this.bookingRepository.deleteBookingDatesByBookingId(bookingId);
+
+    if (booking.client) {
+      this.notify({
+        userId: booking.client.id,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: `Tu reserva en ${venue.name} fue rechazada`,
+        content: reason
+          ? `El propietario rechazo tu solicitud del ${this.toDateOnly(booking.eventDate)}. Motivo: ${reason}`
+          : `El propietario rechazo tu solicitud del ${this.toDateOnly(booking.eventDate)}.`,
+        recipientEmail: booking.client.email,
+      });
+    }
     return updated;
   }
 
@@ -431,6 +477,18 @@ export class BookingService {
       BookingStatus.CANCELLED_BY_CLIENT,
     );
     await this.bookingRepository.deleteBookingDatesByBookingId(bookingId);
+
+    const ownerContact = await this.venueService.getOwnerContact(booking.venueId);
+    if (ownerContact) {
+      const venueName = booking.venue?.name ?? 'tu local';
+      this.notify({
+        userId: ownerContact.id,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: `Reserva cancelada en ${venueName}`,
+        content: `El cliente cancelo su reserva del ${this.toDateOnly(booking.eventDate)}. Las fechas quedaron liberadas en tu calendario.`,
+        recipientEmail: ownerContact.email,
+      });
+    }
     return updated;
   }
 
@@ -466,7 +524,18 @@ export class BookingService {
       throw new BadRequestException('Esta reserva no puede ser marcada como completada');
     }
 
-    return this.bookingRepository.updateStatus(bookingId, BookingStatus.COMPLETED);
+    const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.COMPLETED);
+    if (booking.client) {
+      const venueName = booking.venue?.name ?? 'el local';
+      this.notify({
+        userId: booking.client.id,
+        type: NotificationType.REVIEW_REQUEST,
+        title: `¿Que tal estuvo tu evento en ${venueName}?`,
+        content: 'Contanos tu experiencia — tu resena ayuda a otros a elegir mejor.',
+        recipientEmail: booking.client.email,
+      });
+    }
+    return updated;
   }
 
   async markAsNoShow(bookingId: string): Promise<BookingEntity> {

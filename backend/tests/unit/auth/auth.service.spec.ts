@@ -9,6 +9,7 @@ import {
   UserStatus,
 } from '../../../src/modules/auth/domain/entities/user.entity';
 import { AUTH_REPOSITORY } from '../../../src/modules/auth/domain/repositories/auth.repository.interface';
+import { NotificationService } from '../../../src/modules/notification/application/services/notification.service';
 
 const activeUser = (overrides: Partial<UserEntity> = {}) =>
   new UserEntity({
@@ -76,11 +77,14 @@ describe('AuthService', () => {
       getRefreshTokenExpiresAt: jest.fn().mockReturnValue(new Date('2030-01-01T00:00:00.000Z')),
     };
 
+    const mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: AUTH_REPOSITORY, useValue: mockAuthRepository },
         { provide: TokenService, useValue: mockTokenService },
+        { provide: NotificationService, useValue: mockNotificationService },
       ],
     }).compile();
 

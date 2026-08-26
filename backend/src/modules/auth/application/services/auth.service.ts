@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { NotificationType } from '@prisma/client';
 import { UserEntity, UserRole } from '../../domain/entities/user.entity';
 import {
   AUTH_REPOSITORY,
@@ -16,6 +17,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { NotificationService } from '../../../notification/application/services/notification.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +25,7 @@ export class AuthService {
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: IAuthRepository,
     private readonly tokenService: TokenService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
@@ -48,6 +51,21 @@ export class AuthService {
     });
 
     const tokens = await this.issueTokens(user);
+
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.WELCOME,
+        title: `Bienvenido a SalonFacil, ${user.fullName.split(' ')[0]}`,
+        content:
+          user.role === UserRole.OWNER
+            ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
+            : 'Gracias por registrarte. Ya podes buscar y reservar locales para tu proximo evento.',
+        recipientEmail: user.email,
+      })
+      .catch(() => {
+        // Best-effort — a failed welcome notification should never block registration itself.
+      });
 
     return this.buildAuthResponse(user, tokens);
   }

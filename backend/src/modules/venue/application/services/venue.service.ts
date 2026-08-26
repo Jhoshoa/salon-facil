@@ -71,6 +71,13 @@ export class VenueService {
     return this.venueRepository.findByOwner(ownerId);
   }
 
+  /** Internal use only (notifications) — see findOwnerContact on the repository interface. */
+  async getOwnerContact(
+    venueId: string,
+  ): Promise<{ id: string; email: string; phone: string; fullName: string } | null> {
+    return this.venueRepository.findOwnerContact(venueId);
+  }
+
   async updateVenue(
     id: string,
     dto: UpdateVenueDto,

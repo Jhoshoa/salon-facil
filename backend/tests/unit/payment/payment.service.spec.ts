@@ -23,6 +23,7 @@ import { VenueService } from '../../../src/modules/venue/application/services/ve
 import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../src/modules/upload/cloudinary.service';
+import { NotificationService } from '../../../src/modules/notification/application/services/notification.service';
 
 const makeBooking = (overrides: Partial<BookingEntity> = {}) =>
   new BookingEntity({
@@ -101,8 +102,9 @@ describe('PaymentService', () => {
   let service: PaymentService;
   let paymentRepository: jest.Mocked<IPaymentRepository>;
   let bookingRepository: jest.Mocked<IBookingRepository>;
-  let venueService: { getVenueById: jest.Mock };
+  let venueService: { getVenueById: jest.Mock; getOwnerContact: jest.Mock };
   let cloudinaryService: { uploadImage: jest.Mock };
+  let notificationService: { enqueue: jest.Mock };
 
   beforeEach(async () => {
     paymentRepository = {
@@ -140,10 +142,15 @@ describe('PaymentService', () => {
 
     venueService = {
       getVenueById: jest.fn(),
+      getOwnerContact: jest.fn().mockResolvedValue(null),
     };
 
     cloudinaryService = {
       uploadImage: jest.fn(),
+    };
+
+    notificationService = {
+      enqueue: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -153,6 +160,7 @@ describe('PaymentService', () => {
         { provide: BOOKING_REPOSITORY, useValue: bookingRepository },
         { provide: VenueService, useValue: venueService },
         { provide: CloudinaryService, useValue: cloudinaryService },
+        { provide: NotificationService, useValue: notificationService },
       ],
     }).compile();
 

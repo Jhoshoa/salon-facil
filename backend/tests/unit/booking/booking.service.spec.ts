@@ -16,6 +16,7 @@ import {
 import { VenueService } from '../../../src/modules/venue/application/services/venue.service';
 import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
+import { NotificationService } from '../../../src/modules/notification/application/services/notification.service';
 
 const makeBooking = (overrides: Partial<BookingEntity> = {}) =>
   new BookingEntity({
@@ -85,6 +86,7 @@ describe('BookingService', () => {
   };
   let mockVenueService: {
     getVenueById: jest.Mock;
+    getOwnerContact: jest.Mock;
   };
   let mockPriceCalculator: {
     calculate: jest.Mock;
@@ -93,6 +95,9 @@ describe('BookingService', () => {
   };
   let mockAvailabilityService: {
     checkAvailability: jest.Mock;
+  };
+  let mockNotificationService: {
+    enqueue: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -120,6 +125,7 @@ describe('BookingService', () => {
 
     mockVenueService = {
       getVenueById: jest.fn(),
+      getOwnerContact: jest.fn().mockResolvedValue(null),
     };
 
     mockPriceCalculator = {
@@ -155,6 +161,10 @@ describe('BookingService', () => {
       }),
     };
 
+    mockNotificationService = {
+      enqueue: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BookingService,
@@ -162,6 +172,7 @@ describe('BookingService', () => {
         { provide: VenueService, useValue: mockVenueService },
         { provide: PriceCalculatorService, useValue: mockPriceCalculator },
         { provide: AvailabilityService, useValue: mockAvailabilityService },
+        { provide: NotificationService, useValue: mockNotificationService },
       ],
     }).compile();
 
@@ -401,7 +412,9 @@ describe('BookingService', () => {
     const midnightVenue = () =>
       makeVenue({
         priceUnit: 'HOUR' as never,
-        openingHours: [{ id: 'oh-fri', dayOfWeek: 5, opensAt: '10:00', closesAt: '00:00', isClosed: false }],
+        openingHours: [
+          { id: 'oh-fri', dayOfWeek: 5, opensAt: '10:00', closesAt: '00:00', isClosed: false },
+        ],
       });
     const midnightDto = {
       eventType: 'Rodaje',
