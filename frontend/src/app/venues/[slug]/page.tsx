@@ -34,7 +34,7 @@ export default function VenueDetailPage({ params, searchParams }: VenueDetailPag
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader />
-      <div className="sf-top-band border-b px-4 py-5 sm:px-6 lg:px-8">
+      <div className="sf-top-band border-b px-4 py-2.5 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-7xl">
           <Breadcrumbs
             className="mb-0"
