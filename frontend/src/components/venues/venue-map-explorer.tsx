@@ -143,7 +143,22 @@ export const VenueMapExplorer = ({ searchParams, highlightSlug }: VenueMapExplor
   const activeId = hoveredId ?? pinnedId;
   const activeVenue = located.find((venue) => venue.id === activeId) ?? null;
 
-  const backToListHref = `/venues${buildQueryString(toBackToListParams(searchParams))}`;
+  // Wherever the user opened the map FROM — the search results or a specific venue's detail
+  // page — "Cerrar el mapa" should return there, not always to the plain search list. Browser
+  // history already knows that (this page was reached via router.push from either place), so
+  // going back reconstructs the exact previous page, query string and scroll position for free.
+  // The rebuilt URL is only a fallback for a direct/shared link into the map with no history.
+  const fallbackHref = highlightSlug
+    ? `/venues/${highlightSlug}${buildQueryString(toBackToListParams(searchParams))}`
+    : `/venues${buildQueryString(toBackToListParams(searchParams))}`;
+
+  const handleClose = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(fallbackHref);
+  };
 
   return (
     <div className="relative h-[calc(100vh-var(--header-height))] w-full overflow-hidden">
@@ -174,7 +189,7 @@ export const VenueMapExplorer = ({ searchParams, highlightSlug }: VenueMapExplor
       ) : null}
 
       <div className="absolute right-4 top-4 z-[1000]">
-        <Button variant="secondary" className="shadow-lg" onClick={() => router.push(backToListHref)}>
+        <Button variant="secondary" className="shadow-lg" onClick={handleClose}>
           <X className="h-4 w-4" />
           Cerrar el mapa
         </Button>
