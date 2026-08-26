@@ -3,9 +3,10 @@
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useRef } from 'react';
-import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import { Marker, TileLayer, useMap } from 'react-leaflet';
 import { formatCurrency } from '@/lib/formatters';
 import type { Venue } from '@/types/api';
+import { StableMapContainer } from './stable-map-container';
 
 export interface LocatedVenue extends Venue {
   latitude: number;
@@ -66,7 +67,7 @@ export const VenuePriceMap = ({ venues, activeId, onHover, onSelect }: VenuePric
     : DEFAULT_CENTER;
 
   return (
-    <MapContainer center={center} zoom={12} scrollWheelZoom className="h-full w-full">
+    <StableMapContainer center={center} zoom={12} scrollWheelZoom className="h-full w-full">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -85,6 +86,6 @@ export const VenuePriceMap = ({ venues, activeId, onHover, onSelect }: VenuePric
           }}
         />
       ))}
-    </MapContainer>
+    </StableMapContainer>
   );
 };

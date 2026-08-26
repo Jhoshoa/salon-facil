@@ -2,7 +2,8 @@
 
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { Marker, Popup, TileLayer } from 'react-leaflet';
+import { StableMapContainer } from './stable-map-container';
 
 const markerIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -22,7 +23,7 @@ interface VenueLocationMapProps {
 
 export const VenueLocationMap = ({ latitude, longitude, name }: VenueLocationMapProps) => {
   return (
-    <MapContainer
+    <StableMapContainer
       center={[latitude, longitude]}
       zoom={15}
       scrollWheelZoom={false}
@@ -35,6 +36,6 @@ export const VenueLocationMap = ({ latitude, longitude, name }: VenueLocationMap
       <Marker position={[latitude, longitude]} icon={markerIcon}>
         <Popup>{name}</Popup>
       </Marker>
-    </MapContainer>
+    </StableMapContainer>
   );
 };
