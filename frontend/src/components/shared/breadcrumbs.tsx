@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface BreadcrumbItem {
   label: string;
@@ -17,7 +18,7 @@ interface BreadcrumbsProps {
 export const Breadcrumbs = ({ items, className = '' }: BreadcrumbsProps) => (
   <nav
     aria-label="Ruta de navegacion"
-    className={`mb-4 flex flex-wrap items-center gap-1.5 text-sm ${className}`}
+    className={cn('mb-4 flex flex-wrap items-center gap-1.5 text-sm', className)}
   >
     {items.map((item, index) => {
       const isLast = index === items.length - 1;
