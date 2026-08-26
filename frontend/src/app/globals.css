@@ -313,6 +313,15 @@
     @apply flex items-center justify-between gap-3 border-t pt-3;
   }
 
+  /* --- Venue map price pins --- */
+  .venue-price-pin {
+    @apply inline-flex cursor-pointer items-center whitespace-nowrap rounded-full border border-border bg-foreground px-2.5 py-1 text-xs font-semibold text-background shadow-md transition-transform;
+  }
+
+  .venue-price-pin-active {
+    @apply scale-110 border-primary bg-primary text-primary-foreground shadow-lg;
+  }
+
   /* --- Carousel Cards --- */
   .sf-carousel-card {
     @apply sf-card-interactive h-full overflow-hidden;

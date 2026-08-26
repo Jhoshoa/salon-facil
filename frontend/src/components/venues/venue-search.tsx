@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import dynamic from 'next/dynamic';
 import { FormEvent, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { CalendarDays, Map as MapIcon, Search, SlidersHorizontal, Users } from 'lucide-react';
@@ -17,23 +16,12 @@ import type { PriceUnit, VenueSearchParams } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { VenueFilterSidebar, type VenueFilterValues } from './venue-filter-sidebar';
 import { VenueCardSkeleton } from './venue-card-skeleton';
 import { VenueResultCard } from './venue-result-card';
-
-const VenueSearchMap = dynamic(
-  () => import('./venue-search-map').then((mod) => mod.VenueSearchMap),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-full w-full" />,
-  },
-);
-
-type MapBounds = { north: number; south: number; east: number; west: number };
 
 interface VenueSearchProps {
   initialQuery?: string;
@@ -53,6 +41,14 @@ interface VenueSearchProps {
 }
 
 const splitCsv = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
+
+// Shared by the URL sync (browser Back button support) and the "Ver en mapa" handoff: the
+// API's `guestCount`/`limit` fields don't belong in a shareable URL — `capacity` matches the
+// key name the home page's search form and the map page both read back.
+const toUrlParams = (params: VenueSearchParams) => {
+  const { guestCount, limit: _limit, ...urlParams } = params;
+  return { ...urlParams, capacity: guestCount };
+};
 
 export const VenueSearch = ({
   initialQuery = '',
@@ -89,8 +85,6 @@ export const VenueSearch = ({
     instantBooking: initialInstantBooking === 'true',
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [showMap, setShowMap] = useState(false);
-  const [bounds, setBounds] = useState<MapBounds | null>(null);
   const [errors, setErrors] = useState<{ startDate?: string; endDate?: string; capacity?: string }>(
     {},
   );
@@ -210,10 +204,7 @@ export const VenueSearch = ({
   // instead of a blank search form. `page.tsx` reads the query string back with `capacity`
   // as the key name (matching the home page's search form), not `guestCount`.
   const syncUrl = (params: VenueSearchParams) => {
-    const { guestCount, limit: _limit, ...urlParams } = params;
-    router.replace(`${pathname}${buildQueryString({ ...urlParams, capacity: guestCount })}`, {
-      scroll: false,
-    });
+    router.replace(`${pathname}${buildQueryString(toUrlParams(params))}`, { scroll: false });
   };
 
   const submitSearch = () => {
@@ -239,10 +230,7 @@ export const VenueSearch = ({
     syncUrl(params);
   };
 
-  const buildSearchParams = (
-    filterOverride: VenueFilterValues = filters,
-    boundsOverride: MapBounds | null = bounds,
-  ): VenueSearchParams => ({
+  const buildSearchParams = (filterOverride: VenueFilterValues = filters): VenueSearchParams => ({
     query: queryText,
     district: filterOverride.district || undefined,
     startDate,
@@ -257,19 +245,22 @@ export const VenueSearch = ({
     useTypes: filterOverride.useTypes.length ? filterOverride.useTypes : undefined,
     priceUnit: filterOverride.priceUnit || undefined,
     instantBooking: filterOverride.instantBooking || undefined,
-    ...(boundsOverride ?? {}),
     limit: 12,
   });
 
-  // Triggered only by the map's explicit "Buscar en esta area" button, not on every
-  // pan/zoom frame — re-runs the search with the map's current viewport as a bounding box.
-  const handleBoundsChange = (nextBounds: MapBounds) => {
-    setBounds(nextBounds);
+  // The full-page map view is a separate route (not an inline panel) — it needs its own
+  // screen real estate to show price pins clearly, so it takes over the whole viewport
+  // instead of splitting space with a results list and filter sidebar.
+  const goToMapView = () => {
     if (!submittedParams) return;
-    const params = buildSearchParams(filters, nextBounds);
-    setSubmittedParams(params);
-    syncUrl(params);
+    router.push(`/venues/map${buildQueryString(toUrlParams(submittedParams))}`);
   };
+
+  // Carried onto each venue's detail link so "Ver en el mapa" from there can reopen the map
+  // with the exact same search criteria instead of losing them.
+  const resultsQueryString = submittedParams
+    ? buildQueryString(toUrlParams(submittedParams)).replace(/^\?/, '')
+    : '';
 
   return (
     <div className="space-y-6">
@@ -392,13 +383,9 @@ export const VenueSearch = ({
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowMap((current) => !current)}
-                >
+                <Button variant="outline" size="sm" onClick={goToMapView}>
                   <MapIcon className="h-4 w-4" />
-                  {showMap ? 'Ver lista' : 'Ver en mapa'}
+                  Ver en mapa
                 </Button>
                 <Button
                   variant="outline"
@@ -438,28 +425,16 @@ export const VenueSearch = ({
           ) : null}
 
           {venues.length > 0 ? (
-            <div
-              className={
-                showMap
-                  ? 'grid gap-4 lg:grid-cols-2'
-                  : 'space-y-4'
-              }
-            >
-              <div className={showMap ? 'space-y-4 lg:max-h-[70vh] lg:overflow-y-auto' : 'space-y-4'}>
-                {venues.map((venue) => (
-                  <VenueResultCard
-                    key={venue.id}
-                    venue={venue}
-                    startDate={submittedParams?.startDate}
-                    endDate={submittedParams?.endDate}
-                  />
-                ))}
-              </div>
-              {showMap ? (
-                <div className="h-[50vh] lg:sticky lg:top-44 lg:h-[70vh]">
-                  <VenueSearchMap venues={venues} onBoundsChange={handleBoundsChange} />
-                </div>
-              ) : null}
+            <div className="space-y-4">
+              {venues.map((venue) => (
+                <VenueResultCard
+                  key={venue.id}
+                  venue={venue}
+                  startDate={submittedParams?.startDate}
+                  endDate={submittedParams?.endDate}
+                  searchQueryString={resultsQueryString}
+                />
+              ))}
             </div>
           ) : null}
         </section>

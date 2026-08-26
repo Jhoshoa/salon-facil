@@ -10,6 +10,9 @@ interface VenueResultCardProps {
   venue: Venue;
   startDate?: string;
   endDate?: string;
+  /** Full current search query string (no leading "?"), so a later "Ver en el mapa" from the
+   * detail page can reopen the map with the exact same criteria instead of just the dates. */
+  searchQueryString?: string;
 }
 
 const getBasePrice = (venue: Venue) => {
@@ -23,7 +26,12 @@ const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
 };
 
 
-export const VenueResultCard = ({ venue, startDate, endDate }: VenueResultCardProps) => {
+export const VenueResultCard = ({
+  venue,
+  startDate,
+  endDate,
+  searchQueryString,
+}: VenueResultCardProps) => {
   const photo =
     venue.media?.find((item) => item.isCover)?.url ?? venue.media?.[0]?.url ?? venue.photos?.[0];
   const basePrice = getBasePrice(venue);
@@ -31,6 +39,7 @@ export const VenueResultCard = ({ venue, startDate, endDate }: VenueResultCardPr
   const services = amenities.length ? [] : (venue.services?.slice(0, 3) ?? []);
 
   const detailHref = (() => {
+    if (searchQueryString) return `/venues/${venue.slug}?${searchQueryString}`;
     if (!startDate) return `/venues/${venue.slug}`;
     const params = new URLSearchParams({ startDate });
     if (endDate) params.set('endDate', endDate);

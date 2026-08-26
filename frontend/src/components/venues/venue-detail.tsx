@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import { BookingForm } from '@/components/booking/booking-form';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
 import { ErrorState } from '@/components/shared/error-state';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AmenityCategory, Venue } from '@/types/api';
 import { VenueSimilarCard } from './venue-similar-card';
@@ -21,6 +23,9 @@ interface VenueDetailProps {
   slug: string;
   initialStartDate?: string;
   initialEndDate?: string;
+  /** Link back to the full-page map view, pre-loaded with the same search criteria the user
+   * arrived with and this venue highlighted. */
+  mapHref?: string;
 }
 
 const VenueLocationMap = dynamic(
@@ -72,7 +77,12 @@ const groupAmenities = (venue: Venue) =>
     {},
   );
 
-export const VenueDetail = ({ slug, initialStartDate, initialEndDate }: VenueDetailProps) => {
+export const VenueDetail = ({
+  slug,
+  initialStartDate,
+  initialEndDate,
+  mapHref,
+}: VenueDetailProps) => {
   const query = useQuery({
     queryKey: ['venue', slug],
     queryFn: () => getVenueBySlug(slug),
@@ -300,7 +310,17 @@ export const VenueDetail = ({ slug, initialStartDate, initialEndDate }: VenueDet
 
         {/* Location */}
         <section className="sf-detail-section">
-          <h2 className="sf-detail-title">Ubicacion</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="sf-detail-title">Ubicacion</h2>
+            {mapHref ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={mapHref}>
+                  <Map className="h-4 w-4" />
+                  Ver en el mapa
+                </Link>
+              </Button>
+            ) : null}
+          </div>
           <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 shrink-0" />
             {venue.address ? `${venue.address}, ` : ''}
