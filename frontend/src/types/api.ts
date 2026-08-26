@@ -493,6 +493,19 @@ export interface Payment {
   booking?: Booking;
 }
 
+export interface AdminAnalyticsDashboard {
+  summary: {
+    revenueThisMonth: number;
+    bookingsThisMonth: number;
+    newUsersThisMonth: number;
+    activeVenues: number;
+  };
+  revenueOverTime: { month: string; total: number }[];
+  bookingsByStatus: { status: string; count: number }[];
+  newUsersOverTime: { month: string; count: number }[];
+  topVenues: { id: string; name: string; total: number }[];
+}
+
 export interface EarningsBreakdownRow {
   venueId: string;
   venueName: string;

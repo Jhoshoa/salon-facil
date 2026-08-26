@@ -3,13 +3,23 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarCheck, CalendarRange, LayoutGrid, Menu, ShieldCheck, Sparkles, Tag } from 'lucide-react';
+import {
+  BarChart3,
+  CalendarCheck,
+  CalendarRange,
+  LayoutGrid,
+  Menu,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+} from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
 import { AppDrawer } from '@/components/shared/app-drawer';
 
 const navItems = [
+  { href: '/admin/analytics', label: 'Analitica', icon: BarChart3 },
   { href: '/admin/venues', label: 'Verificacion de locales', icon: ShieldCheck },
   { href: '/admin/catalog/space-types', label: 'Tipos de espacio', icon: LayoutGrid },
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },

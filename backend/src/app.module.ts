@@ -13,6 +13,7 @@ import { BookingModule } from './modules/booking/interface/booking.module';
 import { PaymentModule } from './modules/payment/interface/payment.module';
 import { ReviewModule } from './modules/review/interface/review.module';
 import { NotificationModule } from './modules/notification/interface/notification.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { JwtAuthGuard } from './shared/guards/jwt-auth.guard';
 import { OwnershipGuard } from './shared/guards/ownership.guard';
 import { RolesGuard } from './shared/guards/roles.guard';
@@ -48,6 +49,7 @@ import { validationSchema } from './config/validation.schema';
     PaymentModule,
     ReviewModule,
     NotificationModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
