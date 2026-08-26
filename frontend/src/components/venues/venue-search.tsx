@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import dynamic from 'next/dynamic';
 import { FormEvent, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, Search, SlidersHorizontal, Users } from 'lucide-react';
+import { CalendarDays, Map as MapIcon, Search, SlidersHorizontal, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { buildQueryString } from '@/lib/api/client';
 import {
@@ -16,12 +17,23 @@ import type { PriceUnit, VenueSearchParams } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { VenueFilterSidebar, type VenueFilterValues } from './venue-filter-sidebar';
 import { VenueCardSkeleton } from './venue-card-skeleton';
 import { VenueResultCard } from './venue-result-card';
+
+const VenueSearchMap = dynamic(
+  () => import('./venue-search-map').then((mod) => mod.VenueSearchMap),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-full w-full" />,
+  },
+);
+
+type MapBounds = { north: number; south: number; east: number; west: number };
 
 interface VenueSearchProps {
   initialQuery?: string;
@@ -77,6 +89,8 @@ export const VenueSearch = ({
     instantBooking: initialInstantBooking === 'true',
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [bounds, setBounds] = useState<MapBounds | null>(null);
   const [errors, setErrors] = useState<{ startDate?: string; endDate?: string; capacity?: string }>(
     {},
   );
@@ -225,7 +239,10 @@ export const VenueSearch = ({
     syncUrl(params);
   };
 
-  const buildSearchParams = (filterOverride: VenueFilterValues = filters): VenueSearchParams => ({
+  const buildSearchParams = (
+    filterOverride: VenueFilterValues = filters,
+    boundsOverride: MapBounds | null = bounds,
+  ): VenueSearchParams => ({
     query: queryText,
     district: filterOverride.district || undefined,
     startDate,
@@ -240,8 +257,19 @@ export const VenueSearch = ({
     useTypes: filterOverride.useTypes.length ? filterOverride.useTypes : undefined,
     priceUnit: filterOverride.priceUnit || undefined,
     instantBooking: filterOverride.instantBooking || undefined,
+    ...(boundsOverride ?? {}),
     limit: 12,
   });
+
+  // Triggered only by the map's explicit "Buscar en esta area" button, not on every
+  // pan/zoom frame — re-runs the search with the map's current viewport as a bounding box.
+  const handleBoundsChange = (nextBounds: MapBounds) => {
+    setBounds(nextBounds);
+    if (!submittedParams) return;
+    const params = buildSearchParams(filters, nextBounds);
+    setSubmittedParams(params);
+    syncUrl(params);
+  };
 
   return (
     <div className="space-y-6">
@@ -363,15 +391,25 @@ export const VenueSearch = ({
                   {endDate ? ` hasta ${endDate}` : ''}
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFiltersOpen(true)}
-                className="lg:hidden"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                Filtros
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMap((current) => !current)}
+                >
+                  <MapIcon className="h-4 w-4" />
+                  {showMap ? 'Ver lista' : 'Ver en mapa'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFiltersOpen(true)}
+                  className="lg:hidden"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filtros
+                </Button>
+              </div>
             </div>
           ) : null}
 
@@ -400,15 +438,28 @@ export const VenueSearch = ({
           ) : null}
 
           {venues.length > 0 ? (
-            <div className="space-y-4">
-              {venues.map((venue) => (
-                <VenueResultCard
-                  key={venue.id}
-                  venue={venue}
-                  startDate={submittedParams?.startDate}
-                  endDate={submittedParams?.endDate}
-                />
-              ))}
+            <div
+              className={
+                showMap
+                  ? 'grid gap-4 lg:grid-cols-2'
+                  : 'space-y-4'
+              }
+            >
+              <div className={showMap ? 'space-y-4 lg:max-h-[70vh] lg:overflow-y-auto' : 'space-y-4'}>
+                {venues.map((venue) => (
+                  <VenueResultCard
+                    key={venue.id}
+                    venue={venue}
+                    startDate={submittedParams?.startDate}
+                    endDate={submittedParams?.endDate}
+                  />
+                ))}
+              </div>
+              {showMap ? (
+                <div className="h-[50vh] lg:sticky lg:top-44 lg:h-[70vh]">
+                  <VenueSearchMap venues={venues} onBoundsChange={handleBoundsChange} />
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>
