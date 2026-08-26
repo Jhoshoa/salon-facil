@@ -16,6 +16,13 @@ export interface IPaymentRepository {
   uploadProof(id: string, comprobanteUrl: string): Promise<PaymentEntity>;
   confirm(id: string, ownerId: string, notes?: string): Promise<PaymentEntity>;
   reject(id: string, reason: string): Promise<PaymentEntity>;
+  getOwnerEarningsSummary(ownerId: string): Promise<{ totalEarned: number; paymentCount: number }>;
+  getOwnerEarningsByVenueAndMonth(
+    ownerId: string,
+    monthsBack: number,
+  ): Promise<
+    { venueId: string; venueName: string; month: Date; total: number; count: number }[]
+  >;
 }
 
 export interface CreatePaymentData {

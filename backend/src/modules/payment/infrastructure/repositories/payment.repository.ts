@@ -149,6 +149,54 @@ export class PaymentRepository implements IPaymentRepository {
     return this.toEntity(payment);
   }
 
+  async getOwnerEarningsSummary(
+    ownerId: string,
+  ): Promise<{ totalEarned: number; paymentCount: number }> {
+    const result = await this.prisma.payment.aggregate({
+      where: { status: PaymentStatus.COMPLETED, booking: { venue: { ownerId } } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+
+    return {
+      totalEarned: Number(result._sum.amount ?? 0),
+      paymentCount: result._count._all,
+    };
+  }
+
+  async getOwnerEarningsByVenueAndMonth(
+    ownerId: string,
+    monthsBack: number,
+  ): Promise<{ venueId: string; venueName: string; month: Date; total: number; count: number }[]> {
+    const since = new Date();
+    since.setMonth(since.getMonth() - monthsBack);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
+    const rows = await this.prisma.$queryRaw<
+      { venueId: string; venueName: string; month: Date; total: Prisma.Decimal; count: bigint }[]
+    >(Prisma.sql`
+      SELECT v.id as "venueId", v.name as "venueName",
+             date_trunc('month', p.paid_at) as month,
+             SUM(p.amount) as total, COUNT(*) as count
+      FROM payments p
+      JOIN bookings b ON b.id = p.booking_id
+      JOIN venues v ON v.id = b.venue_id
+      WHERE p.status = 'COMPLETED' AND v.owner_id = ${ownerId}
+        AND p.paid_at >= ${since}
+      GROUP BY v.id, v.name, month
+      ORDER BY month DESC, v.name ASC
+    `);
+
+    return rows.map((row) => ({
+      venueId: row.venueId,
+      venueName: row.venueName,
+      month: row.month,
+      total: Number(row.total),
+      count: Number(row.count),
+    }));
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private toEntity(raw: any): PaymentEntity {
     return new PaymentEntity({

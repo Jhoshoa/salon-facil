@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { CreatePaymentPayload, Payment } from '@/types/api';
+import type { CreatePaymentPayload, OwnerEarnings, Payment } from '@/types/api';
 
 export const createPayment = async (
   bookingId: string,
@@ -41,4 +41,8 @@ export const rejectPayment = async (paymentId: string, reason: string): Promise<
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
+};
+
+export const getOwnerEarnings = async (months = 6): Promise<OwnerEarnings> => {
+  return apiRequest<OwnerEarnings>(`/payments/owner/earnings?months=${months}`);
 };

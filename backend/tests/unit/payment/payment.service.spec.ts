@@ -116,6 +116,8 @@ describe('PaymentService', () => {
       uploadProof: jest.fn(),
       confirm: jest.fn(),
       reject: jest.fn(),
+      getOwnerEarningsSummary: jest.fn(),
+      getOwnerEarningsByVenueAndMonth: jest.fn(),
     };
 
     bookingRepository = {
@@ -262,6 +264,37 @@ describe('PaymentService', () => {
       await expect(
         service.getBookingPayments('missing', 'client-1', UserRole.CLIENT),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getOwnerEarnings', () => {
+    it('combines the summary and the monthly breakdown for the owner', async () => {
+      paymentRepository.getOwnerEarningsSummary.mockResolvedValue({
+        totalEarned: 4500,
+        paymentCount: 3,
+      });
+      paymentRepository.getOwnerEarningsByVenueAndMonth.mockResolvedValue([
+        { venueId: 'venue-1', venueName: 'Salon Test', month: new Date('2026-08-01'), total: 4500, count: 3 },
+      ]);
+
+      const result = await service.getOwnerEarnings('owner-1', 6);
+
+      expect(result.summary).toEqual({ totalEarned: 4500, paymentCount: 3 });
+      expect(result.breakdown).toHaveLength(1);
+      expect(paymentRepository.getOwnerEarningsSummary).toHaveBeenCalledWith('owner-1');
+      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith('owner-1', 6);
+    });
+
+    it('defaults to a 6-month lookback', async () => {
+      paymentRepository.getOwnerEarningsSummary.mockResolvedValue({
+        totalEarned: 0,
+        paymentCount: 0,
+      });
+      paymentRepository.getOwnerEarningsByVenueAndMonth.mockResolvedValue([]);
+
+      await service.getOwnerEarnings('owner-1');
+
+      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith('owner-1', 6);
     });
   });
 });

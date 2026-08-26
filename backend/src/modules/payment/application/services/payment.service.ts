@@ -207,6 +207,15 @@ export class PaymentService {
     return updated;
   }
 
+  async getOwnerEarnings(ownerId: string, monthsBack = 6) {
+    const [summary, breakdown] = await Promise.all([
+      this.paymentRepository.getOwnerEarningsSummary(ownerId),
+      this.paymentRepository.getOwnerEarningsByVenueAndMonth(ownerId, monthsBack),
+    ]);
+
+    return { summary, breakdown };
+  }
+
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentEntity> {
     const payment = await this.paymentRepository.findById(paymentId);
     if (!payment) {

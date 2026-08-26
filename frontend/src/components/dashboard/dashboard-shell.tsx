@@ -11,6 +11,7 @@ import {
   Menu,
   Store,
   User,
+  Wallet,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/use-logout';
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/dashboard/venues', label: 'Mis locales', icon: Store },
   { href: '/dashboard/bookings', label: 'Reservas', icon: CalendarCheck },
   { href: '/dashboard/calendar', label: 'Calendario', icon: CalendarDays },
+  { href: '/dashboard/earnings', label: 'Ganancias', icon: Wallet },
   { href: '/dashboard/profile', label: 'Mi perfil', icon: User },
 ];
 

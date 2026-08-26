@@ -493,6 +493,19 @@ export interface Payment {
   booking?: Booking;
 }
 
+export interface EarningsBreakdownRow {
+  venueId: string;
+  venueName: string;
+  month: string;
+  total: number;
+  count: number;
+}
+
+export interface OwnerEarnings {
+  summary: { totalEarned: number; paymentCount: number };
+  breakdown: EarningsBreakdownRow[];
+}
+
 export interface CreatePaymentPayload {
   paymentType: PaymentType;
   method: PaymentMethod;
