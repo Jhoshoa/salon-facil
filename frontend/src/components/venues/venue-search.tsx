@@ -191,36 +191,55 @@ export const VenueSearch = ({
     submitSearch();
   };
 
-  const submitSearch = () => {
-    if (!validate()) return false;
-    const params = buildSearchParams();
-    setSubmittedParams(params);
-    // Search state lives in the URL, not just in memory: this is what lets the browser's
-    // Back button (after opening a venue's detail page) land the user on the exact same
-    // results instead of a blank search form. `page.tsx` reads the query string back with
-    // `capacity` as the key name (matching the home page's search form), not `guestCount`.
+  // Search state lives in the URL, not just in memory: this is what lets the browser's Back
+  // button (after opening a venue's detail page) land the user on the exact same results
+  // instead of a blank search form. `page.tsx` reads the query string back with `capacity`
+  // as the key name (matching the home page's search form), not `guestCount`.
+  const syncUrl = (params: VenueSearchParams) => {
     const { guestCount, limit: _limit, ...urlParams } = params;
     router.replace(`${pathname}${buildQueryString({ ...urlParams, capacity: guestCount })}`, {
       scroll: false,
     });
+  };
+
+  const submitSearch = () => {
+    if (!validate()) return false;
+    const params = buildSearchParams();
+    setSubmittedParams(params);
+    syncUrl(params);
     return true;
   };
 
-  const buildSearchParams = (): VenueSearchParams => ({
+  // Sidebar filters (amenities, price range, space types, etc.) have no separate "apply"
+  // step on desktop — unlike the main search bar, which needs eventDate/capacity validated
+  // before it can run. So once a base search is already active, apply and URL-sync every
+  // filter change immediately; otherwise a filter tweak that's never explicitly (re)submitted
+  // just vanishes (not reflected in results, not in the URL) the moment the user navigates
+  // away to a venue and back. Takes `next` directly rather than reading `filters` state,
+  // since setFilters(next) hasn't landed yet when this runs.
+  const handleFiltersChange = (next: VenueFilterValues) => {
+    setFilters(next);
+    if (!submittedParams) return;
+    const params = buildSearchParams(next);
+    setSubmittedParams(params);
+    syncUrl(params);
+  };
+
+  const buildSearchParams = (filterOverride: VenueFilterValues = filters): VenueSearchParams => ({
     query: queryText,
-    district: filters.district || undefined,
+    district: filterOverride.district || undefined,
     startDate,
     endDate,
     guestCount: Number(capacity),
-    minCapacity: filters.minCapacity ? Number(filters.minCapacity) : undefined,
-    minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
-    maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
-    services: filters.services.length ? filters.services.join(',') : undefined,
-    amenities: filters.amenities.length ? filters.amenities : undefined,
-    spaceTypes: filters.spaceTypes.length ? filters.spaceTypes : undefined,
-    useTypes: filters.useTypes.length ? filters.useTypes : undefined,
-    priceUnit: filters.priceUnit || undefined,
-    instantBooking: filters.instantBooking || undefined,
+    minCapacity: filterOverride.minCapacity ? Number(filterOverride.minCapacity) : undefined,
+    minPrice: filterOverride.minPrice ? Number(filterOverride.minPrice) : undefined,
+    maxPrice: filterOverride.maxPrice ? Number(filterOverride.maxPrice) : undefined,
+    services: filterOverride.services.length ? filterOverride.services.join(',') : undefined,
+    amenities: filterOverride.amenities.length ? filterOverride.amenities : undefined,
+    spaceTypes: filterOverride.spaceTypes.length ? filterOverride.spaceTypes : undefined,
+    useTypes: filterOverride.useTypes.length ? filterOverride.useTypes : undefined,
+    priceUnit: filterOverride.priceUnit || undefined,
+    instantBooking: filterOverride.instantBooking || undefined,
     limit: 12,
   });
 
@@ -322,7 +341,7 @@ export const VenueSearch = ({
         <div className="hidden lg:sticky lg:top-44 lg:block lg:self-start">
           <VenueFilterSidebar
             values={filters}
-            onChange={setFilters}
+            onChange={handleFiltersChange}
             amenityCatalog={amenitiesQuery.data}
             spaceTypes={spaceTypesQuery.data}
             useTypes={useTypesQuery.data}
@@ -399,7 +418,7 @@ export const VenueSearch = ({
         <div className="space-y-5 pb-5">
           <VenueFilterSidebar
             values={filters}
-            onChange={setFilters}
+            onChange={handleFiltersChange}
             amenityCatalog={amenitiesQuery.data}
             spaceTypes={spaceTypesQuery.data}
             useTypes={useTypesQuery.data}
