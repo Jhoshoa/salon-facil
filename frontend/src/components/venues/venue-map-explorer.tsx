@@ -140,7 +140,12 @@ export const VenueMapExplorer = ({ searchParams, highlightSlug }: VenueMapExplor
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightSlug, located.length]);
 
-  const activeId = hoveredId ?? pinnedId;
+  // Once something is pinned — by a click, or by auto-pinning the venue the user arrived from
+  // — it stays the active one no matter what else gets hovered; only another click changes it.
+  // Hover only drives the active venue while nothing is pinned yet (e.g. freshly arrived from
+  // the search results), so a stray hover can't silently bump the detail card off the venue
+  // the user explicitly selected or arrived to look at.
+  const activeId = pinnedId ?? hoveredId;
   const activeVenue = located.find((venue) => venue.id === activeId) ?? null;
 
   // Wherever the user opened the map FROM — the search results or a specific venue's detail
