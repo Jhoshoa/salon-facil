@@ -26,6 +26,10 @@ const buildLocalQueryString = (params: Record<string, string | undefined>) => {
 
 export default function VenueDetailPage({ params, searchParams }: VenueDetailPageProps) {
   const mapQueryString = buildLocalQueryString({ ...searchParams, highlight: params.slug });
+  // `searchParams` here already carries the full search+filters query string (VenueResultCard
+  // appends it to every "Ver detalles" link) — reuse it as-is so the breadcrumb returns to the
+  // exact same results instead of a blank /venues.
+  const backToListQueryString = buildLocalQueryString(searchParams);
 
   return (
     <main className="min-h-screen bg-background">
@@ -36,7 +40,7 @@ export default function VenueDetailPage({ params, searchParams }: VenueDetailPag
             className="mb-0"
             items={[
               { label: 'Inicio', href: '/' },
-              { label: 'Buscar espacios', href: '/venues' },
+              { label: 'Buscar espacios', href: `/venues${backToListQueryString}` },
               { label: 'Detalle del espacio' },
             ]}
           />
