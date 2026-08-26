@@ -307,7 +307,7 @@ export const VenueDetail = ({ slug, initialStartDate, initialEndDate }: VenueDet
             {venue.district}, {venue.city}
           </p>
           {venue.latitude && venue.longitude ? (
-            <div className="mt-3 h-64 w-full overflow-hidden rounded-lg border">
+            <div className="isolate mt-3 h-64 w-full overflow-hidden rounded-lg border">
               <VenueLocationMap
                 latitude={venue.latitude}
                 longitude={venue.longitude}
