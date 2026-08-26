@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { User as PrismaUser } from '@prisma/client';
+import { Prisma, User as PrismaUser } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { IAuthRepository } from '../../domain/repositories/auth.repository.interface';
 import { UserEntity, UserRole, UserStatus } from '../../domain/entities/user.entity';
@@ -164,6 +164,45 @@ export class AuthRepository implements IAuthRepository {
       where: { id },
       data: { usedAt: new Date() },
     });
+  }
+
+  async findMany(params: {
+    search?: string;
+    role?: UserRole;
+    status?: UserStatus;
+    page: number;
+    limit: number;
+  }): Promise<{ items: UserEntity[]; total: number }> {
+    const where: Prisma.UserWhereInput = {
+      ...(params.role ? { role: params.role } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.search
+        ? {
+            OR: [
+              { fullName: { contains: params.search, mode: 'insensitive' } },
+              { email: { contains: params.search, mode: 'insensitive' } },
+              { phone: { contains: params.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { items: items.map((user) => this.toEntity(user)), total };
+  }
+
+  async updateStatus(userId: string, status: UserStatus): Promise<UserEntity> {
+    const user = await this.prisma.user.update({ where: { id: userId }, data: { status } });
+    return this.toEntity(user);
   }
 
   private toEntity(prismaUser: PrismaUser): UserEntity {

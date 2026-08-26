@@ -33,6 +33,6 @@ import { NotificationModule } from '../../notification/interface/notification.mo
       useClass: AuthRepository,
     },
   ],
-  exports: [AuthService, TokenService],
+  exports: [AuthService, TokenService, AUTH_REPOSITORY],
 })
 export class AuthModule {}

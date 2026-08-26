@@ -493,6 +493,19 @@ export interface Payment {
   booking?: Booking;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  role: 'CLIENT' | 'OWNER' | 'ADMIN';
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION';
+  city: string | null;
+  district: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
 export interface AdminAnalyticsDashboard {
   summary: {
     revenueThisMonth: number;

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Tag,
+  Users,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/use-logout';
@@ -20,6 +21,7 @@ import { AppDrawer } from '@/components/shared/app-drawer';
 
 const navItems = [
   { href: '/admin/analytics', label: 'Analitica', icon: BarChart3 },
+  { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/venues', label: 'Verificacion de locales', icon: ShieldCheck },
   { href: '/admin/catalog/space-types', label: 'Tipos de espacio', icon: LayoutGrid },
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },

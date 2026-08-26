@@ -1,4 +1,4 @@
-import { UserEntity } from '../entities/user.entity';
+import { UserEntity, UserRole, UserStatus } from '../entities/user.entity';
 
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
 
@@ -53,4 +53,12 @@ export interface IAuthRepository {
     usedAt: Date | null;
   } | null>;
   markPasswordResetTokenUsed(id: string): Promise<void>;
+  findMany(params: {
+    search?: string;
+    role?: UserRole;
+    status?: UserStatus;
+    page: number;
+    limit: number;
+  }): Promise<{ items: UserEntity[]; total: number }>;
+  updateStatus(userId: string, status: UserStatus): Promise<UserEntity>;
 }
