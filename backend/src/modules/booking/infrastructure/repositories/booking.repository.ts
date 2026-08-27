@@ -5,6 +5,7 @@ import {
   CreateBookingData,
   CreateCalendarBlockData,
   OccupiedDateEntry,
+  ReminderField,
 } from '../../domain/repositories/booking.repository.interface';
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
@@ -12,6 +13,14 @@ import { Prisma } from '@prisma/client';
 
 const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
   BookingStatus.PENDING,
+  BookingStatus.APPROVED,
+  BookingStatus.DEPOSIT_PAID,
+  BookingStatus.FULLY_PAID,
+];
+
+// PENDING excluded on purpose — an owner hasn't approved it yet, so it's not a confirmed
+// event to remind the client about.
+const CONFIRMED_BOOKING_STATUSES: BookingStatus[] = [
   BookingStatus.APPROVED,
   BookingStatus.DEPOSIT_PAID,
   BookingStatus.FULLY_PAID,
@@ -290,6 +299,28 @@ export class BookingRepository implements IBookingRepository {
     });
   }
 
+  async findBookingsDueForReminder(
+    eventDate: Date,
+    reminderField: ReminderField,
+  ): Promise<BookingEntity[]> {
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        eventDate,
+        status: { in: CONFIRMED_BOOKING_STATUSES },
+        [reminderField]: null,
+      },
+      include: BOOKING_INCLUDE,
+    });
+    return bookings.map((b) => this.toEntity(b));
+  }
+
+  async markReminderSent(id: string, reminderField: ReminderField): Promise<void> {
+    await this.prisma.booking.update({
+      where: { id },
+      data: { [reminderField]: new Date() },
+    });
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private toEntity(raw: any): BookingEntity {
     return new BookingEntity({
@@ -311,6 +342,9 @@ export class BookingRepository implements IBookingRepository {
       specialRequests: raw.specialRequests,
       contractUrl: raw.contractUrl,
       contractSentAt: raw.contractSentAt,
+      reminder7SentAt: raw.reminder7SentAt,
+      reminder3SentAt: raw.reminder3SentAt,
+      reminder1SentAt: raw.reminder1SentAt,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
       venue: raw.venue,

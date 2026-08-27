@@ -83,6 +83,8 @@ describe('BookingService', () => {
     isDateBlocked: jest.Mock;
     countByVenueAndStatus: jest.Mock;
     incrementVenueBookingCount: jest.Mock;
+    findBookingsDueForReminder: jest.Mock;
+    markReminderSent: jest.Mock;
   };
   let mockVenueService: {
     getVenueById: jest.Mock;
@@ -121,6 +123,8 @@ describe('BookingService', () => {
       isDateBlocked: jest.fn(),
       countByVenueAndStatus: jest.fn(),
       incrementVenueBookingCount: jest.fn(),
+      findBookingsDueForReminder: jest.fn(),
+      markReminderSent: jest.fn(),
     };
 
     mockVenueService = {
@@ -686,6 +690,71 @@ describe('BookingService', () => {
       await expect(
         service.getCalendar('venue-1', new Date('not-a-date'), new Date('2026-09-30')),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('sendDueReminders', () => {
+    const dueBooking = (overrides: Partial<BookingEntity> = {}) =>
+      makeBooking({
+        status: BookingStatus.APPROVED,
+        client: { id: 'client-1', fullName: 'Test Client', email: 'client@email.com', phone: null },
+        venue: { id: 'venue-1', name: 'Salon Test', slug: 'salon-test', photos: [], capacityMax: 200 },
+        ...overrides,
+      });
+
+    it('notifies and marks each reminder tier independently', async () => {
+      mockBookingRepository.findBookingsDueForReminder.mockImplementation((_date, field) =>
+        field === 'reminder7SentAt' ? Promise.resolve([dueBooking()]) : Promise.resolve([]),
+      );
+
+      const sentCount = await service.sendDueReminders();
+
+      expect(sentCount).toBe(1);
+      expect(mockNotificationService.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'client-1', recipientEmail: 'client@email.com' }),
+      );
+      expect(mockBookingRepository.markReminderSent).toHaveBeenCalledWith(
+        'booking-1',
+        'reminder7SentAt',
+      );
+    });
+
+    it('marks the reminder sent even when the client has no relation loaded', async () => {
+      mockBookingRepository.findBookingsDueForReminder.mockImplementation((_date, field) =>
+        field === 'reminder1SentAt'
+          ? Promise.resolve([dueBooking({ client: undefined })])
+          : Promise.resolve([]),
+      );
+
+      const sentCount = await service.sendDueReminders();
+
+      expect(sentCount).toBe(1);
+      expect(mockNotificationService.enqueue).not.toHaveBeenCalled();
+      expect(mockBookingRepository.markReminderSent).toHaveBeenCalledWith(
+        'booking-1',
+        'reminder1SentAt',
+      );
+    });
+
+    it('returns 0 when nothing is due', async () => {
+      mockBookingRepository.findBookingsDueForReminder.mockResolvedValue([]);
+
+      const sentCount = await service.sendDueReminders();
+
+      expect(sentCount).toBe(0);
+      expect(mockNotificationService.enqueue).not.toHaveBeenCalled();
+      expect(mockBookingRepository.markReminderSent).not.toHaveBeenCalled();
+    });
+
+    it('queries all three reminder tiers', async () => {
+      mockBookingRepository.findBookingsDueForReminder.mockResolvedValue([]);
+
+      await service.sendDueReminders();
+
+      const queriedFields = mockBookingRepository.findBookingsDueForReminder.mock.calls.map(
+        (call) => call[1],
+      );
+      expect(queriedFields).toEqual(['reminder7SentAt', 'reminder3SentAt', 'reminder1SentAt']);
     });
   });
 });

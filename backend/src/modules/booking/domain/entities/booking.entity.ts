@@ -41,6 +41,9 @@ export class BookingEntity {
   specialRequests: string | null = null;
   contractUrl: string | null = null;
   contractSentAt: Date | null = null;
+  reminder7SentAt: Date | null = null;
+  reminder3SentAt: Date | null = null;
+  reminder1SentAt: Date | null = null;
   createdAt!: Date;
   updatedAt!: Date;
 

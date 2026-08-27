@@ -12,6 +12,7 @@ import {
   IBookingRepository,
   CreateBookingData,
   CreateCalendarBlockData,
+  ReminderField,
 } from '../../domain/repositories/booking.repository.interface';
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
@@ -24,6 +25,12 @@ import { NotificationService } from '../../../notification/application/services/
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
 const MAX_BOOKING_RANGE_DAYS = 30;
+
+const REMINDER_TIERS: { type: NotificationType; days: number; field: ReminderField }[] = [
+  { type: NotificationType.REMINDER_7_DAYS, days: 7, field: 'reminder7SentAt' },
+  { type: NotificationType.REMINDER_3_DAYS, days: 3, field: 'reminder3SentAt' },
+  { type: NotificationType.REMINDER_1_DAY, days: 1, field: 'reminder1SentAt' },
+];
 
 interface DailyScheduleEntry {
   date: string;
@@ -656,6 +663,44 @@ export class BookingService {
   async checkAvailabilityRange(venueId: string, startDate: Date, endDate: Date) {
     this.validateCalendarRange(startDate, endDate);
     return this.availabilityService.checkAvailabilityRange(venueId, startDate, endDate);
+  }
+
+  /** Called once a day by BookingReminderScheduler. Finds confirmed bookings whose event is
+   * exactly 7, 3, or 1 day(s) away and haven't had that tier's reminder sent yet, notifies
+   * each client, and marks the tier as sent so a re-run (or a slow day) never double-sends.
+   * Returns how many reminders went out, purely for the scheduler's log line. */
+  async sendDueReminders(): Promise<number> {
+    let sentCount = 0;
+
+    for (const tier of REMINDER_TIERS) {
+      const targetDate = this.addUtcDays(new Date(), tier.days);
+      const bookings = await this.bookingRepository.findBookingsDueForReminder(
+        targetDate,
+        tier.field,
+      );
+
+      for (const booking of bookings) {
+        if (booking.client) {
+          const venueName = booking.venue?.name ?? 'tu local';
+          this.notify({
+            userId: booking.clientId,
+            type: tier.type,
+            title: `Tu evento en ${venueName} es en ${tier.days} dia${tier.days === 1 ? '' : 's'}`,
+            content: `Recordatorio: tu reserva "${booking.eventType}" en ${venueName} es el ${this.toDateOnly(booking.eventDate)}. Prepara todo para tu evento.`,
+            recipientEmail: booking.client.email,
+          });
+        }
+
+        await this.bookingRepository.markReminderSent(booking.id, tier.field);
+        sentCount++;
+      }
+    }
+
+    return sentCount;
+  }
+
+  private addUtcDays(date: Date, days: number): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
   }
 
   private toDateOnly(date: Date): string {

@@ -3,6 +3,8 @@ import { CalendarBlockEntity } from '../entities/calendar-block.entity';
 
 export const BOOKING_REPOSITORY = Symbol('BOOKING_REPOSITORY');
 
+export type ReminderField = 'reminder7SentAt' | 'reminder3SentAt' | 'reminder1SentAt';
+
 /** One occupied day within a venue's calendar, sourced from BookingDate. */
 export interface OccupiedDateEntry {
   bookingId: string;
@@ -46,6 +48,15 @@ export interface IBookingRepository {
   // Counts
   countByVenueAndStatus(venueId: string, status: BookingStatus): Promise<number>;
   incrementVenueBookingCount(venueId: string): Promise<void>;
+
+  // Reminders
+  /** Confirmed bookings (APPROVED/DEPOSIT_PAID/FULLY_PAID) whose event lands on `eventDate`
+   * and haven't had this particular reminder tier sent yet. */
+  findBookingsDueForReminder(
+    eventDate: Date,
+    reminderField: ReminderField,
+  ): Promise<BookingEntity[]>;
+  markReminderSent(id: string, reminderField: ReminderField): Promise<void>;
 }
 
 export interface CreateBookingData {

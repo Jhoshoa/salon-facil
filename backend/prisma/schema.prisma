@@ -432,6 +432,9 @@ model Booking {
   specialRequests String?       @map("special_requests") @db.Text
   contractUrl     String?       @map("contract_url")
   contractSentAt  DateTime?     @map("contract_sent_at")
+  reminder7SentAt DateTime?     @map("reminder_7_sent_at")
+  reminder3SentAt DateTime?     @map("reminder_3_sent_at")
+  reminder1SentAt DateTime?     @map("reminder_1_sent_at")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 

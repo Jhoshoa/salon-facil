@@ -140,6 +140,8 @@ describe('PaymentService', () => {
       isDateBlocked: jest.fn(),
       countByVenueAndStatus: jest.fn(),
       incrementVenueBookingCount: jest.fn(),
+      findBookingsDueForReminder: jest.fn(),
+      markReminderSent: jest.fn(),
     };
 
     venueService = {

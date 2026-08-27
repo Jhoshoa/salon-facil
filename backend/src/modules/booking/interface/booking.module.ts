@@ -5,6 +5,7 @@ import { CalendarController, CalendarPublicController } from './controllers/cale
 import { BookingService } from '../application/services/booking.service';
 import { PriceCalculatorService } from '../application/services/price-calculator.service';
 import { AvailabilityService } from '../application/services/availability.service';
+import { BookingReminderScheduler } from '../application/services/booking-reminder.scheduler';
 import { BookingRepository } from '../infrastructure/repositories/booking.repository';
 import { BOOKING_REPOSITORY } from '../domain/repositories/booking.repository.interface';
 import { VenueModule } from '../../venue/interface/venue.module';
@@ -23,6 +24,7 @@ import { PrismaModule } from '../../../prisma/prisma.module';
     BookingService,
     PriceCalculatorService,
     AvailabilityService,
+    BookingReminderScheduler,
     {
       provide: BOOKING_REPOSITORY,
       useClass: BookingRepository,
