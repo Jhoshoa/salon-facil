@@ -24,8 +24,8 @@
        colors (success/warning/destructive below) are deliberately untouched. */
     --primary: 216 69% 34%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 216 20% 96%;
-    --secondary-foreground: 213 65% 17%;
+    --secondary: 43 89% 38%;
+    --secondary-foreground: 0 0% 100%;
     --accent: 43 70% 95%;
     --accent-foreground: 43 75% 30%;
     --destructive: 0 84% 60%;
