@@ -4,27 +4,29 @@
 
 @layer base {
   :root {
-    /* Core colors */
-    --background: 0 0% 100%;
-    --foreground: 222 20% 12%;
+    /* Core colors — neutrals carry a slight indigo lean (hue 250) to match the brand hue
+       instead of a hue-less grey, per the Altiplano Dusk palette. */
+    --background: 250 30% 98%;
+    --foreground: 250 25% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 222 20% 12%;
+    --card-foreground: 250 25% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 20% 12%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 14% 46%;
-    --border: 220 14% 90%;
-    --input: 220 14% 90%;
-    --ring: 217 91% 50%;
+    --popover-foreground: 250 25% 14%;
+    --muted: 250 14% 95%;
+    --muted-foreground: 250 10% 45%;
+    --border: 250 14% 89%;
+    --input: 250 14% 89%;
+    --ring: 250 35% 30%;
     --radius: 0.625rem;
 
-    /* Brand colors */
-    --primary: 217 91% 50%;
+    /* Brand colors — Altiplano Dusk: indigo primary, copper accent. Semantic colors
+       (success/warning/destructive below) are deliberately untouched. */
+    --primary: 250 35% 30%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 20% 12%;
-    --accent: 217 91% 97%;
-    --accent-foreground: 217 91% 40%;
+    --secondary: 250 14% 95%;
+    --secondary-foreground: 250 25% 14%;
+    --accent: 23 70% 95%;
+    --accent-foreground: 23 55% 32%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
@@ -251,8 +253,8 @@
     @apply relative overflow-hidden;
     background: linear-gradient(
       135deg,
-      hsl(217 91% 97%) 0%,
-      hsl(220 14% 98%) 50%,
+      hsl(250 35% 96%) 0%,
+      hsl(250 14% 98%) 50%,
       hsl(0 0% 100%) 100%
     );
   }
@@ -262,18 +264,18 @@
     @apply pointer-events-none absolute inset-0;
     background: radial-gradient(
       ellipse 80% 50% at 50% -20%,
-      hsl(217 91% 50% / 0.08),
+      hsl(250 35% 30% / 0.08),
       transparent
     );
   }
 
   /* --- Empty & Gradient States --- */
   .sf-gradient-subtle {
-    background: linear-gradient(135deg, hsl(217 91% 97%), hsl(220 14% 96%));
+    background: linear-gradient(135deg, hsl(250 35% 96%), hsl(250 14% 95%));
   }
 
   .sf-gradient-warm {
-    background: linear-gradient(135deg, hsl(217 91% 97%), hsl(38 92% 96%));
+    background: linear-gradient(135deg, hsl(250 35% 96%), hsl(38 92% 96%));
   }
 
   /* --- Logo Mark --- */
