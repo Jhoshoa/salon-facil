@@ -1,12 +1,12 @@
 // Recharts renders to SVG and can't read CSS custom properties at paint time, so the palette
 // is duplicated here as resolved hsl() strings matching the tokens in globals.css.
 export const CHART_COLORS = {
-  primary: 'hsl(250, 35%, 30%)',
+  primary: 'hsl(216, 69%, 34%)',
   success: 'hsl(142, 71%, 45%)',
   warning: 'hsl(38, 92%, 50%)',
   destructive: 'hsl(0, 84%, 60%)',
-  accent: 'hsl(23, 67%, 55%)',
-  muted: 'hsl(250, 14%, 70%)',
+  accent: 'hsl(43, 89%, 38%)',
+  muted: 'hsl(216, 20%, 70%)',
 } as const;
 
 export const CHART_PALETTE = [
