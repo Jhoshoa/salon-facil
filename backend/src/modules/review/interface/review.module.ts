@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
-import { VenueReviewController, BookingReviewController, ReviewController } from './review.controller';
+import {
+  VenueReviewController,
+  BookingReviewController,
+  ReviewController,
+} from './review.controller';
 import { ReviewService } from '../application/services/review.service';
 import { ReviewRepository } from '../infrastructure/repositories/review.repository';
 import { REVIEW_REPOSITORY } from '../domain/repositories/review.repository.interface';

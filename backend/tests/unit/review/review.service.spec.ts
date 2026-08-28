@@ -15,7 +15,10 @@ import {
   BOOKING_REPOSITORY,
   IBookingRepository,
 } from '../../../src/modules/booking/domain/repositories/booking.repository.interface';
-import { BookingEntity, BookingStatus } from '../../../src/modules/booking/domain/entities/booking.entity';
+import {
+  BookingEntity,
+  BookingStatus,
+} from '../../../src/modules/booking/domain/entities/booking.entity';
 import { VenueService } from '../../../src/modules/venue/application/services/venue.service';
 import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
@@ -149,33 +152,37 @@ describe('ReviewService', () => {
 
       expect(result.id).toBe('review-1');
       expect(reviewRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ venueId: 'venue-1', clientId: 'client-1', bookingId: 'booking-1' }),
+        expect.objectContaining({
+          venueId: 'venue-1',
+          clientId: 'client-1',
+          bookingId: 'booking-1',
+        }),
       );
     });
 
     it('rejects reviewing another client booking', async () => {
       bookingRepository.findById.mockResolvedValue(makeBooking({ clientId: 'other-client' }));
 
-      await expect(
-        service.createReview('booking-1', 'client-1', { rating: 5 }),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.createReview('booking-1', 'client-1', { rating: 5 })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('rejects reviewing a non-completed booking', async () => {
       bookingRepository.findById.mockResolvedValue(makeBooking({ status: BookingStatus.APPROVED }));
 
-      await expect(
-        service.createReview('booking-1', 'client-1', { rating: 5 }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createReview('booking-1', 'client-1', { rating: 5 })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('rejects reviewing the same booking twice', async () => {
       bookingRepository.findById.mockResolvedValue(makeBooking());
       reviewRepository.findByBookingId.mockResolvedValue(makeReview());
 
-      await expect(
-        service.createReview('booking-1', 'client-1', { rating: 5 }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.createReview('booking-1', 'client-1', { rating: 5 })).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -196,9 +203,9 @@ describe('ReviewService', () => {
     it('rejects editing a review written by someone else', async () => {
       reviewRepository.findById.mockResolvedValue(makeReview({ clientId: 'other-client' }));
 
-      await expect(
-        service.updateReview('review-1', 'client-1', { rating: 4 }),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.updateReview('review-1', 'client-1', { rating: 4 })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('throws not found for a missing review', async () => {
@@ -230,9 +237,9 @@ describe('ReviewService', () => {
     it('rejects deleting a review written by someone else', async () => {
       reviewRepository.findById.mockResolvedValue(makeReview({ clientId: 'other-client' }));
 
-      await expect(
-        service.deleteReview('review-1', 'client-1', UserRole.CLIENT),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.deleteReview('review-1', 'client-1', UserRole.CLIENT)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 

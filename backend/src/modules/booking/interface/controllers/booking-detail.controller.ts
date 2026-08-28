@@ -110,10 +110,7 @@ export class BookingDetailController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Marcar reserva como no show (OWNER/ADMIN)' })
   @ApiResponse({ status: 200, description: 'Reserva marcada como no show' })
-  async markAsNoShow(
-    @Param('id') id: string,
-    @CurrentUser() user: { id: string; role: UserRole },
-  ) {
+  async markAsNoShow(@Param('id') id: string, @CurrentUser() user: { id: string; role: UserRole }) {
     return this.bookingService.markAsNoShow(id, user.id, user.role);
   }
 }

@@ -327,9 +327,7 @@ describe('AuthService', () => {
         'user-123',
         expect.any(String),
       );
-      expect(mockAuthRepository.markPasswordResetTokenUsed).toHaveBeenCalledWith(
-        'reset-token-123',
-      );
+      expect(mockAuthRepository.markPasswordResetTokenUsed).toHaveBeenCalledWith('reset-token-123');
       expect(mockAuthRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-123');
     });
 

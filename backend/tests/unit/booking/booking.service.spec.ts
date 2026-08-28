@@ -599,9 +599,9 @@ describe('BookingService', () => {
         makeBooking({ status: BookingStatus.PENDING }),
       );
 
-      await expect(
-        service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw ForbiddenException when user cannot edit venue', async () => {
@@ -610,9 +610,9 @@ describe('BookingService', () => {
       );
       mockVenueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'other-owner' }));
 
-      await expect(
-        service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -776,7 +776,13 @@ describe('BookingService', () => {
       makeBooking({
         status: BookingStatus.APPROVED,
         client: { id: 'client-1', fullName: 'Test Client', email: 'client@email.com', phone: null },
-        venue: { id: 'venue-1', name: 'Salon Test', slug: 'salon-test', photos: [], capacityMax: 200 },
+        venue: {
+          id: 'venue-1',
+          name: 'Salon Test',
+          slug: 'salon-test',
+          photos: [],
+          capacityMax: 200,
+        },
         ...overrides,
       });
 

@@ -257,9 +257,7 @@ describe('PaymentService', () => {
     });
 
     it('advances a booking to FULLY_PAID when a full payment is confirmed', async () => {
-      paymentRepository.findById.mockResolvedValue(
-        makePayment({ paymentType: PaymentType.FULL }),
-      );
+      paymentRepository.findById.mockResolvedValue(makePayment({ paymentType: PaymentType.FULL }));
       venueService.getVenueById.mockResolvedValue(makeVenue());
       paymentRepository.confirm.mockResolvedValue(makePayment({ status: PaymentStatus.COMPLETED }));
 
@@ -339,7 +337,13 @@ describe('PaymentService', () => {
         paymentCount: 3,
       });
       paymentRepository.getOwnerEarningsByVenueAndMonth.mockResolvedValue([
-        { venueId: 'venue-1', venueName: 'Salon Test', month: new Date('2026-08-01'), total: 4500, count: 3 },
+        {
+          venueId: 'venue-1',
+          venueName: 'Salon Test',
+          month: new Date('2026-08-01'),
+          total: 4500,
+          count: 3,
+        },
       ]);
 
       const result = await service.getOwnerEarnings('owner-1', 6);

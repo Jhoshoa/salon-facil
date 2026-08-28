@@ -5,7 +5,11 @@ import {
   AUTH_REPOSITORY,
   IAuthRepository,
 } from '../../../src/modules/auth/domain/repositories/auth.repository.interface';
-import { UserEntity, UserRole, UserStatus } from '../../../src/modules/auth/domain/entities/user.entity';
+import {
+  UserEntity,
+  UserRole,
+  UserStatus,
+} from '../../../src/modules/auth/domain/entities/user.entity';
 
 const makeUser = (overrides: Partial<UserEntity> = {}) =>
   new UserEntity({

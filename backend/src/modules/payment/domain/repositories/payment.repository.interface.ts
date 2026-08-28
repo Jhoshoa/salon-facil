@@ -20,9 +20,7 @@ export interface IPaymentRepository {
   getOwnerEarningsByVenueAndMonth(
     ownerId: string,
     monthsBack: number,
-  ): Promise<
-    { venueId: string; venueName: string; month: Date; total: number; count: number }[]
-  >;
+  ): Promise<{ venueId: string; venueName: string; month: Date; total: number; count: number }[]>;
 }
 
 export interface CreatePaymentData {
