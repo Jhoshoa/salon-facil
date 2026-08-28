@@ -91,4 +91,29 @@ export class BookingDetailController {
   ) {
     return this.bookingService.markDepositPaid(id, user.id, user.role);
   }
+
+  @Put(':id/complete')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Marcar reserva como completada (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Reserva completada' })
+  @ApiResponse({ status: 400, description: 'La reserva no puede ser completada' })
+  async markAsCompleted(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.bookingService.markAsCompleted(id, user.id, user.role);
+  }
+
+  @Put(':id/no-show')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Marcar reserva como no show (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Reserva marcada como no show' })
+  async markAsNoShow(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.bookingService.markAsNoShow(id, user.id, user.role);
+  }
 }

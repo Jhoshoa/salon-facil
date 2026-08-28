@@ -10,20 +10,30 @@ import { useAuthHydrated, useAuthStore } from '@/stores/auth.store';
 // return 401) instead of sending the visitor to log in. Mirrors dashboard/layout.tsx's guard,
 // but redirects to the exact page the visitor tried to reach (not a fixed path), since this
 // covers both /bookings and /bookings/[id].
+//
+// The underlying APIs (getMyBookings, etc.) are CLIENT-only, so an authenticated OWNER/ADMIN
+// must also be redirected here — otherwise they'd pass this guard and hit a 403 that renders
+// as a generic "couldn't load your bookings" error with a retry button that can never succeed.
 const BookingsLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
   const hydrated = useAuthHydrated();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const role = useAuthStore((state) => state.role);
+  const isAllowed = isAuthenticated && role === 'CLIENT';
 
   useEffect(() => {
     if (!hydrated) return;
     if (!isAuthenticated) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
     }
-  }, [hydrated, isAuthenticated, pathname, router]);
+    if (!isAllowed) {
+      router.replace('/dashboard/bookings');
+    }
+  }, [hydrated, isAuthenticated, isAllowed, pathname, router]);
 
-  if (!hydrated || !isAuthenticated) {
+  if (!hydrated || !isAllowed) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

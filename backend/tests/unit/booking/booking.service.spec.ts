@@ -575,6 +575,84 @@ describe('BookingService', () => {
     });
   });
 
+  describe('markAsCompleted', () => {
+    it('should mark a deposit-paid booking as completed', async () => {
+      mockBookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.DEPOSIT_PAID }),
+      );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+      mockBookingRepository.updateStatus.mockResolvedValue(
+        makeBooking({ status: BookingStatus.COMPLETED }),
+      );
+
+      const result = await service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER);
+
+      expect(result.status).toBe(BookingStatus.COMPLETED);
+      expect(mockBookingRepository.updateStatus).toHaveBeenCalledWith(
+        'booking-1',
+        BookingStatus.COMPLETED,
+      );
+    });
+
+    it('should throw BadRequestException when booking cannot be completed', async () => {
+      mockBookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.PENDING }),
+      );
+
+      await expect(
+        service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ForbiddenException when user cannot edit venue', async () => {
+      mockBookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.DEPOSIT_PAID }),
+      );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'other-owner' }));
+
+      await expect(
+        service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('markAsNoShow', () => {
+    it('should mark an approved booking as no show', async () => {
+      mockBookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.APPROVED }),
+      );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+      mockBookingRepository.updateStatus.mockResolvedValue(
+        makeBooking({ status: BookingStatus.NO_SHOW }),
+      );
+
+      const result = await service.markAsNoShow('booking-1', 'owner-1', UserRole.OWNER);
+
+      expect(result.status).toBe(BookingStatus.NO_SHOW);
+    });
+
+    it('should throw BadRequestException when booking is not approved', async () => {
+      mockBookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.PENDING }),
+      );
+
+      await expect(service.markAsNoShow('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw ForbiddenException when user cannot edit venue', async () => {
+      mockBookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.APPROVED }),
+      );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'other-owner' }));
+
+      await expect(service.markAsNoShow('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
   describe('createCalendarBlock', () => {
     it('should create a calendar block', async () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue());

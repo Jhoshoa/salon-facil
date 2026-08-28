@@ -90,3 +90,7 @@ export const rejectBooking = async (id: string, reason: string): Promise<Booking
     body: JSON.stringify({ reason }),
   });
 };
+
+export const markBookingCompleted = async (id: string): Promise<Booking> => {
+  return apiRequest<Booking>(`/bookings/${id}/complete`, { method: 'PUT' });
+};

@@ -1,10 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, CreditCard, X } from 'lucide-react';
+import { Check, CreditCard, PartyPopper, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { approveBooking, getVenueBookings, rejectBooking } from '@/lib/api/bookings.api';
+import {
+  approveBooking,
+  getVenueBookings,
+  markBookingCompleted,
+  rejectBooking,
+} from '@/lib/api/bookings.api';
 import { getMyVenues } from '@/lib/api/venues.api';
 import { getPendingOwnerPayments, confirmPayment, rejectPayment } from '@/lib/api/payments.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
@@ -30,12 +35,16 @@ const OwnerBookingRow = ({
   booking,
   onApprove,
   onReject,
+  onComplete,
   approving,
+  completing,
 }: {
   booking: Booking;
   onApprove: (booking: Booking) => void;
   onReject: (booking: Booking) => void;
+  onComplete: (booking: Booking) => void;
   approving: boolean;
+  completing: boolean;
 }) => (
   <div className="grid gap-3 rounded-md border p-3 lg:grid-cols-[1fr_auto] lg:items-center">
     <div className="space-y-1">
@@ -63,6 +72,19 @@ const OwnerBookingRow = ({
         <Button size="sm" variant="outline" onClick={() => onReject(booking)}>
           <X className="h-4 w-4" />
           Rechazar
+        </Button>
+      </div>
+    ) : null}
+    {booking.status === 'DEPOSIT_PAID' || booking.status === 'FULLY_PAID' ? (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onComplete(booking)}
+          disabled={completing}
+        >
+          <PartyPopper className="h-4 w-4" />
+          Marcar como completada
         </Button>
       </div>
     ) : null}
@@ -141,6 +163,16 @@ export const OwnerBookingManagement = () => {
       toast.error('No se pudo aprobar', { description: error.message }),
   });
 
+  const completeMutation = useMutation({
+    mutationFn: markBookingCompleted,
+    onSuccess: async () => {
+      toast.success('Reserva marcada como completada');
+      await queryClient.invalidateQueries({ queryKey: ['owner-bookings', venueId] });
+    },
+    onError: (error: { message?: string }) =>
+      toast.error('No se pudo completar', { description: error.message }),
+  });
+
   const rejectMutation = useMutation({
     mutationFn: ({ id, value }: { id: string; value: string }) => rejectBooking(id, value),
     onSuccess: async () => {
@@ -215,8 +247,10 @@ export const OwnerBookingManagement = () => {
             key={booking.id}
             booking={booking}
             approving={approveMutation.isPending}
+            completing={completeMutation.isPending}
             onApprove={(item) => approveMutation.mutate(item.id)}
             onReject={(item) => setRejectState({ id: item.id, type: 'booking' })}
+            onComplete={(item) => completeMutation.mutate(item.id)}
           />
         ))}
       </section>

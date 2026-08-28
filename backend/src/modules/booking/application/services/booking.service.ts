@@ -521,7 +521,11 @@ export class BookingService {
     return this.bookingRepository.markDepositPaid(bookingId);
   }
 
-  async markAsCompleted(bookingId: string): Promise<BookingEntity> {
+  async markAsCompleted(
+    bookingId: string,
+    venueOwnerId: string,
+    userRole: UserRole,
+  ): Promise<BookingEntity> {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
@@ -529,6 +533,11 @@ export class BookingService {
 
     if (!booking.canBeCompleted()) {
       throw new BadRequestException('Esta reserva no puede ser marcada como completada');
+    }
+
+    const venue = await this.venueService.getVenueById(booking.venueId);
+    if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para completar esta reserva');
     }
 
     const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.COMPLETED);
@@ -545,7 +554,11 @@ export class BookingService {
     return updated;
   }
 
-  async markAsNoShow(bookingId: string): Promise<BookingEntity> {
+  async markAsNoShow(
+    bookingId: string,
+    venueOwnerId: string,
+    userRole: UserRole,
+  ): Promise<BookingEntity> {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
@@ -553,6 +566,11 @@ export class BookingService {
 
     if (booking.status !== BookingStatus.APPROVED) {
       throw new BadRequestException('Solo se puede marcar como no show reservas aprobadas');
+    }
+
+    const venue = await this.venueService.getVenueById(booking.venueId);
+    if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para marcar esta reserva como no show');
     }
 
     return this.bookingRepository.updateStatus(bookingId, BookingStatus.NO_SHOW);
