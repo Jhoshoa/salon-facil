@@ -265,12 +265,16 @@ flujos completos:
    pasar a OWNER/ADMIN aunque la API subyacente es solo para CLIENT, mostrando un error
    generico sin salida. Ahora redirige a `/dashboard/bookings` para esos roles.
 
-2. **Confirmar un pago nunca avanzaba el estado de la reserva** ([backend/src/modules/payment/application/services/payment.service.ts](../../backend/src/modules/payment/application/services/payment.service.ts))
-   — `confirmPayment` marcaba el pago como COMPLETED pero la reserva se quedaba en APROBADA
-   para siempre. Como `markAsCompleted` (necesario para dejar reseña) solo acepta reservas en
-   SEÑA PAGADA o PAGADA, esto hacia que ninguna reserva pudiera completarse ni recibir una
-   reseña nunca, sin importar cuantos pagos se confirmaran. Ahora la confirmacion avanza la
-   reserva automaticamente segun el tipo de pago (seña → SEÑA PAGADA, completo/resto → PAGADA).
+2. **Confirmar un pago de tipo "completo" o "resto" nunca avanzaba el estado de la reserva**
+   ([backend/src/modules/payment/infrastructure/repositories/payment.repository.ts](../../backend/src/modules/payment/infrastructure/repositories/payment.repository.ts)) —
+   el pago de tipo seña (`DEPOSIT`) ya funcionaba bien desde antes (avanzaba la reserva a
+   SEÑA PAGADA); pero para pagos `FULL`/`REMAINING` no habia ninguna logica que tocara la
+   reserva, asi que se quedaba en APROBADA para siempre aunque el pago completo ya estuviera
+   confirmado. Como `markAsCompleted` (necesario para dejar reseña) solo acepta reservas en
+   SEÑA PAGADA o PAGADA, una reserva pagada de una sola vez (sin pasar por seña) nunca podia
+   completarse ni recibir reseña. Ahora la confirmacion avanza la reserva automaticamente
+   segun el tipo de pago (seña → SEÑA PAGADA, completo/resto → PAGADA), todo dentro de la
+   misma transaccion que confirma el pago.
 
 3. **No existia forma de marcar una reserva como completada** — el metodo `markAsCompleted`
    existia en el backend pero sin endpoint ni boton en la interfaz; nunca se llamaba desde
@@ -278,6 +282,25 @@ flujos completos:
    de paso, mismo patron) y el boton "Marcar como completada" en `/dashboard/bookings`
    ([frontend/src/components/dashboard/owner-booking-management.tsx](../../frontend/src/components/dashboard/owner-booking-management.tsx)).
 
-Los tres se verificaron con la suite de tests (`npx jest` en `backend/`, 171 tests en verde)
-y con una prueba end-to-end real contra la base de datos de desarrollo (reserva → pago →
-confirmacion → completada → reseña), revirtiendo despues los datos de prueba creados.
+Los tres se verificaron con la suite de tests y con una prueba end-to-end real contra la base
+de datos de desarrollo (reserva → pago → confirmacion → completada → reseña), revirtiendo
+despues los datos de prueba creados.
+
+## Nota tecnica: cobertura e2e para reservas y pagos (sesion siguiente)
+
+Se agrego cobertura e2e real (`backend/tests/e2e/booking.e2e-spec.ts` y
+`payment.e2e-spec.ts`, 47 tests nuevos) para los flujos de arriba, en vez de solo tests
+unitarios con repositorios mockeados. Esto encontro un segundo matiz del bug de pagos: el
+pago de tipo **seña** (`DEPOSIT`) ya avanzaba la reserva correctamente desde antes de esta
+sesion — el problema real estaba solo en pagos **completos/resto** (`FULL`/`REMAINING`), que
+nunca tocaban el estado de la reserva. El fix quedo consolidado en una sola transaccion en
+`PaymentRepository.confirm()` en vez de logica duplicada en dos capas.
+
+De paso se aislaron los tests e2e de la base de datos de desarrollo: antes corrian contra
+`salonfacil_dev` (la misma que usas para probar manualmente) y dejaban usuarios/locales de
+prueba permanentes ahi. Ahora usan `salonfacil_test`, una base separada que se recrea desde
+cero en cada corrida — `npm run test:e2e` es seguro de correr en cualquier momento, no
+interfiere con lo que estes probando a mano. Los ~20 usuarios `owner-venue-*`/`unique-*`/etc.
+que ya estaban en `salonfacil_dev` de corridas anteriores a este fix siguen ahi — son todos
+cuentas de prueba desechables, pero no se borraron automaticamente por si acaso; borralos a
+mano si te estorban.

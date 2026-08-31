@@ -39,7 +39,10 @@ describe('Prisma Connection', () => {
     const uniqueSuffix = Date.now();
     const email = `unique-${uniqueSuffix}@email.com`;
 
-    await prisma.user.create({
+    // This file defaults DATABASE_URL to the dev database (see beforeAll) — deliberate, since
+    // its job is sanity-checking that connection and its seed data, not running in isolation.
+    // That means the row created here is permanent unless removed explicitly.
+    const created = await prisma.user.create({
       data: {
         email,
         phone: `+5916${String(uniqueSuffix).slice(-7)}`,
@@ -48,16 +51,20 @@ describe('Prisma Connection', () => {
       },
     });
 
-    await expect(
-      prisma.user.create({
-        data: {
-          email,
-          phone: `+5917${String(uniqueSuffix).slice(-7)}`,
-          passwordHash: 'test-hash',
-          fullName: 'Duplicate Constraint Test',
-        },
-      }),
-    ).rejects.toBeInstanceOf(PrismaClientKnownRequestError);
+    try {
+      await expect(
+        prisma.user.create({
+          data: {
+            email,
+            phone: `+5917${String(uniqueSuffix).slice(-7)}`,
+            passwordHash: 'test-hash',
+            fullName: 'Duplicate Constraint Test',
+          },
+        }),
+      ).rejects.toBeInstanceOf(PrismaClientKnownRequestError);
+    } finally {
+      await prisma.user.delete({ where: { id: created.id } });
+    }
   });
 
   it('returns related data through joins', async () => {

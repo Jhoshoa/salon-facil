@@ -163,7 +163,6 @@ export class PaymentService {
 
     await this.assertCanManagePayment(payment, ownerId, userRole);
     const updated = await this.paymentRepository.confirm(paymentId, ownerId, notes);
-    await this.advanceBookingStatusForConfirmedPayment(payment);
 
     if (payment.booking?.client) {
       const venueName = payment.booking.venue?.name ?? 'el local';
@@ -215,30 +214,6 @@ export class PaymentService {
     ]);
 
     return { summary, breakdown };
-  }
-
-  /** Confirming a payment doesn't touch the booking on its own — the booking's status
-   * (APPROVED → DEPOSIT_PAID/FULLY_PAID) is what drives eligibility for markAsCompleted()
-   * and, downstream, for leaving a review, so it must advance here rather than needing a
-   * separate manual step. A DEPOSIT only ever moves an APPROVED booking to DEPOSIT_PAID
-   * (never regresses a booking that's already further along); FULL/REMAINING always land
-   * on FULLY_PAID, since that's the terminal payment state regardless of what came before. */
-  private async advanceBookingStatusForConfirmedPayment(payment: PaymentEntity): Promise<void> {
-    if (!payment.booking) return;
-
-    const targetStatus =
-      payment.paymentType === PaymentType.DEPOSIT
-        ? BookingStatus.DEPOSIT_PAID
-        : BookingStatus.FULLY_PAID;
-
-    const isForwardTransition =
-      targetStatus === BookingStatus.FULLY_PAID
-        ? payment.booking.status !== BookingStatus.FULLY_PAID
-        : payment.booking.status === BookingStatus.APPROVED;
-
-    if (isForwardTransition) {
-      await this.bookingRepository.updateStatus(payment.bookingId, targetStatus);
-    }
   }
 
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentEntity> {

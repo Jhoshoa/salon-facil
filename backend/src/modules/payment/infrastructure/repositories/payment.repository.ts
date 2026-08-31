@@ -121,12 +121,26 @@ export class PaymentRepository implements IPaymentRepository {
         include: paymentInclude,
       });
 
-      if (updatedPayment.paymentType === 'DEPOSIT') {
+      // A DEPOSIT only ever moves an APPROVED booking to DEPOSIT_PAID (never regresses one
+      // that's already further along); FULL/REMAINING always land on FULLY_PAID, since that's
+      // the terminal payment state regardless of what came before. Done in the same
+      // transaction as the payment update so the two can never disagree.
+      const booking = await tx.booking.findUniqueOrThrow({
+        where: { id: updatedPayment.bookingId },
+        select: { status: true },
+      });
+      const targetStatus = updatedPayment.paymentType === 'DEPOSIT' ? 'DEPOSIT_PAID' : 'FULLY_PAID';
+      const isForwardTransition =
+        targetStatus === 'FULLY_PAID'
+          ? booking.status !== 'FULLY_PAID'
+          : booking.status === 'APPROVED';
+
+      if (isForwardTransition) {
         await tx.booking.update({
           where: { id: updatedPayment.bookingId },
           data: {
-            status: 'DEPOSIT_PAID',
-            depositPaid: true,
+            status: targetStatus,
+            depositPaid: targetStatus === 'DEPOSIT_PAID' ? true : undefined,
           },
         });
       }

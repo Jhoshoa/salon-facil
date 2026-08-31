@@ -241,67 +241,6 @@ describe('PaymentService', () => {
       expect(paymentRepository.confirm).toHaveBeenCalledWith('payment-1', 'owner-1', 'ok');
     });
 
-    it('advances an APPROVED booking to DEPOSIT_PAID when a deposit is confirmed', async () => {
-      paymentRepository.findById.mockResolvedValue(
-        makePayment({ paymentType: PaymentType.DEPOSIT }),
-      );
-      venueService.getVenueById.mockResolvedValue(makeVenue());
-      paymentRepository.confirm.mockResolvedValue(makePayment({ status: PaymentStatus.COMPLETED }));
-
-      await service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER, 'ok');
-
-      expect(bookingRepository.updateStatus).toHaveBeenCalledWith(
-        'booking-1',
-        BookingStatus.DEPOSIT_PAID,
-      );
-    });
-
-    it('advances a booking to FULLY_PAID when a full payment is confirmed', async () => {
-      paymentRepository.findById.mockResolvedValue(makePayment({ paymentType: PaymentType.FULL }));
-      venueService.getVenueById.mockResolvedValue(makeVenue());
-      paymentRepository.confirm.mockResolvedValue(makePayment({ status: PaymentStatus.COMPLETED }));
-
-      await service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER, 'ok');
-
-      expect(bookingRepository.updateStatus).toHaveBeenCalledWith(
-        'booking-1',
-        BookingStatus.FULLY_PAID,
-      );
-    });
-
-    it('advances a REMAINING payment to FULLY_PAID even after a deposit', async () => {
-      paymentRepository.findById.mockResolvedValue(
-        makePayment({
-          paymentType: PaymentType.REMAINING,
-          booking: { ...makePayment().booking!, status: BookingStatus.DEPOSIT_PAID },
-        }),
-      );
-      venueService.getVenueById.mockResolvedValue(makeVenue());
-      paymentRepository.confirm.mockResolvedValue(makePayment({ status: PaymentStatus.COMPLETED }));
-
-      await service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER, 'ok');
-
-      expect(bookingRepository.updateStatus).toHaveBeenCalledWith(
-        'booking-1',
-        BookingStatus.FULLY_PAID,
-      );
-    });
-
-    it('does not regress a booking that is already FULLY_PAID', async () => {
-      paymentRepository.findById.mockResolvedValue(
-        makePayment({
-          paymentType: PaymentType.DEPOSIT,
-          booking: { ...makePayment().booking!, status: BookingStatus.FULLY_PAID },
-        }),
-      );
-      venueService.getVenueById.mockResolvedValue(makeVenue());
-      paymentRepository.confirm.mockResolvedValue(makePayment({ status: PaymentStatus.COMPLETED }));
-
-      await service.confirmPayment('payment-1', 'owner-1', UserRole.OWNER, 'ok');
-
-      expect(bookingRepository.updateStatus).not.toHaveBeenCalled();
-    });
-
     it('rejects confirmation from another owner', async () => {
       paymentRepository.findById.mockResolvedValue(makePayment());
       venueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'other-owner' }));

@@ -28,7 +28,7 @@ npm run lint         # ESLint
 npm run format       # Prettier
 npm run test         # Jest unit tests
 npm run test:watch   # Jest watch mode
-npm run test:e2e     # E2E tests
+npm run test:e2e     # E2E tests (auto-provisions an isolated salonfacil_test DB — see below)
 npm run prisma:generate  # Generate Prisma client after schema changes
 npm run migrate:dev      # Create and apply migrations
 ```
@@ -84,6 +84,18 @@ PostgreSQL with Prisma ORM. Schema at `backend/prisma/schema.prisma`.
 Key entities: User, Venue, Booking, Payment, Review, Notification
 
 User roles: CLIENT, OWNER, ADMIN
+
+### E2E tests use an isolated database
+
+`backend/tests/e2e/*.e2e-spec.ts` run against `salonfacil_test` (same Postgres instance as dev,
+different database name), never `salonfacil_dev`. `backend/test/setup-env.ts` forces this via
+`jest-e2e.json`'s `setupFiles` before `AppModule` loads; `backend/scripts/setup-e2e-db.js` runs
+automatically before `npm run test:e2e` (via the `pretest:e2e` npm hook) to create the database
+if missing, apply migrations, and reseed it fresh every run. This means `npm run test:e2e` is
+always safe to run — it never touches the DB used for manual browser testing.
+
+`test/prisma-connection.spec.ts` is a deliberate exception: it's a sanity check for the *dev*
+DB connection itself and runs under plain `npm test`, not `test:e2e`.
 
 ### Services
 
