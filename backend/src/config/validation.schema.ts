@@ -12,6 +12,10 @@ export const validationSchema = Joi.object({
   BCRYPT_ROUNDS: Joi.number().default(12),
   CORS_ORIGINS: Joi.string().default('http://localhost:3000'),
   FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
+  // Only needed if the frontend and backend end up on different subdomains in production
+  // (e.g. app.salonfacil.bo + api.salonfacil.bo) — see auth-cookies.util.ts. Leave unset for
+  // local dev and for any setup where they share an origin/host.
+  COOKIE_DOMAIN: Joi.string().optional(),
   SUPABASE_URL: Joi.string().uri().optional(),
   SUPABASE_SERVICE_ROLE_KEY: Joi.string().optional(),
   CLOUDINARY_CLOUD_NAME: Joi.string().optional(),

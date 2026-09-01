@@ -8,11 +8,10 @@ import { useAuthStore } from '@/stores/auth.store';
 
 export const useLogout = () => {
   const router = useRouter();
-  const refreshToken = useAuthStore((state) => state.refreshToken);
   const storeLogout = useAuthStore((state) => state.logout);
 
   return useMutation({
-    mutationFn: () => logoutRequest(refreshToken ?? undefined),
+    mutationFn: () => logoutRequest(),
     onSettled: () => {
       storeLogout();
       toast.success('Sesion cerrada');

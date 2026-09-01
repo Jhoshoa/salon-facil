@@ -42,10 +42,10 @@ export interface UpdateProfilePayload {
 
 export type UserRole = 'CLIENT' | 'OWNER' | 'ADMIN';
 
-export interface AuthResponse {
+// accessToken/refreshToken are never in this response — they travel only via httpOnly
+// Set-Cookie headers the browser can't expose to JS. See lib/api/client.ts.
+export interface PublicAuthResponse {
   user: AuthUser;
-  accessToken: string;
-  refreshToken: string;
   expiresIn: number;
 }
 

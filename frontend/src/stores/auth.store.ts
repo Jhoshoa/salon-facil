@@ -3,15 +3,19 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AuthResponse, AuthUser, UserRole } from '@/types/api';
+import type { PublicAuthResponse, AuthUser, UserRole } from '@/types/api';
 
+// accessToken/refreshToken never live here (or anywhere else in JS-reachable storage) — they're
+// httpOnly cookies the browser attaches automatically. `user`/`isAuthenticated`/`role` are not
+// secrets; they're only persisted so the UI can render as "logged in" immediately on load
+// instead of flashing a logged-out state while the first request round-trips. The cookie is
+// still the actual source of truth: if it's missing or expired, the next API call 401s and
+// apiRequest's own logout-on-failed-refresh (see lib/api/client.ts) corrects this flag.
 interface AuthState {
   user: AuthUser | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   role: UserRole | null;
-  setSession: (session: AuthResponse) => void;
+  setSession: (session: PublicAuthResponse) => void;
   updateUser: (user: AuthUser) => void;
   logout: () => void;
 }
@@ -20,15 +24,11 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       role: null,
       setSession: (session) =>
         set({
           user: session.user,
-          accessToken: session.accessToken,
-          refreshToken: session.refreshToken,
           isAuthenticated: true,
           role: session.user.role,
         }),
@@ -36,8 +36,6 @@ export const useAuthStore = create<AuthState>()(
       logout: () =>
         set({
           user: null,
-          accessToken: null,
-          refreshToken: null,
           isAuthenticated: false,
           role: null,
         }),
@@ -46,8 +44,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'salonfacil-auth',
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
         role: state.role,
       }),

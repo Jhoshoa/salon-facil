@@ -1,6 +1,18 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Put,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../shared/decorators/public.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { RegisterUseCase } from '../application/use-cases/register.use-case';
@@ -10,12 +22,14 @@ import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { AuthService } from '../application/services/auth.service';
 import { RegisterDto } from '../application/dto/register.dto';
 import { LoginDto } from '../application/dto/login.dto';
-import { RefreshTokenDto } from '../application/dto/refresh-token.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
 import { ForgotPasswordDto } from '../application/dto/forgot-password.dto';
 import { ResetPasswordDto } from '../application/dto/reset-password.dto';
-import { AuthResponseDto } from '../application/dto/auth-response.dto';
+import { AuthResponseDto, PublicAuthResponseDto } from '../application/dto/auth-response.dto';
+import { LogoutDto } from '../application/dto/logout.dto';
 import { UserEntity } from '../domain/entities/user.entity';
+import { TokenService } from '../application/services/token.service';
+import { REFRESH_TOKEN_COOKIE, clearAuthCookies, setAuthCookies } from './auth-cookies.util';
 
 const toProfileDto = (user: UserEntity) => ({
   id: user.id,
@@ -33,6 +47,13 @@ const toProfileDto = (user: UserEntity) => ({
   tiktokUrl: user.tiktokUrl,
 });
 
+// Strips accessToken/refreshToken before they'd ever reach a JSON response body — they only
+// travel via the httpOnly Set-Cookie headers written by setAuthCookies.
+const toPublicResponse = (auth: AuthResponseDto): PublicAuthResponseDto => ({
+  user: auth.user,
+  expiresIn: auth.expiresIn,
+});
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -42,6 +63,7 @@ export class AuthController {
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly authService: AuthService,
+    private readonly tokenService: TokenService,
   ) {}
 
   @Public()
@@ -51,8 +73,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Registrar nuevo usuario (CLIENT o OWNER)' })
   @ApiResponse({ status: 201, description: 'Usuario registrado exitosamente' })
   @ApiResponse({ status: 409, description: 'Email o teléfono ya registrado' })
-  async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
-    return this.registerUseCase.execute(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<PublicAuthResponseDto> {
+    const auth = await this.registerUseCase.execute(dto);
+    setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
+    return toPublicResponse(auth);
   }
 
   @Public()
@@ -62,30 +89,54 @@ export class AuthController {
   @ApiOperation({ summary: 'Iniciar sesión' })
   @ApiResponse({ status: 200, description: 'Login exitoso' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
-  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.loginUseCase.execute(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<PublicAuthResponseDto> {
+    const auth = await this.loginUseCase.execute(dto);
+    setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
+    return toPublicResponse(auth);
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refrescar tokens de acceso' })
+  @ApiOperation({ summary: 'Refrescar tokens de acceso usando la cookie de refresh' })
   @ApiResponse({ status: 200, description: 'Tokens refrescados exitosamente' })
-  @ApiResponse({ status: 401, description: 'Refresh token inválido o expirado' })
-  async refreshTokens(@Body() dto: RefreshTokenDto): Promise<AuthResponseDto> {
-    return this.refreshTokenUseCase.execute(dto.refreshToken);
+  @ApiResponse({ status: 401, description: 'Refresh token inválido, expirado o ausente' })
+  async refreshTokens(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<PublicAuthResponseDto> {
+    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token requerido');
+    }
+
+    const auth = await this.refreshTokenUseCase.execute(refreshToken);
+    setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
+    return toPublicResponse(auth);
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cerrar sesión' })
+  @ApiOperation({ summary: 'Cerrar sesión (o todas las sesiones con { allDevices: true })' })
   @ApiResponse({ status: 200, description: 'Sesión cerrada exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   async logout(
     @CurrentUser('id') userId: string,
-    @Body() dto: Partial<RefreshTokenDto>,
+    @Body() dto: LogoutDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<{ message: string }> {
-    return this.logoutUseCase.execute(userId, dto.refreshToken);
+    // Always revoke whatever's actually in this browser's own cookie — never a token value the
+    // client could claim in the body, which used to be possible when this came from @Body().
+    const refreshToken = dto.allDevices
+      ? undefined
+      : (req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined);
+    const result = await this.logoutUseCase.execute(userId, refreshToken);
+    clearAuthCookies(res);
+    return result;
   }
 
   @Public()
@@ -118,7 +169,6 @@ export class AuthController {
   }
 
   @Put('me')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Actualizar el perfil del usuario autenticado' })
   @ApiResponse({ status: 200, description: 'Perfil actualizado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })

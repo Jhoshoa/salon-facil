@@ -1,9 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-// compression exports a CommonJS callable function; default import compiles but fails at runtime.
+// compression and cookie-parser export CommonJS callable functions; default import compiles but
+// fails at runtime.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import compression = require('compression');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import cookieParser = require('cookie-parser');
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
@@ -12,6 +15,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
   app.use(compression());
+  // Populates req.cookies before any guard/controller runs — required for the httpOnly-cookie
+  // JWT auth (see modules/auth/infrastructure/strategies/jwt.strategy.ts).
+  app.use(cookieParser());
 
   app.enableCors({
     origin: process.env.CORS_ORIGINS?.split(',') ?? ['http://localhost:3000'],

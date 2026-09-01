@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import cookieParser = require('cookie-parser');
 import { AppModule } from '../../src/app.module';
 import {
   createVerifiedVenue,
@@ -12,7 +14,6 @@ import {
 describe('Bookings (e2e)', () => {
   let app: INestApplication;
   let users: BookingFixtureUsers;
-  let adminToken: string;
   let venueId: string;
 
   const uniqueId = Date.now();
@@ -27,6 +28,7 @@ describe('Bookings (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -38,8 +40,8 @@ describe('Bookings (e2e)', () => {
     await app.init();
 
     users = await registerFixtureUsers(app, uniqueId);
-    adminToken = await loginAdmin(app);
-    venueId = await createVerifiedVenue(app, users.ownerToken, adminToken, uniqueId, {
+    const adminAgent = await loginAdmin(app);
+    venueId = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
       capacityMax: 100,
       basePrice: 1000,
     });
@@ -51,9 +53,8 @@ describe('Bookings (e2e)', () => {
 
   describe('POST /api/v1/venues/:venueId/bookings', () => {
     it('creates a booking as CLIENT and calculates its price', () => {
-      return request(app.getHttpServer())
+      return users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Boda',
           eventDate: futureDate(30),
@@ -71,9 +72,8 @@ describe('Bookings (e2e)', () => {
     });
 
     it('rejects a guest count above the venue capacity', () => {
-      return request(app.getHttpServer())
+      return users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Boda',
           eventDate: futureDate(31),
@@ -85,9 +85,8 @@ describe('Bookings (e2e)', () => {
     });
 
     it('rejects a booking in the past', () => {
-      return request(app.getHttpServer())
+      return users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Boda',
           eventDate: '2020-01-01',
@@ -100,9 +99,8 @@ describe('Bookings (e2e)', () => {
 
     it('returns 409 when the date is already booked', async () => {
       const eventDate = futureDate(40);
-      await request(app.getHttpServer())
+      await users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Boda',
           eventDate,
@@ -112,9 +110,8 @@ describe('Bookings (e2e)', () => {
         })
         .expect(201);
 
-      return request(app.getHttpServer())
+      return users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Otro',
           eventDate,
@@ -125,7 +122,7 @@ describe('Bookings (e2e)', () => {
         .expect(409);
     });
 
-    it('returns 401 without a token', () => {
+    it('returns 401 without a session', () => {
       return request(app.getHttpServer())
         .post(`/api/v1/venues/${venueId}/bookings`)
         .send({
@@ -139,9 +136,8 @@ describe('Bookings (e2e)', () => {
     });
 
     it('returns 403 for OWNER role', () => {
-      return request(app.getHttpServer())
+      return users.ownerAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.ownerToken}`)
         .send({
           eventType: 'Boda',
           eventDate: futureDate(33),
@@ -170,9 +166,8 @@ describe('Bookings (e2e)', () => {
     let lifecycleDayOffset = 60;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Cumpleanos',
           eventDate: futureDate(lifecycleDayOffset++),
@@ -185,9 +180,8 @@ describe('Bookings (e2e)', () => {
     });
 
     it('lets the venue owner approve a PENDING booking', () => {
-      return request(app.getHttpServer())
+      return users.ownerAgent
         .put(`/api/v1/bookings/${bookingId}/approve`)
-        .set('Authorization', `Bearer ${users.ownerToken}`)
         .expect(200)
         .then((res) => {
           expect(res.body.status).toBe('APPROVED');
@@ -195,23 +189,16 @@ describe('Bookings (e2e)', () => {
     });
 
     it('returns 403 when a different owner tries to approve', () => {
-      return request(app.getHttpServer())
-        .put(`/api/v1/bookings/${bookingId}/approve`)
-        .set('Authorization', `Bearer ${users.otherOwnerToken}`)
-        .expect(403);
+      return users.otherOwnerAgent.put(`/api/v1/bookings/${bookingId}/approve`).expect(403);
     });
 
     it('returns 403 when the CLIENT tries to approve their own booking', () => {
-      return request(app.getHttpServer())
-        .put(`/api/v1/bookings/${bookingId}/approve`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
-        .expect(403);
+      return users.clientAgent.put(`/api/v1/bookings/${bookingId}/approve`).expect(403);
     });
 
     it('lets the owner reject a booking with a reason', () => {
-      return request(app.getHttpServer())
+      return users.ownerAgent
         .put(`/api/v1/bookings/${bookingId}/reject`)
-        .set('Authorization', `Bearer ${users.ownerToken}`)
         .send({ reason: 'Fecha no disponible internamente' })
         .expect(200)
         .then((res) => {
@@ -220,9 +207,8 @@ describe('Bookings (e2e)', () => {
     });
 
     it('lets the client cancel their own PENDING booking', () => {
-      return request(app.getHttpServer())
+      return users.clientAgent
         .put(`/api/v1/bookings/${bookingId}/cancel`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .expect(200)
         .then((res) => {
           expect(res.body.status).toBe('CANCELLED_BY_CLIENT');
@@ -230,28 +216,23 @@ describe('Bookings (e2e)', () => {
     });
 
     it('returns 403 when a different client cancels', async () => {
-      const otherClient = await request(app.getHttpServer())
-        .post('/api/v1/auth/register')
-        .send({
-          email: `other-client-${uniqueId}@email.com`,
-          password: 'Password123!',
-          phone: `+5917${String(uniqueId).slice(-6)}9`,
-          fullName: 'Other Client E2E',
-          role: 'CLIENT',
-        });
+      const otherClientAgent = request.agent(app.getHttpServer());
+      await otherClientAgent.post('/api/v1/auth/register').send({
+        email: `other-client-${uniqueId}@email.com`,
+        password: 'Password123!',
+        phone: `+5917${String(uniqueId).slice(-6)}9`,
+        fullName: 'Other Client E2E',
+        role: 'CLIENT',
+      });
 
-      return request(app.getHttpServer())
-        .put(`/api/v1/bookings/${bookingId}/cancel`)
-        .set('Authorization', `Bearer ${otherClient.body.accessToken}`)
-        .expect(403);
+      return otherClientAgent.put(`/api/v1/bookings/${bookingId}/cancel`).expect(403);
     });
   });
 
   describe('GET /api/v1/bookings/my', () => {
     it("returns the client's own bookings", () => {
-      return request(app.getHttpServer())
+      return users.clientAgent
         .get('/api/v1/bookings/my')
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .expect(200)
         .then((res) => {
           expect(Array.isArray(res.body)).toBe(true);
@@ -263,27 +244,22 @@ describe('Bookings (e2e)', () => {
     });
 
     it('returns 403 for OWNER role', () => {
-      return request(app.getHttpServer())
-        .get('/api/v1/bookings/my')
-        .set('Authorization', `Bearer ${users.ownerToken}`)
-        .expect(403);
+      return users.ownerAgent.get('/api/v1/bookings/my').expect(403);
     });
   });
 
   describe('GET /api/v1/bookings/:id', () => {
     it('returns 404 for a non-existent booking', () => {
-      return request(app.getHttpServer())
+      return users.clientAgent
         .get('/api/v1/bookings/00000000-0000-0000-0000-000000000000')
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .expect(404);
     });
   });
 
   describe('markAsCompleted / markAsNoShow (OWNER/ADMIN, added this session)', () => {
     it('rejects completing a booking that is still PENDING', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Test',
           eventDate: futureDate(200),
@@ -293,16 +269,12 @@ describe('Bookings (e2e)', () => {
         })
         .expect(201);
 
-      return request(app.getHttpServer())
-        .put(`/api/v1/bookings/${res.body.booking.id}/complete`)
-        .set('Authorization', `Bearer ${users.ownerToken}`)
-        .expect(400);
+      return users.ownerAgent.put(`/api/v1/bookings/${res.body.booking.id}/complete`).expect(400);
     });
 
     it('returns 403 when a different owner tries to mark a booking as no-show', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await users.clientAgent
         .post(`/api/v1/venues/${venueId}/bookings`)
-        .set('Authorization', `Bearer ${users.clientToken}`)
         .send({
           eventType: 'Test',
           eventDate: futureDate(201),
@@ -313,15 +285,9 @@ describe('Bookings (e2e)', () => {
         .expect(201);
       const bookingId = res.body.booking.id;
 
-      await request(app.getHttpServer())
-        .put(`/api/v1/bookings/${bookingId}/approve`)
-        .set('Authorization', `Bearer ${users.ownerToken}`)
-        .expect(200);
+      await users.ownerAgent.put(`/api/v1/bookings/${bookingId}/approve`).expect(200);
 
-      return request(app.getHttpServer())
-        .put(`/api/v1/bookings/${bookingId}/no-show`)
-        .set('Authorization', `Bearer ${users.otherOwnerToken}`)
-        .expect(403);
+      return users.otherOwnerAgent.put(`/api/v1/bookings/${bookingId}/no-show`).expect(403);
     });
   });
 });

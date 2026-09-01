@@ -1,14 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import cookieParser = require('cookie-parser');
 import { AppModule } from '../../src/app.module';
+
+type TestAgent = ReturnType<typeof request.agent>;
 
 describe('Venues (e2e)', () => {
   let app: INestApplication;
-  let ownerToken: string;
-  let owner2Token: string;
-  let clientToken: string;
-  let adminToken: string;
+  let ownerAgent: TestAgent;
+  let owner2Agent: TestAgent;
+  let clientAgent: TestAgent;
+  let adminAgent: TestAgent;
   let ownerUserId: string;
 
   const uniqueId = Date.now();
@@ -27,6 +31,7 @@ describe('Venues (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -37,40 +42,41 @@ describe('Venues (e2e)', () => {
     );
     await app.init();
 
-    // Register users
-    const ownerRes = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+    // Register users — each agent keeps its own cookie jar (httpOnly auth cookies), like a
+    // separate logged-in browser tab per user.
+    ownerAgent = request.agent(app.getHttpServer());
+    const ownerRes = await ownerAgent.post('/api/v1/auth/register').send({
       email: ownerEmail,
       password: 'Password123!',
       phone: ownerPhone,
       fullName: 'Owner Venue Test',
       role: 'OWNER',
     });
-    ownerToken = ownerRes.body.accessToken;
     ownerUserId = ownerRes.body.user.id;
 
-    const owner2Res = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+    owner2Agent = request.agent(app.getHttpServer());
+    await owner2Agent.post('/api/v1/auth/register').send({
       email: owner2Email,
       password: 'Password123!',
       phone: owner2Phone,
       fullName: 'Owner 2 Venue Test',
       role: 'OWNER',
     });
-    owner2Token = owner2Res.body.accessToken;
 
-    const clientRes = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+    clientAgent = request.agent(app.getHttpServer());
+    await clientAgent.post('/api/v1/auth/register').send({
       email: clientEmail,
       password: 'Password123!',
       phone: clientPhone,
       fullName: 'Client Venue Test',
       role: 'CLIENT',
     });
-    clientToken = clientRes.body.accessToken;
 
-    const adminRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+    adminAgent = request.agent(app.getHttpServer());
+    await adminAgent.post('/api/v1/auth/login').send({
       email: 'admin@salonfacil.bo',
       password: 'Password123!',
     });
-    adminToken = adminRes.body.accessToken;
   }, 30000);
 
   afterAll(async () => {
@@ -112,9 +118,8 @@ describe('Venues (e2e)', () => {
     let createdVenueSlug: string;
 
     it('should create a venue as OWNER (CA1)', () => {
-      return request(app.getHttpServer())
+      return ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', venueName)
         .field('description', 'Un salon de fiestas ideal para eventos especiales en El Alto.')
         .field('address', 'Av. 6 de Octubre #1234')
@@ -135,9 +140,8 @@ describe('Venues (e2e)', () => {
 
     // ===== CA2: Slug uniqueness =====
     it('should generate unique slugs (CA2)', async () => {
-      const res2 = await request(app.getHttpServer())
+      const res2 = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', venueName)
         .field('description', 'Otro salon con el mismo nombre para probar slugs unicos.')
         .field('address', 'Av. 6 de Octubre #5678')
@@ -165,7 +169,7 @@ describe('Venues (e2e)', () => {
         });
     });
 
-    it('should return 401 without token', () => {
+    it('should return 401 without a session', () => {
       return request(app.getHttpServer())
         .post('/api/v1/venues')
         .field('name', 'No Auth Salon')
@@ -177,9 +181,8 @@ describe('Venues (e2e)', () => {
     });
 
     it('should return 403 for CLIENT role', () => {
-      return request(app.getHttpServer())
+      return clientAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${clientToken}`)
         .field('name', 'Client Salon')
         .field('description', 'Este salon no deberia crearse con rol de cliente.')
         .field('address', 'Client Address 12345')
@@ -189,9 +192,8 @@ describe('Venues (e2e)', () => {
     });
 
     it('should return 400 for invalid data', () => {
-      return request(app.getHttpServer())
+      return ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', 'AB')
         .field('description', 'Short')
         .field('address', '')
@@ -205,9 +207,8 @@ describe('Venues (e2e)', () => {
     let testSlug: string;
 
     beforeAll(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', `Slug Test Venue ${uniqueId}`)
         .field('description', 'Venue para probar obtencion por slug correctamente.')
         .field('address', 'Slug Test Address 12345')
@@ -239,9 +240,8 @@ describe('Venues (e2e)', () => {
     let owner1VenueId: string;
 
     beforeAll(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', `Ownership Test Venue ${uniqueId}`)
         .field('description', 'Venue para probar la proteccion de ownership entre propietarios.')
         .field('address', 'Ownership Address 12345')
@@ -252,9 +252,8 @@ describe('Venues (e2e)', () => {
     });
 
     it('should allow owner to update their venue', () => {
-      return request(app.getHttpServer())
+      return ownerAgent
         .put(`/api/v1/venues/${owner1VenueId}`)
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', 'Ownership Test Venue Updated')
         .expect(200)
         .then((res) => {
@@ -263,17 +262,15 @@ describe('Venues (e2e)', () => {
     });
 
     it('should return 403 when different owner tries to update (CA6)', () => {
-      return request(app.getHttpServer())
+      return owner2Agent
         .put(`/api/v1/venues/${owner1VenueId}`)
-        .set('Authorization', `Bearer ${owner2Token}`)
         .field('name', 'Hacked Venue Name')
         .expect(403);
     });
 
     it('should return 403 when CLIENT tries to update', () => {
-      return request(app.getHttpServer())
+      return clientAgent
         .put(`/api/v1/venues/${owner1VenueId}`)
-        .set('Authorization', `Bearer ${clientToken}`)
         .field('name', 'Client Hacked Venue')
         .expect(403);
     });
@@ -284,9 +281,8 @@ describe('Venues (e2e)', () => {
     let deleteVenueId: string;
 
     beforeAll(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', `Delete Test Venue ${uniqueId}`)
         .field('description', 'Venue que sera eliminada para probar el soft delete.')
         .field('address', 'Delete Address 12345')
@@ -297,25 +293,18 @@ describe('Venues (e2e)', () => {
     });
 
     it('should soft delete venue (CA9)', async () => {
-      await request(app.getHttpServer())
-        .delete(`/api/v1/venues/${deleteVenueId}`)
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .expect(204);
+      await ownerAgent.delete(`/api/v1/venues/${deleteVenueId}`).expect(204);
 
       // Venue should now be INACTIVE
-      const getRes = await request(app.getHttpServer())
-        .get(`/api/v1/venues/my/venues`)
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .expect(200);
+      const getRes = await ownerAgent.get(`/api/v1/venues/my/venues`).expect(200);
 
       const deletedVenue = getRes.body.find((v: { id: string }) => v.id === deleteVenueId);
       expect(deletedVenue.status).toBe('INACTIVE');
     });
 
     it('should return 403 when different owner tries to delete', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', `Delete 403 Test ${uniqueId}`)
         .field('description', 'Venue para verificar que otro propietario no puede eliminar.')
         .field('address', 'Delete 403 Address')
@@ -323,10 +312,7 @@ describe('Venues (e2e)', () => {
         .field('capacityMax', '50')
         .expect(201);
 
-      return request(app.getHttpServer())
-        .delete(`/api/v1/venues/${res.body.id}`)
-        .set('Authorization', `Bearer ${owner2Token}`)
-        .expect(403);
+      return owner2Agent.delete(`/api/v1/venues/${res.body.id}`).expect(403);
     });
   });
 
@@ -335,9 +321,8 @@ describe('Venues (e2e)', () => {
     let pendingVenueId: string;
 
     beforeAll(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', `Verify Test Venue ${uniqueId}`)
         .field('description', 'Venue pendiente de verificacion por administrador.')
         .field('address', 'Verify Address 12345')
@@ -348,9 +333,8 @@ describe('Venues (e2e)', () => {
     });
 
     it('should verify venue as ADMIN (CA7)', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await adminAgent
         .put(`/api/v1/venues/${pendingVenueId}/verify`)
-        .set('Authorization', `Bearer ${adminToken}`)
         .send({ approve: true })
         .expect(200);
 
@@ -359,17 +343,15 @@ describe('Venues (e2e)', () => {
     });
 
     it('should return 403 when OWNER tries to verify', () => {
-      return request(app.getHttpServer())
+      return ownerAgent
         .put(`/api/v1/venues/${pendingVenueId}/verify`)
-        .set('Authorization', `Bearer ${ownerToken}`)
         .send({ approve: true })
         .expect(403);
     });
 
     it('should return 403 when CLIENT tries to verify', () => {
-      return request(app.getHttpServer())
+      return clientAgent
         .put(`/api/v1/venues/${pendingVenueId}/verify`)
-        .set('Authorization', `Bearer ${clientToken}`)
         .send({ approve: true })
         .expect(403);
     });
@@ -378,9 +360,8 @@ describe('Venues (e2e)', () => {
   // ===== My venues =====
   describe('GET /api/v1/venues/my/venues', () => {
     it('should return venues owned by the authenticated user', () => {
-      return request(app.getHttpServer())
+      return ownerAgent
         .get('/api/v1/venues/my/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .expect(200)
         .then((res) => {
           expect(Array.isArray(res.body)).toBe(true);
@@ -388,7 +369,7 @@ describe('Venues (e2e)', () => {
         });
     });
 
-    it('should return 401 without token', () => {
+    it('should return 401 without a session', () => {
       return request(app.getHttpServer()).get('/api/v1/venues/my/venues').expect(401);
     });
   });
@@ -397,9 +378,8 @@ describe('Venues (e2e)', () => {
   describe('GET /api/v1/venues (filters)', () => {
     beforeAll(async () => {
       // Create a verified venue for search
-      const res = await request(app.getHttpServer())
+      const res = await ownerAgent
         .post('/api/v1/venues')
-        .set('Authorization', `Bearer ${ownerToken}`)
         .field('name', `Search Filter Venue ${uniqueId}`)
         .field('description', 'Venue con capacidad alta para busqueda con filtros.')
         .field('address', 'Search Address 12345')
@@ -408,9 +388,8 @@ describe('Venues (e2e)', () => {
         .expect(201);
 
       // Verify it
-      await request(app.getHttpServer())
+      await adminAgent
         .put(`/api/v1/venues/${res.body.id}/verify`)
-        .set('Authorization', `Bearer ${adminToken}`)
         .send({ approve: true })
         .expect(200);
     });
@@ -437,10 +416,7 @@ describe('Venues (e2e)', () => {
   // ===== Admin pending queue =====
   describe('GET /api/v1/venues/admin/pending', () => {
     it('should return only PENDING venues and be reachable by ADMIN', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/api/v1/venues/admin/pending')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+      const res = await adminAgent.get('/api/v1/venues/admin/pending').expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);
       for (const venue of res.body) {
@@ -449,17 +425,11 @@ describe('Venues (e2e)', () => {
     });
 
     it('should return 403 when OWNER requests the pending queue', () => {
-      return request(app.getHttpServer())
-        .get('/api/v1/venues/admin/pending')
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .expect(403);
+      return ownerAgent.get('/api/v1/venues/admin/pending').expect(403);
     });
 
     it('should return 403 when CLIENT requests the pending queue', () => {
-      return request(app.getHttpServer())
-        .get('/api/v1/venues/admin/pending')
-        .set('Authorization', `Bearer ${clientToken}`)
-        .expect(403);
+      return clientAgent.get('/api/v1/venues/admin/pending').expect(403);
     });
   });
 
@@ -479,39 +449,33 @@ describe('Venues (e2e)', () => {
             : { key: `TEST_${resource}_${uniqueId}`, name: `Test ${resource} ${uniqueId}` };
 
         it('should return 403 for OWNER on GET', () => {
-          return request(app.getHttpServer())
-            .get(`/api/v1/venues/admin/catalog/${resource}`)
-            .set('Authorization', `Bearer ${ownerToken}`)
-            .expect(403);
+          return ownerAgent.get(`/api/v1/venues/admin/catalog/${resource}`).expect(403);
         });
 
         it('should return 403 for CLIENT on POST', () => {
-          return request(app.getHttpServer())
+          return clientAgent
             .post(`/api/v1/venues/admin/catalog/${resource}`)
-            .set('Authorization', `Bearer ${clientToken}`)
             .send(basePayload)
             .expect(403);
         });
 
-        it('should return 401 without a token', () => {
+        it('should return 401 without a session', () => {
           return request(app.getHttpServer())
             .get(`/api/v1/venues/admin/catalog/${resource}`)
             .expect(401);
         });
 
         it('should allow ADMIN to create and update a catalog item', async () => {
-          const createRes = await request(app.getHttpServer())
+          const createRes = await adminAgent
             .post(`/api/v1/venues/admin/catalog/${resource}`)
-            .set('Authorization', `Bearer ${adminToken}`)
             .send(basePayload)
             .expect(201);
 
           expect(createRes.body).toHaveProperty('id');
           expect(createRes.body.isActive).toBe(true);
 
-          const updateRes = await request(app.getHttpServer())
+          const updateRes = await adminAgent
             .put(`/api/v1/venues/admin/catalog/${resource}/${createRes.body.id}`)
-            .set('Authorization', `Bearer ${adminToken}`)
             .send({ isActive: false })
             .expect(200);
 

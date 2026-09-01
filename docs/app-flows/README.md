@@ -31,21 +31,26 @@ a mano. Nunca lo corras sin confirmar antes.**
 
 ### 0.2 Servicios opcionales sin configurar
 
-Este entorno local **no tiene configurado** Cloudinary, Resend (email) ni Twilio (WhatsApp)
-— no hay archivo `.env` con esas credenciales. Esto afecta tres flujos:
+**Cloudinary ya esta configurado** (credenciales reales en `backend/.env.local` y en `.env`
+en la raiz para docker-compose) — subir fotos de un local y comprobantes de pago funciona de
+punta a punta. Resend (email) y Twilio (WhatsApp) siguen **sin configurar**:
 
-- **Subir fotos de un local** (owner) y **subir comprobante de pago** (client): la subida
-  falla con un error porque Cloudinary no esta configurado. Para probar el resto del flujo
-  de todas formas, un desarrollador puede insertar la URL manualmente en la base de datos
-  (ver flujo 3.4 y 4.2 mas abajo).
 - **Recuperar contraseña**: el correo nunca llega a una bandeja real. El enlace de recuperacion
   queda igual disponible en la tabla `notifications` — ver flujo 1.3.
 - **Notificaciones de reserva/pago**: siempre se crean en la campanita de notificaciones
   in-app (`/notifications`, icono de campana en el header), pero nunca llegan por email o
   WhatsApp real. Verifica los flujos ahi, no en tu correo.
 
-Si en algun momento configuran esas credenciales en `backend/.env`, estas limitaciones
-desaparecen y esos tres flujos funcionan de punta a punta sin pasos manuales.
+Si en algun momento configuran esas credenciales en `backend/.env.local`, estas limitaciones
+desaparecen y esos flujos funcionan de punta a punta sin pasos manuales.
+
+### 0.4 Rate limiting en /auth
+
+`login`, `register`, `reset-password` aceptan **5 intentos por minuto** y `forgot-password`
+**3 por minuto** (por IP) — si estas probando el flujo de login repetidamente en poco tiempo
+(por ejemplo reintentando credenciales o recorriendo varios usuarios seed seguidos) y de golpe
+empezas a ver un error inesperado en vez del comportamiento normal, esperá un minuto: es el
+limite de intentos, no un bug.
 
 ### 0.3 Consultar la base de datos directamente
 
@@ -84,6 +89,15 @@ si `GOOGLE_MAPS_API_KEY` esta configurado (no es obligatorio, pero puede degrada
 2. Cerrar sesion desde el menu de usuario en el header.
 3. Probar credenciales invalidas — debe mostrar un error claro, no un crash.
 
+**Nota tecnica:** la sesion ya no se guarda en `localStorage` como antes — el navegador la
+maneja via cookies `httpOnly` (invisibles para JavaScript, incluso para un eventual script
+malicioso). No deberias notar ninguna diferencia usando la app normalmente: el login/logout
+se ve igual, y las sesiones se renuevan solas en segundo plano sin pedirte volver a iniciar
+sesion cada 15 minutos. Si queres confirmar que efectivamente no hay tokens expuestos, abri
+la consola del navegador y corré `document.cookie` — no debería mostrar nada relacionado a
+la sesion (a diferencia de `localStorage.getItem('salonfacil-auth')`, que sigue mostrando tu
+usuario y rol, pero nunca un token).
+
 ### 1.4 Recuperar contraseña ⚠️
 1. Ir a `/forgot-password`, ingresar un email valido del seed. El mensaje es siempre el mismo
    exista o no el email (por seguridad, no revela si el correo esta registrado).
@@ -116,16 +130,13 @@ Inicia sesion con `cliente1@email.com` (tiene reservas en distintos estados) o
 3. Cancelar una reserva PENDIENTE o APROBADA — confirmar que pasa a estado cancelada y libera
    el calendario del local.
 
-### 2.3 Pagar una reserva (seña o pago completo) ⚠️
+### 2.3 Pagar una reserva (seña o pago completo)
 1. En una reserva **APROBADA**, ir a la seccion de pago y elegir tipo (seña o completo) y
-   metodo (transferencia, QR, efectivo, etc.).
-2. Subir el comprobante — **esto falla en este entorno** porque Cloudinary no esta
-   configurado (ver 0.2). Para seguir probando el resto del flujo sin esa integracion, un
-   desarrollador puede insertar la URL manualmente:
-   ```sql
-   UPDATE payments SET comprobante_url = 'https://example.com/test.jpg', comprobante_uploaded_at = now()
-   WHERE id = '<payment-id>';
-   ```
+   metodo (transferencia, QR, efectivo, etc.). El monto para seña o pago completo se valida
+   contra lo que realmente corresponde a la reserva — no se puede pagar un monto arbitrario.
+2. Subir el comprobante (imagen o PDF real — Cloudinary rechaza cualquier archivo cuyo
+   contenido no coincida con el tipo declarado, asi que un archivo renombrado con otra
+   extension no pasa).
 3. Esperar a que el propietario confirme el pago (flujo 3.2) y verificar que el estado de la
    reserva avanza a **SEÑA PAGADA** o **PAGADA**, segun el tipo de pago.
 
@@ -164,9 +175,8 @@ Todo lo de este bloque vive bajo `/dashboard`.
 3. `/dashboard/venues/[id]/preview` — ver como se ve publicamente antes de publicar.
 4. Revisar el checklist de completitud del perfil y publicar el local (`Publicar`) — un local
    nuevo no es visible en `/venues` hasta que se publica **y** un admin lo verifica (flujo 4.1).
-5. Subir fotos del local ⚠️ — **falla en este entorno** por Cloudinary no configurado (igual
-   que el comprobante de pago en 2.3); para seguir probando sin esa integracion, insertar una
-   URL de imagen manualmente en la tabla `venue_media`.
+5. Subir fotos del local (imagen real — mismo chequeo de formato que el comprobante de pago
+   en 2.3). Borrar una foto tambien la elimina de Cloudinary, no solo de la base de datos.
 
 ### 3.2 Gestionar reservas y pagos entrantes
 En `/dashboard/bookings`:
@@ -304,3 +314,33 @@ interfiere con lo que estes probando a mano. Los ~20 usuarios `owner-venue-*`/`u
 que ya estaban en `salonfacil_dev` de corridas anteriores a este fix siguen ahi — son todos
 cuentas de prueba desechables, pero no se borraron automaticamente por si acaso; borralos a
 mano si te estorban.
+
+## Nota tecnica: auditoria de seguridad y migracion de sesion a cookies httpOnly (sesion mas reciente)
+
+Antes de pensar en deployar a produccion se hizo una revision de seguridad completa (aislamiento
+de datos entre clientes/owners, manipulacion de precios, inyeccion SQL, autenticacion). El
+aislamiento entre usuarios y la proteccion contra SQL injection ya estaban bien implementados
+en todo el codebase — no se toco nada ahi. Se corrigieron los gaps reales encontrados:
+
+- **Rate limiting activado**: estaba configurado (`ThrottlerModule`) pero el guard nunca se
+  registraba — ningun endpoint tenia limite de intentos, incluyendo login. Ver seccion 0.4.
+- **Validacion de monto en pagos `FULL`/`REMAINING`**: antes solo se validaba el monto de la
+  seña; un cliente podia crear un pago de 1 Bs marcado como "pago completo". Ver seccion 2.3.
+- **Comprobantes de pago endurecidos**: Cloudinary ahora valida el contenido real del archivo,
+  no solo el tipo que declara el cliente (ver seccion 2.3 y 3.1).
+- **Swagger** (`/api/docs`) se desactiva automaticamente en produccion (`NODE_ENV=production`).
+
+Ademas se migro la sesion de usuario de `localStorage` (tokens JWT visibles a cualquier script
+que corra en la pagina) a **cookies httpOnly** que el navegador maneja solo — invisibles para
+JavaScript, incluidos scripts maliciosos en un eventual XSS futuro. Ver seccion 1.3 para como
+se ve esto desde el uso normal de la app (respuesta corta: igual que antes, no deberias notar
+nada). Esto incluyo reescribir la suite completa de tests e2e (`auth`, `venue`, `booking`,
+`payment` — 101 tests) para autenticarse con `supertest.agent()` (que mantiene su propia
+"cajita" de cookies como un navegador real) en vez de capturar un token del body y mandarlo a
+mano en cada request — asi los tests realmente ejercitan el mecanismo de sesion que usa la app
+en produccion, no un atajo que solo funcionaba en el entorno de pruebas.
+
+Verificado: 178 tests unitarios + 101 e2e en verde, mas pruebas manuales reales en el navegador
+(login/logout como CLIENT y OWNER, `document.cookie` vacio, `localStorage` sin tokens, sesion
+cerrada del lado del servidor de verdad al hacer logout, rate limit cortando en el 6to intento
+de login).

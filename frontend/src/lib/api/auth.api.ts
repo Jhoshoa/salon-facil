@@ -1,26 +1,35 @@
 import { apiRequest } from './client';
-import type { AuthResponse, AuthUser, LoginPayload, RegisterPayload, UpdateProfilePayload } from '@/types/api';
+import type {
+  PublicAuthResponse,
+  AuthUser,
+  LoginPayload,
+  RegisterPayload,
+  UpdateProfilePayload,
+} from '@/types/api';
 
-export const login = async (payload: LoginPayload): Promise<AuthResponse> => {
-  return apiRequest<AuthResponse>('/auth/login', {
+export const login = async (payload: LoginPayload): Promise<PublicAuthResponse> => {
+  return apiRequest<PublicAuthResponse>('/auth/login', {
     auth: false,
     method: 'POST',
     body: JSON.stringify(payload),
   });
 };
 
-export const register = async (payload: RegisterPayload): Promise<AuthResponse> => {
-  return apiRequest<AuthResponse>('/auth/register', {
+export const register = async (payload: RegisterPayload): Promise<PublicAuthResponse> => {
+  return apiRequest<PublicAuthResponse>('/auth/register', {
     auth: false,
     method: 'POST',
     body: JSON.stringify(payload),
   });
 };
 
-export const logout = async (refreshToken?: string): Promise<{ message: string }> => {
+// No refreshToken param — the backend reads it from the httpOnly cookie itself. `allDevices`
+// revokes every session for this user instead of just the one in this browser.
+export const logout = async (allDevices?: boolean): Promise<{ message: string }> => {
   return apiRequest<{ message: string }>('/auth/logout', {
+    auth: false,
     method: 'POST',
-    body: JSON.stringify({ refreshToken }),
+    body: JSON.stringify({ allDevices }),
   });
 };
 
