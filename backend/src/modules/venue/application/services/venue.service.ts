@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -25,6 +26,8 @@ export interface VenueCompletion {
 
 @Injectable()
 export class VenueService {
+  private readonly logger = new Logger(VenueService.name);
+
   constructor(
     @Inject(VENUE_REPOSITORY)
     private readonly venueRepository: IVenueRepository,
@@ -351,6 +354,7 @@ export class VenueService {
   }
 
   async verifyVenue(id: string, adminId: string, approve: boolean): Promise<VenueEntity> {
+    this.logger.log(`Admin ${adminId} ${approve ? 'approved' : 'rejected'} venue ${id}`);
     if (approve) {
       return this.venueRepository.updateStatus(id, VenueStatus.ACTIVE, adminId);
     }

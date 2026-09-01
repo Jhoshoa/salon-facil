@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -26,6 +27,8 @@ const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: IAuthRepository,
@@ -79,15 +82,21 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.authRepository.findByEmail(dto.email);
     if (!user) {
+      // Deliberately logs the attempted email, not the password — this is the standard audit
+      // trail for spotting credential stuffing/enumeration after the fact, since nothing else
+      // in the app records failed auth attempts (see docs/app-flows/README.md).
+      this.logger.warn(`Login failed — no account for email: ${dto.email}`);
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
     if (!user.isActive()) {
+      this.logger.warn(`Login rejected — account suspended/inactive: ${user.id}`);
       throw new UnauthorizedException('Tu cuenta esta suspendida o inactiva');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
+      this.logger.warn(`Login failed — wrong password for user: ${user.id}`);
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
@@ -104,10 +113,17 @@ export class AuthService {
     const storedToken = await this.authRepository.findActiveRefreshToken(tokenHash);
 
     if (!storedToken || storedToken.revokedAt || storedToken.expiresAt <= new Date()) {
+      // A validly-signed but revoked/expired/unknown refresh token is exactly what you'd see
+      // if someone replayed a stolen or already-rotated token — worth a trace even though the
+      // request is correctly rejected either way.
+      this.logger.warn(`Refresh rejected — token not active for user: ${payload.sub}`);
       throw new UnauthorizedException('Refresh token invalido o expirado');
     }
 
     if (storedToken.userId !== payload.sub) {
+      this.logger.warn(
+        `Refresh rejected — token/user mismatch (token user: ${storedToken.userId}, claimed: ${payload.sub})`,
+      );
       throw new UnauthorizedException('Refresh token invalido o expirado');
     }
 

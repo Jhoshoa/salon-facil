@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   AUTH_REPOSITORY,
   IAuthRepository,
@@ -9,6 +9,8 @@ import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
 
 @Injectable()
 export class AdminUserService {
+  private readonly logger = new Logger(AdminUserService.name);
+
   constructor(
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: IAuthRepository,
@@ -46,6 +48,7 @@ export class AdminUserService {
       throw new NotFoundException(`Usuario con ID '${userId}' no encontrado`);
     }
 
+    this.logger.log(`Admin ${adminId} set user ${userId} status to ${dto.status}`);
     return this.authRepository.updateStatus(userId, dto.status);
   }
 }

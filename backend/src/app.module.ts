@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import Redis from 'ioredis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,6 +18,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { JwtAuthGuard } from './shared/guards/jwt-auth.guard';
 import { OwnershipGuard } from './shared/guards/ownership.guard';
 import { RolesGuard } from './shared/guards/roles.guard';
+import { ForbiddenLoggingFilter } from './shared/filters/forbidden-logging.filter';
 import { validationSchema } from './config/validation.schema';
 
 @Module({
@@ -80,6 +81,10 @@ import { validationSchema } from './config/validation.schema';
     {
       provide: APP_GUARD,
       useClass: OwnershipGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: ForbiddenLoggingFilter,
     },
   ],
 })
