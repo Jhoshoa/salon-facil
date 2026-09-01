@@ -51,6 +51,7 @@ export class CloudinaryService implements OnModuleInit {
         {
           folder: `salon-facil/${folder}`,
           resource_type: 'image',
+          allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
           transformation: [
             { width: 1200, height: 800, crop: 'limit' },
             { quality: 'auto:good', fetch_format: 'auto' },
@@ -70,6 +71,12 @@ export class CloudinaryService implements OnModuleInit {
     });
   }
 
+  /** Used only for payment proofs. `resource_type: 'auto'` on its own only looks at the
+   * client-supplied Content-Type — it will happily store and re-serve an HTML file relabeled
+   * as `image/jpeg` with its original bytes intact, which a browser then executes when a venue
+   * owner opens "Ver comprobante". `allowed_formats` makes Cloudinary itself inspect the real
+   * file signature and reject anything that isn't actually one of these formats, regardless of
+   * what Content-Type the upload claims. */
   async uploadFile(
     file: Express.Multer.File,
     folder: string,
@@ -81,6 +88,7 @@ export class CloudinaryService implements OnModuleInit {
         {
           folder: `salon-facil/${folder}`,
           resource_type: 'auto',
+          allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
         },
         (error, result) => {
           if (error) return reject(error);

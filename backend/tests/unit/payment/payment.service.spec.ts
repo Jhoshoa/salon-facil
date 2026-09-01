@@ -112,6 +112,7 @@ describe('PaymentService', () => {
       findByBooking: jest.fn(),
       findByClient: jest.fn(),
       findPendingByOwner: jest.fn(),
+      findAllPending: jest.fn(),
       create: jest.fn(),
       uploadProof: jest.fn(),
       confirm: jest.fn(),
@@ -225,6 +226,68 @@ describe('PaymentService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('creates a full payment for exactly the booking total', async () => {
+      bookingRepository.findById.mockResolvedValue(makeBooking());
+      paymentRepository.create.mockResolvedValue(
+        makePayment({ paymentType: PaymentType.FULL, amount: 5000 }),
+      );
+
+      await service.createPayment('booking-1', 'client-1', {
+        paymentType: PaymentType.FULL,
+        method: PaymentMethod.QR_BANK,
+        amount: 5000,
+      });
+
+      expect(paymentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 5000 }),
+      );
+    });
+
+    it('rejects a full payment for less than the booking total', async () => {
+      bookingRepository.findById.mockResolvedValue(makeBooking());
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.FULL,
+          method: PaymentMethod.QR_BANK,
+          amount: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('creates a remaining payment for totalPrice minus depositAmount', async () => {
+      bookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.DEPOSIT_PAID, depositPaid: true }),
+      );
+      paymentRepository.create.mockResolvedValue(
+        makePayment({ paymentType: PaymentType.REMAINING, amount: 3500 }),
+      );
+
+      await service.createPayment('booking-1', 'client-1', {
+        paymentType: PaymentType.REMAINING,
+        method: PaymentMethod.CASH,
+        amount: 3500,
+      });
+
+      expect(paymentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 3500 }),
+      );
+    });
+
+    it('rejects a remaining payment that does not match totalPrice minus depositAmount', async () => {
+      bookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.DEPOSIT_PAID, depositPaid: true }),
+      );
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.REMAINING,
+          method: PaymentMethod.CASH,
+          amount: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('confirmPayment', () => {
@@ -266,6 +329,26 @@ describe('PaymentService', () => {
       await expect(
         service.getBookingPayments('missing', 'client-1', UserRole.CLIENT),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getPendingOwnerPayments', () => {
+    it('scopes to the requesting owner for OWNER role', async () => {
+      paymentRepository.findPendingByOwner.mockResolvedValue([]);
+
+      await service.getPendingOwnerPayments('owner-1', UserRole.OWNER);
+
+      expect(paymentRepository.findPendingByOwner).toHaveBeenCalledWith('owner-1');
+      expect(paymentRepository.findAllPending).not.toHaveBeenCalled();
+    });
+
+    it('returns the platform-wide pending queue for ADMIN role', async () => {
+      paymentRepository.findAllPending.mockResolvedValue([]);
+
+      await service.getPendingOwnerPayments('admin-1', UserRole.ADMIN);
+
+      expect(paymentRepository.findAllPending).toHaveBeenCalled();
+      expect(paymentRepository.findPendingByOwner).not.toHaveBeenCalled();
     });
   });
 

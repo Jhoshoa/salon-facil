@@ -71,6 +71,20 @@ export class PaymentService {
       throw new BadRequestException(`El monto de sena esperado es ${booking.depositAmount}`);
     }
 
+    // Only DEPOSIT was checked here before — a client could create a FULL/REMAINING payment
+    // for an arbitrary (e.g. trivially small) amount and, once an owner confirmed it, have the
+    // booking treated as fully paid for far less than what's actually owed.
+    if (dto.paymentType === PaymentType.FULL && dto.amount !== booking.totalPrice) {
+      throw new BadRequestException(`El monto del pago completo esperado es ${booking.totalPrice}`);
+    }
+
+    if (dto.paymentType === PaymentType.REMAINING) {
+      const expectedRemaining = booking.totalPrice - booking.depositAmount;
+      if (dto.amount !== expectedRemaining) {
+        throw new BadRequestException(`El monto restante esperado es ${expectedRemaining}`);
+      }
+    }
+
     return this.paymentRepository.create({
       bookingId,
       amount: dto.amount,
@@ -97,7 +111,17 @@ export class PaymentService {
       throw new BadRequestException('Solo se puede subir comprobante a pagos pendientes');
     }
 
-    const upload = await this.cloudinaryService.uploadFile(file, `payments/${payment.bookingId}`);
+    let upload: { url: string; publicId: string };
+    try {
+      upload = await this.cloudinaryService.uploadFile(file, `payments/${payment.bookingId}`);
+    } catch {
+      // Most likely cause: the file's real content doesn't match its declared type (rejected
+      // by Cloudinary's allowed_formats check), not an infra failure — surface it as a client
+      // error rather than a bare 500.
+      throw new BadRequestException(
+        'El archivo no parece ser una imagen o PDF valido. Proba con otro archivo.',
+      );
+    }
     const updated = await this.paymentRepository.uploadProof(paymentId, upload.url);
 
     if (payment.booking) {
@@ -143,8 +167,11 @@ export class PaymentService {
   }
 
   async getPendingOwnerPayments(ownerId: string, userRole: UserRole): Promise<PaymentEntity[]> {
+    // Both branches called the same owner-scoped query before this fix — an ADMIN's own user
+    // id never matches any venue's ownerId, so this endpoint silently returned an empty list
+    // for every admin instead of the platform-wide pending queue.
     if (userRole === UserRole.ADMIN) {
-      return this.paymentRepository.findPendingByOwner(ownerId);
+      return this.paymentRepository.findAllPending();
     }
     return this.paymentRepository.findPendingByOwner(ownerId);
   }

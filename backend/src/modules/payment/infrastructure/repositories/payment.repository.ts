@@ -80,6 +80,15 @@ export class PaymentRepository implements IPaymentRepository {
     return payments.map((payment) => this.toEntity(payment));
   }
 
+  async findAllPending(): Promise<PaymentEntity[]> {
+    const payments = await this.prisma.payment.findMany({
+      where: { status: PaymentStatus.PENDING },
+      include: paymentInclude,
+      orderBy: { createdAt: 'asc' },
+    });
+    return payments.map((payment) => this.toEntity(payment));
+  }
+
   async create(data: CreatePaymentData): Promise<PaymentEntity> {
     const payment = await this.prisma.payment.create({
       data: {

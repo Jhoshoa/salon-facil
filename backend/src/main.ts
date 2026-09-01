@@ -31,21 +31,28 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api/v1');
 
-  const config = new DocumentBuilder()
-    .setTitle('SalónFácil API')
-    .setDescription('API para la plataforma de alquiler de locales para eventos')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
+  // Publicly exposes every route, DTO shape, and which endpoints require auth — fine for
+  // local/staging, not something to hand to an unauthenticated visitor in production.
+  const swaggerEnabled = process.env.NODE_ENV !== 'production';
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('SalónFácil API')
+      .setDescription('API para la plataforma de alquiler de locales para eventos')
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
 
   console.log(`Backend running on http://localhost:${port}/api/v1`);
-  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  if (swaggerEnabled) {
+    console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  }
   console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
 }
 

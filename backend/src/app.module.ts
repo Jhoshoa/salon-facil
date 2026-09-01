@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
@@ -31,6 +31,11 @@ import { validationSchema } from './config/validation.schema';
       {
         ttl: 60000,
         limit: 100,
+        // e2e tests hammer /auth/register and /auth/login far faster than any real client
+        // would (many fixtures per spec file, all from the same local IP) — without this
+        // they'd all share one throttle bucket and start failing with 429s partway through
+        // a run, unrelated to whatever the test is actually checking.
+        skipIf: () => process.env.NODE_ENV === 'test',
       },
     ]),
     ScheduleModule.forRoot(),
@@ -56,6 +61,14 @@ import { validationSchema } from './config/validation.schema';
   controllers: [AppController],
   providers: [
     AppService,
+    // ThrottlerModule.forRoot() above only registers the storage/config — without this guard
+    // wired up as APP_GUARD, no request in the app was actually rate-limited (confirmed during
+    // a pre-launch security audit). Runs first so throttled requests short-circuit before
+    // spending effort on JWT verification.
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

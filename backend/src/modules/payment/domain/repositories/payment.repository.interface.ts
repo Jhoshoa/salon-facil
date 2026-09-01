@@ -12,6 +12,7 @@ export interface IPaymentRepository {
   findByBooking(bookingId: string): Promise<PaymentEntity[]>;
   findByClient(clientId: string): Promise<PaymentEntity[]>;
   findPendingByOwner(ownerId: string): Promise<PaymentEntity[]>;
+  findAllPending(): Promise<PaymentEntity[]>;
   create(data: CreatePaymentData): Promise<PaymentEntity>;
   uploadProof(id: string, comprobanteUrl: string): Promise<PaymentEntity>;
   confirm(id: string, ownerId: string, notes?: string): Promise<PaymentEntity>;
