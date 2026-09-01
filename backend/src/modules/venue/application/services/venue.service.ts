@@ -15,6 +15,7 @@ import { UpdateVenueDto } from '../dto/update-venue.dto';
 import { VenueFilterDto } from '../dto/venue-filter.dto';
 import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
+import { CloudinaryService } from '../../../upload/cloudinary.service';
 
 export interface VenueCompletion {
   score: number;
@@ -28,6 +29,7 @@ export class VenueService {
     @Inject(VENUE_REPOSITORY)
     private readonly venueRepository: IVenueRepository,
     private readonly slugService: SlugService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async createVenue(dto: CreateVenueDto, ownerId: string): Promise<VenueEntity> {
@@ -230,13 +232,13 @@ export class VenueService {
     id: string,
     userId: string,
     userRole: UserRole,
-    urls: string[],
+    uploads: { url: string; publicId: string }[],
   ): Promise<VenueEntity['media']> {
     const venue = await this.getVenueById(id);
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
-    return this.venueRepository.addMedia(id, urls);
+    return this.venueRepository.addMedia(id, uploads);
   }
 
   async deleteVenueMedia(
@@ -249,7 +251,13 @@ export class VenueService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
-    await this.venueRepository.deleteMedia(id, mediaId);
+    const deleted = await this.venueRepository.deleteMedia(id, mediaId);
+    // Best-effort: the DB row is already gone either way, and a Cloudinary hiccup here
+    // shouldn't block the owner's request. Nothing to clean up for photos uploaded before
+    // this fix (no cloudinaryId on file) — those still leak, this only stops new leaks.
+    if (deleted?.cloudinaryId) {
+      await this.cloudinaryService.deleteImage(deleted.cloudinaryId).catch(() => {});
+    }
   }
 
   async reorderVenueMedia(

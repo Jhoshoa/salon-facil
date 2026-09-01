@@ -728,7 +728,10 @@ export class VenueRepository implements IVenueRepository {
     return this.toEntity(venue);
   }
 
-  async addMedia(venueId: string, urls: string[]): Promise<VenueMediaEntity[]> {
+  async addMedia(
+    venueId: string,
+    uploads: { url: string; publicId: string }[],
+  ): Promise<VenueMediaEntity[]> {
     const existing = await this.prisma.venueMedia.findMany({
       where: { venueId },
       select: { sortOrder: true, isCover: true },
@@ -739,10 +742,11 @@ export class VenueRepository implements IVenueRepository {
       : 0;
 
     await this.prisma.venueMedia.createMany({
-      data: urls.map((url, index) => ({
+      data: uploads.map(({ url, publicId }, index) => ({
         venueId,
         type: VenueMediaType.IMAGE,
         url,
+        cloudinaryId: publicId,
         sortOrder: nextSortOrder + index,
         isCover: !hasCover && index === 0,
       })),
@@ -751,9 +755,14 @@ export class VenueRepository implements IVenueRepository {
     return this.listMedia(venueId);
   }
 
-  async deleteMedia(venueId: string, mediaId: string): Promise<void> {
+  /** Returns the deleted row's `cloudinaryId` (or `null`) so the caller can also remove the
+   * asset from Cloudinary — the DB delete happens either way, unconditionally. */
+  async deleteMedia(
+    venueId: string,
+    mediaId: string,
+  ): Promise<{ cloudinaryId: string | null } | null> {
     const media = await this.prisma.venueMedia.findFirst({ where: { id: mediaId, venueId } });
-    if (!media) return;
+    if (!media) return null;
 
     await this.prisma.venueMedia.delete({ where: { id: mediaId } });
 
@@ -766,6 +775,8 @@ export class VenueRepository implements IVenueRepository {
         await this.prisma.venueMedia.update({ where: { id: next.id }, data: { isCover: true } });
       }
     }
+
+    return { cloudinaryId: media.cloudinaryId };
   }
 
   async reorderMedia(

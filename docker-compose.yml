@@ -50,6 +50,9 @@ services:
       JWT_REFRESH_EXPIRATION: 7d
       BCRYPT_ROUNDS: 12
       CORS_ORIGINS: http://localhost:3000
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     volumes:
       - ./backend:/app
       - /app/node_modules

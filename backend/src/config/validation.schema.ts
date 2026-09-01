@@ -17,7 +17,6 @@ export const validationSchema = Joi.object({
   CLOUDINARY_CLOUD_NAME: Joi.string().optional(),
   CLOUDINARY_API_KEY: Joi.string().optional(),
   CLOUDINARY_API_SECRET: Joi.string().optional(),
-  CLOUDINARY_FOLDER: Joi.string().optional(),
   TWILIO_ACCOUNT_SID: Joi.string().optional(),
   TWILIO_AUTH_TOKEN: Joi.string().optional(),
   TWILIO_WHATSAPP_NUMBER: Joi.string().optional(),

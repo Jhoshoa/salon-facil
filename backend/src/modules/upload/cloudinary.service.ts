@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import { Express } from 'express';
@@ -30,7 +30,11 @@ export class CloudinaryService implements OnModuleInit {
 
   private ensureConfigured(): void {
     if (!this.configured) {
-      throw new Error(
+      // A NestJS HttpException (not a plain Error) so Nest's default exception handling
+      // serializes it as { statusCode, message, error } with this message intact — a plain
+      // Error is treated as unknown and replaced with a generic "Internal server error",
+      // which is what reached the frontend's toast before this fix.
+      throw new ServiceUnavailableException(
         'Cloudinary no está configurado. Configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.',
       );
     }
@@ -92,11 +96,14 @@ export class CloudinaryService implements OnModuleInit {
     });
   }
 
-  async uploadMultiple(files: Express.Multer.File[], folder: string): Promise<string[]> {
+  async uploadMultiple(
+    files: Express.Multer.File[],
+    folder: string,
+  ): Promise<{ url: string; publicId: string }[]> {
     this.ensureConfigured();
 
     const uploads = files.map((file, index) =>
-      this.uploadImage(file, `${folder}/${Date.now()}-${index}`).then((r) => r.url),
+      this.uploadImage(file, `${folder}/${Date.now()}-${index}`),
     );
     return Promise.all(uploads);
   }

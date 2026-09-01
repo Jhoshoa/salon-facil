@@ -84,8 +84,11 @@ export interface IVenueRepository {
   create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity>;
   update(id: string, data: Record<string, unknown>): Promise<VenueEntity>;
   updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity>;
-  addMedia(venueId: string, urls: string[]): Promise<VenueMediaEntity[]>;
-  deleteMedia(venueId: string, mediaId: string): Promise<void>;
+  addMedia(
+    venueId: string,
+    uploads: { url: string; publicId: string }[],
+  ): Promise<VenueMediaEntity[]>;
+  deleteMedia(venueId: string, mediaId: string): Promise<{ cloudinaryId: string | null } | null>;
   reorderMedia(venueId: string, order: string[], coverId?: string): Promise<VenueMediaEntity[]>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;

@@ -170,8 +170,8 @@ export class VenueController {
     validateFiles(files);
 
     if (files && files.length > 0) {
-      const photoUrls = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
-      dto.photos = [...(dto.photos ?? []), ...photoUrls];
+      const uploaded = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
+      dto.photos = [...(dto.photos ?? []), ...uploaded.map((u) => u.url)];
     }
 
     return this.createVenueUseCase.execute(dto, user.id);
@@ -198,8 +198,8 @@ export class VenueController {
     validateFiles(files);
 
     if (files && files.length > 0) {
-      const photoUrls = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
-      dto.photos = [...(dto.photos ?? []), ...photoUrls];
+      const uploaded = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
+      dto.photos = [...(dto.photos ?? []), ...uploaded.map((u) => u.url)];
     }
 
     return this.venueService.updateVenue(id, dto, user.id, user.role);
@@ -259,8 +259,8 @@ export class VenueController {
     }
     validateFiles(files);
 
-    const photoUrls = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
-    return this.venueService.addVenueMedia(id, user.id, user.role, photoUrls);
+    const uploaded = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
+    return this.venueService.addVenueMedia(id, user.id, user.role, uploaded);
   }
 
   @Put(':id/media/order')

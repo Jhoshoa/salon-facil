@@ -357,14 +357,15 @@ model VenueOpeningHour {
 }
 
 model VenueMedia {
-  id        String         @id @default(uuid())
-  venueId   String         @map("venue_id")
-  type      VenueMediaType
-  url       String
-  alt       String?
-  sortOrder Int            @default(0) @map("sort_order")
-  isCover   Boolean        @default(false) @map("is_cover")
-  createdAt DateTime       @default(now()) @map("created_at")
+  id           String         @id @default(uuid())
+  venueId      String         @map("venue_id")
+  type         VenueMediaType
+  url          String
+  cloudinaryId String?        @map("cloudinary_id")
+  alt          String?
+  sortOrder    Int            @default(0) @map("sort_order")
+  isCover      Boolean        @default(false) @map("is_cover")
+  createdAt    DateTime       @default(now()) @map("created_at")
 
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
 

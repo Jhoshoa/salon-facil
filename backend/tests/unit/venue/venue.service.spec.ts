@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { VenueService } from '../../../src/modules/venue/application/services/venue.service';
 import { SlugService } from '../../../src/modules/venue/application/services/slug.service';
 import { VENUE_REPOSITORY } from '../../../src/modules/venue/domain/repositories/venue.repository.interface';
+import { CloudinaryService } from '../../../src/modules/upload/cloudinary.service';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
@@ -10,6 +11,7 @@ describe('VenueService', () => {
   let service: VenueService;
   let mockRepository: Record<string, jest.Mock>;
   let mockSlugService: Record<string, jest.Mock>;
+  let mockCloudinaryService: Record<string, jest.Mock>;
 
   const mockVenue = {
     id: 'venue-1',
@@ -46,10 +48,16 @@ describe('VenueService', () => {
       incrementViewCount: jest.fn().mockResolvedValue(undefined),
       softDelete: jest.fn(),
       existsBySlug: jest.fn(),
+      addMedia: jest.fn(),
+      deleteMedia: jest.fn(),
     };
 
     mockSlugService = {
       generateSlug: jest.fn().mockResolvedValue('salon-perfecto'),
+    };
+
+    mockCloudinaryService = {
+      deleteImage: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -57,6 +65,7 @@ describe('VenueService', () => {
         VenueService,
         { provide: VENUE_REPOSITORY, useValue: mockRepository },
         { provide: SlugService, useValue: mockSlugService },
+        { provide: CloudinaryService, useValue: mockCloudinaryService },
       ],
     }).compile();
 
@@ -191,6 +200,59 @@ describe('VenueService', () => {
       await expect(service.deleteVenue('venue-1', 'other-user', UserRole.CLIENT)).rejects.toThrow(
         ForbiddenException,
       );
+    });
+  });
+
+  describe('addVenueMedia / deleteVenueMedia', () => {
+    it('should pass uploaded url/publicId pairs through to the repository', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      const uploads = [{ url: 'https://cdn/img1.jpg', publicId: 'salon-facil/venues/img1' }];
+      mockRepository.addMedia.mockResolvedValue(uploads);
+
+      await service.addVenueMedia('venue-1', 'owner-1', UserRole.OWNER, uploads);
+
+      expect(mockRepository.addMedia).toHaveBeenCalledWith('venue-1', uploads);
+    });
+
+    it('should throw ForbiddenException when a non-owner adds media', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(false);
+
+      await expect(
+        service.addVenueMedia('venue-1', 'other-user', UserRole.CLIENT, []),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should delete the Cloudinary asset when the deleted row had a cloudinaryId', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      mockRepository.deleteMedia.mockResolvedValue({ cloudinaryId: 'salon-facil/venues/img1' });
+
+      await service.deleteVenueMedia('venue-1', 'media-1', 'owner-1', UserRole.OWNER);
+
+      expect(mockRepository.deleteMedia).toHaveBeenCalledWith('venue-1', 'media-1');
+      expect(mockCloudinaryService.deleteImage).toHaveBeenCalledWith('salon-facil/venues/img1');
+    });
+
+    it('should not call Cloudinary when the deleted row had no cloudinaryId (uploaded before this fix)', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      mockRepository.deleteMedia.mockResolvedValue({ cloudinaryId: null });
+
+      await service.deleteVenueMedia('venue-1', 'media-1', 'owner-1', UserRole.OWNER);
+
+      expect(mockCloudinaryService.deleteImage).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when a non-owner deletes media', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(false);
+
+      await expect(
+        service.deleteVenueMedia('venue-1', 'media-1', 'other-user', UserRole.CLIENT),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRepository.deleteMedia).not.toHaveBeenCalled();
     });
   });
 
