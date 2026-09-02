@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+export const departamentoValues = [
+  'LA_PAZ',
+  'SANTA_CRUZ',
+  'COCHABAMBA',
+  'ORURO',
+  'POTOSI',
+  'CHUQUISACA',
+  'TARIJA',
+  'BENI',
+  'PANDO',
+] as const;
+
 export const venueOpeningHourSchema = z.object({
   dayOfWeek: z.number().min(0).max(6),
   opensAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato HH:mm'),
@@ -16,7 +28,9 @@ export const venueFormSchema = z.object({
   shortDescription: z.string().max(255).optional().or(z.literal('')),
   address: z.string().min(5, 'Ingresa una direccion valida'),
   district: z.string().min(2, 'Ingresa el distrito o zona'),
-  city: z.string().min(2, 'Ingresa la ciudad'),
+  departamento: z.enum(departamentoValues, {
+    errorMap: () => ({ message: 'Selecciona un departamento' }),
+  }),
   latitude: z.string().optional().or(z.literal('')),
   longitude: z.string().optional().or(z.literal('')),
   capacityMin: z.coerce.number().min(0).default(0),
@@ -57,7 +71,7 @@ export const venueFormDefaults: VenueFormValues = {
   shortDescription: '',
   address: '',
   district: '',
-  city: 'El Alto',
+  departamento: 'LA_PAZ',
   latitude: '',
   longitude: '',
   capacityMin: 0,

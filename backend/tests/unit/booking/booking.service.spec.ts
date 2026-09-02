@@ -49,7 +49,7 @@ const makeVenue = (overrides: Partial<VenueEntity> = {}) =>
     description: 'Test',
     address: 'Calle 1',
     district: 'Zona Sur',
-    city: 'El Alto',
+    departamento: 'LA_PAZ',
     capacityMax: 200,
     status: VenueStatus.ACTIVE,
     isVerified: true,

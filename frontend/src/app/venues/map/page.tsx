@@ -1,6 +1,6 @@
 import { VenueMapExplorer } from '@/components/venues/venue-map-explorer';
 import { SiteHeader } from '@/components/shared/site-header';
-import type { PriceUnit, VenueSearchParams } from '@/types/api';
+import type { Departamento, PriceUnit, VenueSearchParams } from '@/types/api';
 
 interface VenueMapPageProps {
   searchParams: {
@@ -9,6 +9,7 @@ interface VenueMapPageProps {
     endDate?: string;
     capacity?: string;
     district?: string;
+    departamento?: string;
     minPrice?: string;
     maxPrice?: string;
     minCapacity?: string;
@@ -28,6 +29,7 @@ export default function VenueMapPage({ searchParams }: VenueMapPageProps) {
   const params: VenueSearchParams = {
     query: searchParams.query,
     district: searchParams.district,
+    departamento: (searchParams.departamento as Departamento | undefined) || undefined,
     startDate: searchParams.startDate,
     endDate: searchParams.endDate,
     guestCount: searchParams.capacity ? Number(searchParams.capacity) : undefined,

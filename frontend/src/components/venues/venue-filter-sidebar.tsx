@@ -3,12 +3,14 @@
 import { Clock, SlidersHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AmenityCatalog, CatalogItem, PriceUnit } from '@/types/api';
-import { priceUnitLabels } from './venue-filter-labels';
+import type { AmenityCatalog, CatalogItem, Departamento, PriceUnit } from '@/types/api';
+import { departamentoLabels, priceUnitLabels } from './venue-filter-labels';
 
 export interface VenueFilterValues {
   district: string;
+  departamento: Departamento | '';
   minPrice: string;
   maxPrice: string;
   minCapacity: string;
@@ -91,6 +93,24 @@ export const VenueFilterSidebar = ({
               onChange={(event) => updateValue('district', event.target.value)}
               placeholder="Sopocachi, Calacoto"
             />
+          </div>
+
+          <div className="sf-filter-section">
+            <Label htmlFor="departamentoFilter">Departamento</Label>
+            <Select
+              id="departamentoFilter"
+              value={values.departamento}
+              onChange={(event) =>
+                onChange({ ...values, departamento: event.target.value as Departamento | '' })
+              }
+            >
+              <option value="">Todos los departamentos</option>
+              {Object.entries(departamentoLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="sf-filter-section">

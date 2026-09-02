@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/formatters';
 import type { Venue } from '@/types/api';
+import { departamentoLabels } from './venue-filter-labels';
 
 interface VenueResultCardProps {
   venue: Venue;
@@ -83,7 +84,7 @@ export const VenueResultCard = ({
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             <p className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4" />
-              {venue.district}, {venue.city}
+              {venue.district}, {departamentoLabels[venue.departamento]}
             </p>
             {venue.averageRating ? (
               <p className="flex items-center gap-1 font-medium text-foreground">

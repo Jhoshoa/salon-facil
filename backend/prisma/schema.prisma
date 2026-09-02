@@ -134,13 +134,13 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   lastLoginAt     DateTime?  @map("last_login_at")
 
-  venues            Venue[]        @relation("VenueOwner")
-  verifiedVenues    Venue[]        @relation("VenueVerifier")
-  bookings          Booking[]      @relation("ClientBookings")
-  reviews           Review[]       @relation("ClientReviews")
-  confirmedPayments Payment[]      @relation("PaymentConfirmedBy")
-  notifications     Notification[]
-  refreshTokens     RefreshToken[]
+  venues              Venue[]              @relation("VenueOwner")
+  verifiedVenues      Venue[]              @relation("VenueVerifier")
+  bookings            Booking[]            @relation("ClientBookings")
+  reviews             Review[]             @relation("ClientReviews")
+  confirmedPayments   Payment[]            @relation("PaymentConfirmedBy")
+  notifications       Notification[]
+  refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([email])
@@ -183,41 +183,40 @@ model PasswordResetToken {
 }
 
 model Venue {
-  id                 String      @id @default(uuid())
-  ownerId            String      @map("owner_id")
+  id                 String       @id @default(uuid())
+  ownerId            String       @map("owner_id")
   name               String
-  slug               String      @unique
-  description        String      @db.Text
-  shortDescription   String?     @map("short_description") @db.VarChar(255)
+  slug               String       @unique
+  description        String       @db.Text
+  shortDescription   String?      @map("short_description") @db.VarChar(255)
   address            String
   district           String
-  city               String      @default("El Alto")
-  state              String      @default("La Paz")
-  country            String      @default("Bolivia")
-  latitude           Decimal?    @db.Decimal(10, 8)
-  longitude          Decimal?    @db.Decimal(11, 8)
-  capacityMin        Int         @default(0) @map("capacity_min")
-  capacityMax        Int         @map("capacity_max")
-  squareMeters       Int?        @map("square_meters")
-  photos             Json        @default("[]")
-  videoUrl           String?     @map("video_url")
-  spaceTypeId        String?     @map("space_type_id")
-  minimumHours       Int         @default(4) @map("minimum_hours")
-  priceUnit          PriceUnit   @default(EVENT) @map("price_unit")
-  instantBooking     Boolean     @default(false) @map("instant_booking")
-  allowsMultipleDays Boolean     @default(false) @map("allows_multiple_days")
-  rules              String?     @db.Text
-  cancellationPolicy String?     @map("cancellation_policy") @db.Text
-  status             VenueStatus @default(DRAFT)
-  isVerified         Boolean     @default(false) @map("is_verified")
-  verifiedAt         DateTime?   @map("verified_at")
-  verifiedById       String?     @map("verified_by_id")
-  isFeatured         Boolean     @default(false) @map("is_featured")
-  featuredUntil      DateTime?   @map("featured_until")
-  viewCount          Int         @default(0) @map("view_count")
-  bookingCount       Int         @default(0) @map("booking_count")
-  createdAt          DateTime    @default(now()) @map("created_at")
-  updatedAt          DateTime    @updatedAt @map("updated_at")
+  departamento       Departamento
+  country            String       @default("Bolivia")
+  latitude           Decimal?     @db.Decimal(10, 8)
+  longitude          Decimal?     @db.Decimal(11, 8)
+  capacityMin        Int          @default(0) @map("capacity_min")
+  capacityMax        Int          @map("capacity_max")
+  squareMeters       Int?         @map("square_meters")
+  photos             Json         @default("[]")
+  videoUrl           String?      @map("video_url")
+  spaceTypeId        String?      @map("space_type_id")
+  minimumHours       Int          @default(4) @map("minimum_hours")
+  priceUnit          PriceUnit    @default(EVENT) @map("price_unit")
+  instantBooking     Boolean      @default(false) @map("instant_booking")
+  allowsMultipleDays Boolean      @default(false) @map("allows_multiple_days")
+  rules              String?      @db.Text
+  cancellationPolicy String?      @map("cancellation_policy") @db.Text
+  status             VenueStatus  @default(DRAFT)
+  isVerified         Boolean      @default(false) @map("is_verified")
+  verifiedAt         DateTime?    @map("verified_at")
+  verifiedById       String?      @map("verified_by_id")
+  isFeatured         Boolean      @default(false) @map("is_featured")
+  featuredUntil      DateTime?    @map("featured_until")
+  viewCount          Int          @default(0) @map("view_count")
+  bookingCount       Int          @default(0) @map("booking_count")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   owner          User               @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   verifiedBy     User?              @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
@@ -235,7 +234,7 @@ model Venue {
 
   @@index([ownerId])
   @@index([slug])
-  @@index([city])
+  @@index([departamento])
   @@index([district])
   @@index([status])
   @@index([isFeatured])
@@ -243,6 +242,23 @@ model Venue {
   @@index([capacityMax])
   @@index([latitude, longitude])
   @@map("venues")
+}
+
+// Bolivia's 9 departamentos — a closed, constitutionally-fixed set. Stored directly on Venue
+// (not via a Municipio catalog) since almost every departamento maps to a single practical
+// choice today (its capital) — a separate municipio catalog/select added no real narrowing
+// power and was removed. District (free text, zona/barrio) stays the finer-grained location
+// field; provincia/municipio are deliberately not modeled beyond this.
+enum Departamento {
+  LA_PAZ
+  SANTA_CRUZ
+  COCHABAMBA
+  ORURO
+  POTOSI
+  CHUQUISACA
+  TARIJA
+  BENI
+  PANDO
 }
 
 model VenueService {
@@ -516,14 +532,14 @@ model CalendarBlock {
 }
 
 model Review {
-  id         String   @id @default(uuid())
-  venueId    String   @map("venue_id")
-  clientId   String   @map("client_id")
-  bookingId  String   @unique @map("booking_id")
+  id              String    @id @default(uuid())
+  venueId         String    @map("venue_id")
+  clientId        String    @map("client_id")
+  bookingId       String    @unique @map("booking_id")
   rating          Int
   comment         String?   @db.Text
   isVerified      Boolean   @default(false) @map("is_verified")
-  ownerResponse   String?   @db.Text @map("owner_response")
+  ownerResponse   String?   @map("owner_response") @db.Text
   ownerResponseAt DateTime? @map("owner_response_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")

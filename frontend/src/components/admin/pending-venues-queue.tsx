@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPendingVenues, verifyVenue } from '@/lib/api/venues.api';
+import { departamentoLabels } from '@/components/venues/venue-filter-labels';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -75,7 +76,7 @@ export const PendingVenuesQueue = () => {
                   <Badge variant="warning">En revision</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {venue.district}, {venue.city}
+                  {venue.district}, {departamentoLabels[venue.departamento]}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Propietario: {venue.owner?.fullName ?? 'N/D'}

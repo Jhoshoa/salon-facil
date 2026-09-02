@@ -85,6 +85,7 @@ export async function createVerifiedVenue(
     .field('description', 'Local de prueba generado por los tests e2e de reservas y pagos.')
     .field('address', 'Av. de Prueba #123')
     .field('district', 'Distrito Fixture')
+    .field('departamento', 'LA_PAZ')
     .field('capacityMax', String(overrides.capacityMax ?? 200))
     .field('allowsMultipleDays', String(overrides.allowsMultipleDays ?? false))
     .field('prices', JSON.stringify([{ priceType: 'BASE', price: overrides.basePrice ?? 1000 }]))

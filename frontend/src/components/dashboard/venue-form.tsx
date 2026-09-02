@@ -20,7 +20,7 @@ import {
   venueFormSchema,
   type VenueFormValues,
 } from '@/lib/validators/venue.schema';
-import { priceUnitLabels } from '@/components/venues/venue-filter-labels';
+import { departamentoLabels, priceUnitLabels } from '@/components/venues/venue-filter-labels';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -107,7 +107,7 @@ const fieldTab: Record<keyof VenueFormValues, TabKey> = {
   spaceType: 'general',
   address: 'location',
   district: 'location',
-  city: 'location',
+  departamento: 'location',
   latitude: 'location',
   longitude: 'location',
   capacityMin: 'pricing',
@@ -135,7 +135,7 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     shortDescription: venue.shortDescription ?? '',
     address: venue.address,
     district: venue.district,
-    city: venue.city,
+    departamento: venue.departamento,
     latitude: venue.latitude != null ? String(venue.latitude) : '',
     longitude: venue.longitude != null ? String(venue.longitude) : '',
     capacityMin: venue.capacityMin,
@@ -173,7 +173,7 @@ const toPayload = (
   shortDescription: values.shortDescription || undefined,
   address: values.address,
   district: values.district,
-  city: values.city,
+  departamento: values.departamento,
   latitude: values.latitude ? Number(values.latitude) : undefined,
   longitude: values.longitude ? Number(values.longitude) : undefined,
   capacityMax: values.capacityMax,
@@ -422,6 +422,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
   const useTypes = form.watch('useTypes');
   const openingHours = form.watch('openingHours');
   const spaceType = form.watch('spaceType');
+  const departamento = form.watch('departamento');
   const defaultPriceUnit = form.watch('priceUnit');
   const defaultBasePrice = form.watch('basePrice');
 
@@ -583,17 +584,32 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                 {errors.address ? <p className="sf-form-error">{errors.address.message}</p> : null}
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="sf-form-group">
-                  <Label htmlFor="district">Distrito o zona</Label>
-                  <Input id="district" placeholder="Villa Adela" {...form.register('district')} />
-                  {errors.district ? <p className="sf-form-error">{errors.district.message}</p> : null}
-                </div>
-                <div className="sf-form-group">
-                  <Label htmlFor="city">Ciudad</Label>
-                  <Input id="city" placeholder="El Alto" {...form.register('city')} />
-                  {errors.city ? <p className="sf-form-error">{errors.city.message}</p> : null}
-                </div>
+              <div className="sf-form-group">
+                <Label htmlFor="district">Distrito o zona</Label>
+                <Input id="district" placeholder="Villa Adela" {...form.register('district')} />
+                {errors.district ? <p className="sf-form-error">{errors.district.message}</p> : null}
+              </div>
+
+              <div className="sf-form-group">
+                <Label htmlFor="departamento">Departamento</Label>
+                <Select
+                  id="departamento"
+                  value={departamento}
+                  onChange={(event) =>
+                    form.setValue('departamento', event.target.value as VenueFormValues['departamento'], {
+                      shouldDirty: true,
+                    })
+                  }
+                >
+                  {Object.entries(departamentoLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+                {errors.departamento ? (
+                  <p className="sf-form-error">{errors.departamento.message}</p>
+                ) : null}
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">

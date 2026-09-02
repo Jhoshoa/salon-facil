@@ -148,6 +148,17 @@ export interface UpdateCatalogAmenityPayload extends UpdateCatalogItemPayload {
 
 export type AmenityCatalog = Partial<Record<AmenityCategory, Amenity[]>>;
 
+export type Departamento =
+  | 'LA_PAZ'
+  | 'SANTA_CRUZ'
+  | 'COCHABAMBA'
+  | 'ORURO'
+  | 'POTOSI'
+  | 'CHUQUISACA'
+  | 'TARIJA'
+  | 'BENI'
+  | 'PANDO';
+
 export interface VenueAmenity {
   id: string;
   amenity: Amenity;
@@ -189,7 +200,7 @@ export interface Venue {
   shortDescription: string | null;
   address: string;
   district: string;
-  city: string;
+  departamento: Departamento;
   latitude: number | null;
   longitude: number | null;
   capacityMin: number;
@@ -283,7 +294,7 @@ export interface VenueFormPayload {
   shortDescription?: string;
   address: string;
   district: string;
-  city?: string;
+  departamento: Departamento;
   latitude?: number;
   longitude?: number;
   capacityMax: number;
@@ -310,7 +321,7 @@ export interface VenueCompletion {
 
 export interface VenueSearchParams {
   query?: string;
-  city?: string;
+  departamento?: Departamento;
   district?: string;
   guestCount?: number;
   minCapacity?: number;

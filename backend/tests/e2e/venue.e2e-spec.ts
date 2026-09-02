@@ -124,6 +124,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Un salon de fiestas ideal para eventos especiales en El Alto.')
         .field('address', 'Av. 6 de Octubre #1234')
         .field('district', 'Distrito 3')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '200')
         .field('services', JSON.stringify([{ name: 'Sonido', isIncluded: true }]))
         .field('prices', JSON.stringify([{ priceType: 'BASE', price: 3000 }]))
@@ -146,6 +147,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Otro salon con el mismo nombre para probar slugs unicos.')
         .field('address', 'Av. 6 de Octubre #5678')
         .field('district', 'Distrito 1')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '100')
         .expect(201);
 
@@ -213,6 +215,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Venue para probar obtencion por slug correctamente.')
         .field('address', 'Slug Test Address 12345')
         .field('district', 'Slug District')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '150')
         .expect(201);
       testSlug = res.body.slug;
@@ -246,6 +249,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Venue para probar la proteccion de ownership entre propietarios.')
         .field('address', 'Ownership Address 12345')
         .field('district', 'Ownership District')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '100')
         .expect(201);
       owner1VenueId = res.body.id;
@@ -287,6 +291,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Venue que sera eliminada para probar el soft delete.')
         .field('address', 'Delete Address 12345')
         .field('district', 'Delete District')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '50')
         .expect(201);
       deleteVenueId = res.body.id;
@@ -309,6 +314,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Venue para verificar que otro propietario no puede eliminar.')
         .field('address', 'Delete 403 Address')
         .field('district', 'Test')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '50')
         .expect(201);
 
@@ -327,6 +333,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Venue pendiente de verificacion por administrador.')
         .field('address', 'Verify Address 12345')
         .field('district', 'Verify District')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '100')
         .expect(201);
       pendingVenueId = res.body.id;
@@ -384,6 +391,7 @@ describe('Venues (e2e)', () => {
         .field('description', 'Venue con capacidad alta para busqueda con filtros.')
         .field('address', 'Search Address 12345')
         .field('district', 'Distrito Filter')
+        .field('departamento', 'LA_PAZ')
         .field('capacityMax', '500')
         .expect(201);
 

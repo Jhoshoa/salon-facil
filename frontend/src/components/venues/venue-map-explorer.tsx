@@ -10,6 +10,7 @@ import { MapPin, Star, Users, X } from 'lucide-react';
 import { buildQueryString } from '@/lib/api/client';
 import { searchVenues } from '@/lib/api/venues.api';
 import { formatCurrency } from '@/lib/formatters';
+import { departamentoLabels } from './venue-filter-labels';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -86,7 +87,7 @@ const VenueMapDetailCard = ({ venue, detailHref, onClose }: VenueMapDetailCardPr
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="line-clamp-1">
-              {venue.district}, {venue.city}
+              {venue.district}, {departamentoLabels[venue.departamento]}
             </span>
           </p>
           <p className="flex items-center gap-1 text-xs text-muted-foreground">

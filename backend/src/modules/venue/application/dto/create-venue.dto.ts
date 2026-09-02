@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsIn,
   IsInt,
   IsNumber,
@@ -16,7 +17,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { PriceUnit } from '@prisma/client';
+import { Departamento, PriceUnit } from '@prisma/client';
 
 type Constructor<T extends object> = new () => T;
 
@@ -194,9 +195,8 @@ export class CreateVenueDto {
   @IsString()
   district!: string;
 
-  @IsOptional()
-  @IsString()
-  city?: string;
+  @IsEnum(Departamento)
+  departamento!: Departamento;
 
   @IsOptional()
   @IsNumber()

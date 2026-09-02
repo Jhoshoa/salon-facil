@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { PriceUnit } from '@prisma/client';
+import { Departamento, PriceUnit } from '@prisma/client';
 
 export enum SortField {
   FEATURED = 'featured',
@@ -50,8 +50,8 @@ const toStringArray = (value: unknown): string[] | undefined => {
 
 export class VenueFilterDto {
   @IsOptional()
-  @IsString()
-  city?: string;
+  @IsEnum(Departamento)
+  departamento?: Departamento;
 
   @IsOptional()
   @IsString()

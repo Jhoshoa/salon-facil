@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, Pencil, Plus, Store, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { deleteVenue, getMyVenues } from '@/lib/api/venues.api';
+import { departamentoLabels } from '@/components/venues/venue-filter-labels';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -110,7 +111,7 @@ export const OwnerVenueList = () => {
                   <div>
                     <h3 className="line-clamp-1 font-semibold">{venue.name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {venue.district}, {venue.city}
+                      {venue.district}, {departamentoLabels[venue.departamento]}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

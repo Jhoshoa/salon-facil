@@ -9,6 +9,7 @@ interface VenuesPageProps {
     endDate?: string;
     capacity?: string;
     district?: string;
+    departamento?: string;
     minPrice?: string;
     maxPrice?: string;
     minCapacity?: string;
@@ -46,6 +47,7 @@ export default function VenuesPage({ searchParams }: VenuesPageProps) {
           initialEndDate={searchParams.endDate}
           initialCapacity={searchParams.capacity}
           initialDistrict={searchParams.district}
+          initialDepartamento={searchParams.departamento}
           initialMinPrice={searchParams.minPrice}
           initialMaxPrice={searchParams.maxPrice}
           initialMinCapacity={searchParams.minCapacity}

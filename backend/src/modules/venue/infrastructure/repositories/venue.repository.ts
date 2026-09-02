@@ -12,7 +12,14 @@ import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entitie
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
-import { AmenityCategory, Prisma, PriceType, PriceUnit, VenueMediaType } from '@prisma/client';
+import {
+  AmenityCategory,
+  Departamento,
+  Prisma,
+  PriceType,
+  PriceUnit,
+  VenueMediaType,
+} from '@prisma/client';
 
 interface RawVenueAmenity {
   id: string;
@@ -125,8 +132,8 @@ export class VenueRepository implements IVenueRepository {
     };
     const andFilters: Prisma.VenueWhereInput[] = [];
 
-    if (filters.city) {
-      where.city = { contains: filters.city, mode: 'insensitive' };
+    if (filters.departamento) {
+      where.departamento = filters.departamento;
     }
     if (filters.district) {
       where.district = { contains: filters.district, mode: 'insensitive' };
@@ -136,7 +143,6 @@ export class VenueRepository implements IVenueRepository {
         { name: { contains: filters.query, mode: 'insensitive' } },
         { description: { contains: filters.query, mode: 'insensitive' } },
         { district: { contains: filters.query, mode: 'insensitive' } },
-        { city: { contains: filters.query, mode: 'insensitive' } },
         { services: { some: { name: { contains: filters.query, mode: 'insensitive' } } } },
         {
           amenities: {
@@ -361,7 +367,7 @@ export class VenueRepository implements IVenueRepository {
         OR: [
           { spaceTypeId: venue.spaceTypeId },
           { district: venue.district },
-          { city: venue.city },
+          { departamento: venue.departamento },
         ],
       },
       include: this.venueInclude,
@@ -502,7 +508,7 @@ export class VenueRepository implements IVenueRepository {
       shortDescription: venueData.shortDescription as string | undefined,
       address: venueData.address as string,
       district: venueData.district as string,
-      city: (venueData.city as string) ?? 'El Alto',
+      departamento: venueData.departamento as Departamento,
       latitude:
         venueData.latitude != null ? new Prisma.Decimal(venueData.latitude as number) : undefined,
       longitude:
@@ -624,7 +630,9 @@ export class VenueRepository implements IVenueRepository {
       updateInput.shortDescription = venueData.shortDescription;
     if (venueData.address != null) updateInput.address = venueData.address;
     if (venueData.district != null) updateInput.district = venueData.district;
-    if (venueData.city != null) updateInput.city = venueData.city;
+    if (venueData.departamento != null) {
+      updateInput.departamento = venueData.departamento as Departamento;
+    }
     if (venueData.latitude != null)
       updateInput.latitude = new Prisma.Decimal(venueData.latitude as number);
     if (venueData.longitude != null)
@@ -962,8 +970,7 @@ export class VenueRepository implements IVenueRepository {
       shortDescription: raw.shortDescription,
       address: raw.address,
       district: raw.district,
-      city: raw.city,
-      state: raw.state,
+      departamento: raw.departamento,
       country: raw.country,
       latitude: raw.latitude != null ? Number(raw.latitude) : null,
       longitude: raw.longitude != null ? Number(raw.longitude) : null,

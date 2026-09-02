@@ -1,6 +1,6 @@
 import { VenueServiceEntity } from './venue-service.entity';
 import { VenuePriceEntity } from './venue-price.entity';
-import { AmenityCategory, PriceUnit, VenueMediaType } from '@prisma/client';
+import { AmenityCategory, Departamento, PriceUnit, VenueMediaType } from '@prisma/client';
 
 /** Shared shape for the admin-managed catalogs (space types, use types). */
 export interface CatalogItemEntity {
@@ -27,8 +27,7 @@ export class VenueEntity {
   shortDescription: string | null = null;
   address!: string;
   district!: string;
-  city: string = 'El Alto';
-  state: string = 'La Paz';
+  departamento!: Departamento;
   country: string = 'Bolivia';
   latitude: number | null = null;
   longitude: number | null = null;

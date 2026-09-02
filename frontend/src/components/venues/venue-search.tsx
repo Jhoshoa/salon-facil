@@ -12,7 +12,7 @@ import {
   getUseTypesCatalog,
   searchVenues,
 } from '@/lib/api/venues.api';
-import type { PriceUnit, VenueSearchParams } from '@/types/api';
+import type { Departamento, PriceUnit, VenueSearchParams } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,7 @@ interface VenueSearchProps {
   initialEndDate?: string;
   initialCapacity?: string;
   initialDistrict?: string;
+  initialDepartamento?: string;
   initialMinPrice?: string;
   initialMaxPrice?: string;
   initialMinCapacity?: string;
@@ -56,6 +57,7 @@ export const VenueSearch = ({
   initialEndDate = '',
   initialCapacity = '',
   initialDistrict = '',
+  initialDepartamento = '',
   initialMinPrice = '',
   initialMaxPrice = '',
   initialMinCapacity = '',
@@ -74,6 +76,7 @@ export const VenueSearch = ({
   const [capacity, setCapacity] = useState(initialCapacity);
   const [filters, setFilters] = useState<VenueFilterValues>({
     district: initialDistrict,
+    departamento: (initialDepartamento as Departamento | '') || '',
     minPrice: initialMinPrice,
     maxPrice: initialMaxPrice,
     minCapacity: initialMinCapacity || initialCapacity,
@@ -93,6 +96,7 @@ export const VenueSearch = ({
     return {
       query: initialQuery,
       district: initialDistrict || undefined,
+      departamento: (initialDepartamento as Departamento | '') || undefined,
       startDate: initialStartDate,
       endDate: initialEndDate,
       guestCount: Number(initialCapacity),
@@ -233,6 +237,7 @@ export const VenueSearch = ({
   const buildSearchParams = (filterOverride: VenueFilterValues = filters): VenueSearchParams => ({
     query: queryText,
     district: filterOverride.district || undefined,
+    departamento: filterOverride.departamento || undefined,
     startDate,
     endDate,
     guestCount: Number(capacity),

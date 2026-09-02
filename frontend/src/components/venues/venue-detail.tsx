@@ -9,6 +9,7 @@ import { CalendarClock, Check, Clock, Map, MapPin, Star, Users, X } from 'lucide
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
+import { departamentoLabels } from './venue-filter-labels';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
@@ -188,7 +189,7 @@ export const VenueDetail = ({
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
             <p className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4" />
-              {venue.district}, {venue.city}
+              {venue.district}, {departamentoLabels[venue.departamento]}
             </p>
             {venue.averageRating ? (
               <p className="flex items-center gap-1 font-medium text-foreground">
@@ -324,7 +325,7 @@ export const VenueDetail = ({
           <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 shrink-0" />
             {venue.address ? `${venue.address}, ` : ''}
-            {venue.district}, {venue.city}
+            {venue.district}, {departamentoLabels[venue.departamento]}
           </p>
           {venue.latitude && venue.longitude ? (
             <div className="isolate mt-3 h-64 w-full overflow-hidden rounded-lg border">
