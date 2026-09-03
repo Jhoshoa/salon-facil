@@ -160,6 +160,7 @@ export class BookingRepository implements IBookingRepository {
           totalPrice: new Prisma.Decimal(data.totalPrice),
           depositAmount: new Prisma.Decimal(data.depositAmount),
           specialRequests: data.specialRequests,
+          selectedExtras: data.selectedExtras as unknown as Prisma.InputJsonValue | undefined,
         },
       });
 
@@ -355,6 +356,7 @@ export class BookingRepository implements IBookingRepository {
       depositPaid: raw.depositPaid,
       status: raw.status as BookingStatus,
       specialRequests: raw.specialRequests,
+      selectedExtras: raw.selectedExtras ?? null,
       contractUrl: raw.contractUrl,
       contractSentAt: raw.contractSentAt,
       reminder7SentAt: raw.reminder7SentAt,

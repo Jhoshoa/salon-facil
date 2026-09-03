@@ -152,6 +152,19 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             <p className="font-semibold">{booking.guestCount}</p>
           </div>
         </div>
+        {booking.selectedExtras?.length ? (
+          <div className="mt-3">
+            <p className="text-xs text-muted-foreground">Extras seleccionados</p>
+            <ul className="mt-1 space-y-1 text-sm">
+              {booking.selectedExtras.map((extra) => (
+                <li key={extra.amenityId} className="flex items-center justify-between gap-3">
+                  <span>{extra.name}</span>
+                  <span className="text-muted-foreground">{formatCurrency(extra.extraCost)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-md border bg-card p-4 shadow-sm">

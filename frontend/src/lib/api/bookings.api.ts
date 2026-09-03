@@ -47,6 +47,7 @@ export const previewBookingPrice = async (
     startTime: string;
     endTime: string;
     dailySchedule?: DailyScheduleEntry[];
+    selectedAmenityIds?: string[];
   },
 ): Promise<RangePriceCalculation> => {
   const search = new URLSearchParams({
@@ -56,6 +57,9 @@ export const previewBookingPrice = async (
     ...(params.endDate ? { endDate: params.endDate } : {}),
     ...(params.dailySchedule?.length
       ? { dailySchedule: JSON.stringify(params.dailySchedule) }
+      : {}),
+    ...(params.selectedAmenityIds?.length
+      ? { selectedAmenityIds: params.selectedAmenityIds.join(',') }
       : {}),
   });
   return apiRequest<RangePriceCalculation>(

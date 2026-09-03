@@ -9,6 +9,13 @@ export enum BookingStatus {
   NO_SHOW = 'NO_SHOW',
 }
 
+/** Snapshot of one extra-cost amenity picked when the booking was requested. */
+export interface SelectedExtra {
+  amenityId: string;
+  name: string;
+  extraCost: number;
+}
+
 export interface BookingPayment {
   id: string;
   bookingId: string;
@@ -39,6 +46,7 @@ export class BookingEntity {
   depositPaid: boolean = false;
   status: BookingStatus = BookingStatus.PENDING;
   specialRequests: string | null = null;
+  selectedExtras: SelectedExtra[] | null = null;
   contractUrl: string | null = null;
   contractSentAt: Date | null = null;
   reminder7SentAt: Date | null = null;

@@ -17,6 +17,7 @@ import {
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
 import { VenueEntity } from '../../../venue/domain/entities/venue.entity';
+import type { SelectedExtra } from '../../domain/entities/booking.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import { PriceCalculatorService, RangePriceCalculationResult } from './price-calculator.service';
 import { AvailabilityService } from './availability.service';
@@ -44,6 +45,13 @@ interface ResolvedDay {
   hours?: number;
   startTime: string;
   endTime: string;
+}
+
+/** The date-based price calculation plus whatever extra-cost amenities the client picked —
+ * `totalPrice`/`depositAmount` here already include `extrasTotal`, unlike the raw calculator result. */
+export interface BookingPriceResult extends RangePriceCalculationResult {
+  extras: SelectedExtra[];
+  extrasTotal: number;
 }
 
 @Injectable()
@@ -75,8 +83,9 @@ export class BookingService {
       guestCount: number;
       specialRequests?: string;
       dailySchedule?: DailyScheduleEntry[];
+      selectedAmenityIds?: string[];
     },
-  ): Promise<{ booking: BookingEntity; priceCalculation: RangePriceCalculationResult }> {
+  ): Promise<{ booking: BookingEntity; priceCalculation: BookingPriceResult }> {
     const venue = await this.venueService.getVenueById(venueId);
 
     if (dto.guestCount > venue.capacityMax) {
@@ -135,11 +144,12 @@ export class BookingService {
     }
 
     const schedule = this.resolveDailySchedule(venue, dates, dto);
-    const priceCalculation = this.priceCalculator.calculateRange(
+    const rangeCalculation = this.priceCalculator.calculateRange(
       venue.prices ?? [],
       venue.priceUnit,
       schedule.map((day) => ({ date: day.date, hours: day.hours })),
     );
+    const priceCalculation = this.applySelectedExtras(venue, dto.selectedAmenityIds, rangeCalculation);
 
     const bookingData: CreateBookingData = {
       venueId,
@@ -155,6 +165,7 @@ export class BookingService {
       totalPrice: priceCalculation.totalPrice,
       depositAmount: priceCalculation.depositAmount,
       specialRequests: dto.specialRequests,
+      selectedExtras: priceCalculation.extras.length ? priceCalculation.extras : undefined,
       dailyBreakdown: priceCalculation.days.map((day, index) => ({
         date: new Date(day.date),
         appliedPrice: day.appliedPrice,
@@ -198,8 +209,9 @@ export class BookingService {
       startTime: string;
       endTime: string;
       dailySchedule?: DailyScheduleEntry[];
+      selectedAmenityIds?: string[];
     },
-  ): Promise<RangePriceCalculationResult> {
+  ): Promise<BookingPriceResult> {
     const venue = await this.venueService.getVenueById(venueId);
 
     if (this.timeToMinutes(dto.startTime) >= this.endTimeToMinutes(dto.endTime)) {
@@ -224,11 +236,42 @@ export class BookingService {
     }
 
     const schedule = this.resolveDailySchedule(venue, dates, dto);
-    return this.priceCalculator.calculateRange(
+    const rangeCalculation = this.priceCalculator.calculateRange(
       venue.prices ?? [],
       venue.priceUnit,
       schedule.map((day) => ({ date: day.date, hours: day.hours })),
     );
+    return this.applySelectedExtras(venue, dto.selectedAmenityIds, rangeCalculation);
+  }
+
+  /** Folds the client's selected extra-cost amenities into a date-based price result: sums
+   * their `extraCost` into `totalPrice`/`depositAmount` and attaches the snapshot that gets
+   * persisted on the booking. Silently drops any id that isn't an extra-cost amenity on this
+   * venue (already included, or not this venue's at all) — same lenient handling the rest of
+   * this flow already gives stale/foreign input, rather than erroring on it. */
+  private applySelectedExtras(
+    venue: VenueEntity,
+    selectedAmenityIds: string[] | undefined,
+    priceCalculation: RangePriceCalculationResult,
+  ): BookingPriceResult {
+    const selectedIds = new Set(selectedAmenityIds ?? []);
+    const extras: SelectedExtra[] = (venue.amenities ?? [])
+      .filter((item) => !item.isIncluded && selectedIds.has(item.amenity.id))
+      .map((item) => ({
+        amenityId: item.amenity.id,
+        name: item.amenity.name,
+        extraCost: item.extraCost ?? 0,
+      }));
+
+    const extrasTotal = this.round(extras.reduce((sum, extra) => sum + extra.extraCost, 0));
+    const totalPrice = this.round(priceCalculation.totalPrice + extrasTotal);
+    const depositAmount = this.round(totalPrice * 0.3);
+
+    return { ...priceCalculation, totalPrice, depositAmount, extras, extrasTotal };
+  }
+
+  private round(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 
   /** Calendar-day sequence from start to end, inclusive. */

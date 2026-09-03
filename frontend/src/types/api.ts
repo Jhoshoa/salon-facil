@@ -376,6 +376,12 @@ export type BookingStatus =
   | 'COMPLETED'
   | 'NO_SHOW';
 
+export interface SelectedExtra {
+  amenityId: string;
+  name: string;
+  extraCost: number;
+}
+
 export interface Booking {
   id: string;
   venueId: string;
@@ -393,6 +399,7 @@ export interface Booking {
   depositPaid: boolean;
   status: BookingStatus;
   specialRequests: string | null;
+  selectedExtras: SelectedExtra[] | null;
   venue?: Venue;
   client?: { id: string; fullName: string; email: string; phone: string | null };
 }
@@ -432,6 +439,8 @@ export interface CreateBookingPayload {
   specialRequests?: string;
   /** Horario por dia solo para los dias cuya unidad efectiva resulta HOUR. */
   dailySchedule?: DailyScheduleEntry[];
+  /** IDs de comodidades con costo extra elegidas por el cliente. */
+  selectedAmenityIds?: string[];
 }
 
 export interface DailyPriceBreakdown {
@@ -447,6 +456,8 @@ export interface RangePriceCalculation {
   totalPrice: number;
   depositAmount: number;
   days: DailyPriceBreakdown[];
+  extras?: SelectedExtra[];
+  extrasTotal?: number;
 }
 
 export interface CreateBookingResponse {

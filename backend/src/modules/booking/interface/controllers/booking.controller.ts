@@ -39,6 +39,7 @@ export class BookingController {
       guestCount: dto.guestCount,
       specialRequests: dto.specialRequests,
       dailySchedule: dto.dailySchedule,
+      selectedAmenityIds: dto.selectedAmenityIds,
     });
   }
 

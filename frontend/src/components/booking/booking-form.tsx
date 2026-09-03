@@ -76,6 +76,7 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
       endTime: defaultSchedule.endTime,
       guestCount: Math.min(venue.capacityMax, 100),
       specialRequests: '',
+      selectedAmenityIds: [],
     },
   });
 
@@ -136,6 +137,7 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
       values.startTime,
       values.endTime,
       dailyScheduleEntries,
+      values.selectedAmenityIds,
     ],
     queryFn: () =>
       previewBookingPrice(venue.id, {
@@ -144,9 +146,24 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
         startTime: values.startTime,
         endTime: values.endTime,
         dailySchedule: dailyScheduleEntries,
+        selectedAmenityIds: values.selectedAmenityIds,
       }),
     enabled: canPreview,
   });
+
+  const extraAmenities = useMemo(
+    () => (venue.amenities ?? []).filter((item) => !item.isIncluded && item.extraCost),
+    [venue.amenities],
+  );
+
+  const selectedAmenityIds = form.watch('selectedAmenityIds');
+
+  const toggleAmenity = (id: string) => {
+    const next = selectedAmenityIds.includes(id)
+      ? selectedAmenityIds.filter((item) => item !== id)
+      : [...selectedAmenityIds, id];
+    form.setValue('selectedAmenityIds', next, { shouldDirty: true, shouldValidate: true });
+  };
 
   const openingHourByWeekday = useMemo(
     () => new Map((venue.openingHours ?? []).map((h) => [h.dayOfWeek, h])),
@@ -238,6 +255,11 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
             </p>
           ) : !previewQuery.data && basePrice > 0 ? (
             <p className="sf-glass-muted mt-0.5 text-xs">{capitalize(unitLabels[venue.priceUnit])}</p>
+          ) : null}
+          {previewQuery.data?.extrasTotal ? (
+            <p className="sf-glass-muted mt-0.5 text-xs">
+              Incluye {formatCurrency(previewQuery.data.extrasTotal)} en extras
+            </p>
           ) : null}
           {previewQuery.data && isMultiDay ? (
             <ul className="sf-glass-muted mt-2 space-y-1 text-xs">
@@ -448,6 +470,31 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
           <p className="text-xs text-muted-foreground">
             Este horario se aplica a todos los dias del rango seleccionado.
           </p>
+        ) : null}
+
+        {extraAmenities.length > 0 ? (
+          <div className="space-y-2">
+            <Label>Extras opcionales</Label>
+            <div className="space-y-2">
+              {extraAmenities.map((item) => (
+                <label
+                  key={item.id}
+                  className="sf-surface flex items-center justify-between gap-2 rounded-[var(--radius)] border p-3 text-sm"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedAmenityIds.includes(item.amenity.id)}
+                      onChange={() => toggleAmenity(item.amenity.id)}
+                      className="h-4 w-4 rounded border-input accent-primary"
+                    />
+                    {item.amenity.name}
+                  </span>
+                  <span className="text-muted-foreground">{formatCurrency(item.extraCost ?? 0)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         ) : null}
 
         <div className="space-y-2">

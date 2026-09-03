@@ -19,6 +19,7 @@ export const bookingSchema = z
     endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora invalida'),
     guestCount: z.coerce.number().min(1, 'Debe haber al menos 1 invitado').max(5000),
     specialRequests: z.string().max(1000).optional(),
+    selectedAmenityIds: z.array(z.string()).default([]),
   })
   .refine((data) => timeToMinutes(data.startTime) < endTimeToMinutes(data.endTime), {
     path: ['endTime'],
