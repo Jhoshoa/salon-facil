@@ -1054,12 +1054,12 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                                   aria-label={`${amenity.name} con costo extra`}
                                 />
                                 {!entry.isIncluded ? (
-                                  <div className="sf-surface flex h-8 items-center gap-1 rounded-[var(--radius)] pl-2 pr-1">
+                                  <div className="sf-surface flex h-8 items-center gap-1.5 rounded-[var(--radius)] px-2">
                                     <span className="text-xs text-muted-foreground">Bs</span>
                                     <Input
                                       type="number"
                                       min={0}
-                                      className="h-7 w-16 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                                      className="h-6 w-16 border-0 bg-transparent p-0 leading-none shadow-none [appearance:textfield] focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                       value={entry.extraCost ?? ''}
                                       onChange={(e) =>
                                         setAmenityExtraCost(
