@@ -189,13 +189,73 @@ export const VenueDetail = ({
 
         {/* Header */}
         <section className="sf-detail-section">
-          <div className="flex flex-wrap gap-2">
-            {venue.spaceType ? <Badge variant="secondary">{venue.spaceType.name}</Badge> : null}
-            {venue.instantBooking ? <Badge>Reserva inmediata</Badge> : null}
-            {venue.isVerified ? (
-              <Badge variant="outline" className="border-primary/30 text-primary">
-                Verificado
-              </Badge>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {venue.spaceType ? <Badge variant="secondary">{venue.spaceType.name}</Badge> : null}
+              {venue.instantBooking ? <Badge>Reserva inmediata</Badge> : null}
+              {venue.isVerified ? (
+                <Badge variant="outline" className="border-primary/30 text-primary">
+                  Verificado
+                </Badge>
+              ) : null}
+            </div>
+            {venue.contactPhone || venue.facebookUrl || venue.instagramUrl || venue.tiktokUrl ? (
+              <div className="flex flex-wrap gap-2">
+                {venue.contactPhone ? (
+                  <a
+                    href={`https://wa.me/${venue.contactPhone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="WhatsApp"
+                    title="WhatsApp"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: '#25D366' }}
+                  >
+                    <Phone className="h-4 w-4" />
+                  </a>
+                ) : null}
+                {venue.facebookUrl ? (
+                  <a
+                    href={venue.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Facebook"
+                    title="Facebook"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: '#1877F2' }}
+                  >
+                    <Facebook className="h-4 w-4" />
+                  </a>
+                ) : null}
+                {venue.instagramUrl ? (
+                  <a
+                    href={venue.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Instagram"
+                    title="Instagram"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(45deg, #FEDA75, #FA7E1E, #D62976, #962FBF, #4F5BD5)',
+                    }}
+                  >
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                ) : null}
+                {venue.tiktokUrl ? (
+                  <a
+                    href={venue.tiktokUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="TikTok"
+                    title="TikTok"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-90"
+                  >
+                    <Music2 className="h-4 w-4" />
+                  </a>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <h1 className="mt-4 text-3xl font-bold">{venue.name}</h1>
@@ -362,59 +422,6 @@ export const VenueDetail = ({
             </div>
           )}
         </section>
-
-        {/* Contact & social */}
-        {venue.contactPhone || venue.facebookUrl || venue.instagramUrl || venue.tiktokUrl ? (
-          <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Contacto</h2>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {venue.contactPhone ? (
-                <a
-                  href={`https://wa.me/${venue.contactPhone.replace(/[^0-9]/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="sf-filter-chip inline-flex items-center gap-1.5"
-                >
-                  <Phone className="h-4 w-4" />
-                  {venue.contactPhone}
-                </a>
-              ) : null}
-              {venue.facebookUrl ? (
-                <a
-                  href={venue.facebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="sf-filter-chip inline-flex items-center gap-1.5"
-                >
-                  <Facebook className="h-4 w-4" />
-                  Facebook
-                </a>
-              ) : null}
-              {venue.instagramUrl ? (
-                <a
-                  href={venue.instagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="sf-filter-chip inline-flex items-center gap-1.5"
-                >
-                  <Instagram className="h-4 w-4" />
-                  Instagram
-                </a>
-              ) : null}
-              {venue.tiktokUrl ? (
-                <a
-                  href={venue.tiktokUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="sf-filter-chip inline-flex items-center gap-1.5"
-                >
-                  <Music2 className="h-4 w-4" />
-                  TikTok
-                </a>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
 
         <AvailabilityCalendar
           venueId={venue.id}
