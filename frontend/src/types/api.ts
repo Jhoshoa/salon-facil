@@ -554,3 +554,25 @@ export interface CreatePaymentPayload {
   transactionReference?: string;
   notes?: string;
 }
+
+export type NotificationType =
+  | 'BOOKING_REQUEST'
+  | 'BOOKING_CONFIRMED'
+  | 'BOOKING_CANCELLED'
+  | 'PAYMENT_RECEIVED'
+  | 'REMINDER_7_DAYS'
+  | 'REMINDER_3_DAYS'
+  | 'REMINDER_1_DAY'
+  | 'REVIEW_REQUEST'
+  | 'WELCOME'
+  | 'PASSWORD_RESET'
+  | 'REVIEW_RESPONSE';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+}

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { CalendarCheck, CalendarDays, LayoutDashboard, Menu, Store, Wallet } from 'lucide-react';
 import { AccountMenu } from '@/components/shared/account-menu';
 import { AppDrawer } from '@/components/shared/app-drawer';
+import { NotificationBell } from '@/components/shared/notification-bell';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
@@ -61,6 +62,9 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
         <div className="flex-1">
           <NavLinks pathname={pathname} />
         </div>
+        <div className="mb-2 flex justify-end px-1">
+          <NotificationBell align="left" />
+        </div>
         <AccountMenu variant="owner" />
       </aside>
 
@@ -72,10 +76,13 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
             </span>
             <span className="text-sm font-bold">SalonFacil</span>
           </Link>
-          <Button variant="ghost" size="icon-sm" onClick={() => setDrawerOpen(true)}>
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Menu</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <Button variant="ghost" size="icon-sm" onClick={() => setDrawerOpen(true)}>
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Menu</span>
+            </Button>
+          </div>
         </header>
 
         <main className="flex-1">{children}</main>
