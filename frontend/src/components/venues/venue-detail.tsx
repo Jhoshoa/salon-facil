@@ -11,6 +11,7 @@ import {
   Clock,
   Map,
   MapPin,
+  Plus,
   Star,
   Users,
   X,
@@ -83,16 +84,18 @@ const getVenuePhotos = (venue: Venue) => {
   return mediaPhotos.length ? mediaPhotos : venue.photos;
 };
 
-const groupAmenities = (venue: Venue) =>
-  (venue.amenities ?? []).reduce<Partial<Record<AmenityCategory, typeof venue.amenities>>>(
-    (groups, item) => {
+const groupAmenities = (
+  venue: Venue,
+  predicate: (item: NonNullable<Venue['amenities']>[number]) => boolean,
+) =>
+  (venue.amenities ?? [])
+    .filter(predicate)
+    .reduce<Partial<Record<AmenityCategory, typeof venue.amenities>>>((groups, item) => {
       const category = item.amenity.category;
       groups[category] = groups[category] ?? [];
       groups[category]?.push(item);
       return groups;
-    },
-    {},
-  );
+    }, {});
 
 export const VenueDetail = ({
   slug,
@@ -150,7 +153,11 @@ export const VenueDetail = ({
   const venue = query.data;
   const photos = getVenuePhotos(venue);
   const mainPhoto = photos[0];
-  const amenityGroups = Object.entries(groupAmenities(venue)) as [
+  const includedAmenityGroups = Object.entries(groupAmenities(venue, (item) => item.isIncluded)) as [
+    AmenityCategory,
+    NonNullable<Venue['amenities']>,
+  ][];
+  const extraAmenityGroups = Object.entries(groupAmenities(venue, (item) => !item.isIncluded)) as [
     AmenityCategory,
     NonNullable<Venue['amenities']>,
   ][];
@@ -345,12 +352,12 @@ export const VenueDetail = ({
           </section>
         ) : null}
 
-        {/* Amenities */}
-        {amenityGroups.length ? (
+        {/* Amenities included in the base price */}
+        {includedAmenityGroups.length ? (
           <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Comodidades y servicios</h2>
+            <h2 className="sf-detail-title">Comodidades y servicios incluidos</h2>
             <div className="mt-4 grid gap-6 md:grid-cols-2">
-              {amenityGroups.map(([category, amenities]) => (
+              {includedAmenityGroups.map(([category, amenities]) => (
                 <div key={category} className="space-y-3">
                   <h3 className="text-sm font-medium text-muted-foreground">
                     {amenityCategoryLabels[category]}
@@ -363,9 +370,36 @@ export const VenueDetail = ({
                       >
                         <Check className="h-4 w-4 text-primary" />
                         <span>{item.amenity.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* Amenities available at an extra cost */}
+        {extraAmenityGroups.length ? (
+          <section className="sf-detail-section">
+            <h2 className="sf-detail-title">Comodidades y servicios con costo extra</h2>
+            <div className="mt-4 grid gap-6 md:grid-cols-2">
+              {extraAmenityGroups.map(([category, amenities]) => (
+                <div key={category} className="space-y-3">
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    {amenityCategoryLabels[category]}
+                  </h3>
+                  <div className="space-y-2">
+                    {amenities.map((item) => (
+                      <div
+                        key={item.id}
+                        className="sf-surface flex items-center gap-2.5 px-3 py-2.5 text-sm"
+                      >
+                        <Plus className="h-4 w-4 text-accent" />
+                        <span>{item.amenity.name}</span>
                         {item.extraCost ? (
                           <span className="text-muted-foreground">
-                            + {formatCurrency(item.extraCost)}
+                            {formatCurrency(item.extraCost)}
                           </span>
                         ) : null}
                       </div>
