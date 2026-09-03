@@ -34,6 +34,10 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  // Keeps the production image to a self-contained node_modules subset instead of the full
+  // dependency tree — the production Dockerfile (frontend/docker/Dockerfile) copies
+  // .next/standalone straight into the final stage.
+  output: 'standalone',
   images: {
     domains: ['res.cloudinary.com'],
     formats: ['image/avif', 'image/webp'],

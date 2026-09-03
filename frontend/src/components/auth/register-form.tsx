@@ -112,6 +112,18 @@ export const RegisterForm = ({ role, submitLabel = 'Crear cuenta' }: RegisterFor
         {submitLabel}
       </SubmitButton>
 
+      <p className="text-center text-xs text-muted-foreground">
+        Al crear una cuenta aceptas nuestros{' '}
+        <Link href="/terminos" className="sf-link">
+          terminos y condiciones
+        </Link>{' '}
+        y nuestra{' '}
+        <Link href="/privacidad" className="sf-link">
+          politica de privacidad
+        </Link>
+        .
+      </p>
+
       <p className="text-center text-sm text-muted-foreground">
         Ya tienes cuenta?{' '}
         <Link href="/login" className="sf-link">

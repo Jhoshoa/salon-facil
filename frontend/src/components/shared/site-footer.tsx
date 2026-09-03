@@ -25,7 +25,8 @@ const footerColumns = [
     links: [
       { label: 'Ayuda', href: '/help' },
       { label: 'Seguridad', href: '/security' },
-      { label: 'Politicas', href: '/policies' },
+      { label: 'Terminos y condiciones', href: '/terminos' },
+      { label: 'Politica de privacidad', href: '/privacidad' },
       { label: 'Contacto', href: '/contact' },
     ],
   },

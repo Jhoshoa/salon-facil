@@ -54,12 +54,21 @@ make studio
 
 ```text
 salon-facil/
-├── backend/              # NestJS API
-├── frontend/             # Next.js 14 App Router
-├── docker-compose.yml    # Infraestructura local
-├── Makefile              # Comandos comunes
-└── .github/workflows/    # CI
+├── backend/                 # NestJS API
+├── frontend/                # Next.js 14 App Router
+├── nginx/                   # Reverse proxy (produccion)
+├── deploy/                  # Scripts de deploy (produccion)
+├── docs/deploy/             # Guia de deploy
+├── docker-compose.yml       # Infraestructura local
+├── docker-compose.prod.yml  # Infraestructura de produccion
+├── Makefile                 # Comandos comunes
+└── .github/workflows/       # CI
 ```
+
+## Deploy en produccion
+
+Ver [docs/deploy/hostinger-vps.md](docs/deploy/hostinger-vps.md) para la guia completa (Docker
+Compose de produccion, nginx con TLS de Let's Encrypt, migraciones, backups).
 
 ## Desarrollo local
 

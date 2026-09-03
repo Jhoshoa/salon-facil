@@ -1,0 +1,138 @@
+# Production stack for a single VPS (see docs/deploy/hostinger-vps.md).
+#
+# Differs from docker-compose.yml (local dev) in the ways that matter for a real server:
+# - builds the production Dockerfiles (multi-stage, no source bind-mounts, no dev watch mode)
+# - postgres/redis ports are bound to 127.0.0.1 only — reachable for an SSH-tunneled admin
+#   session, never directly from the internet
+# - nginx terminates TLS and reverse-proxies to the app + api subdomains; certbot renews the
+#   Let's Encrypt certificate on a loop
+#
+# Reads its variables from a `.env` file in this same directory — copy .env.production.example
+# to `.env` and fill in real values before running `docker compose -f docker-compose.prod.yml up`.
+
+# Without this, compose derives the project name from the directory (same one docker-compose.yml
+# uses), so both files would resolve to identically-named volumes — a prod postgres container
+# would silently mount the dev database's volume instead of getting its own. Confirmed this
+# actually happens by running the two side by side (`docker volume ls` showed a single shared
+# salon-facil_postgres_data). Named explicitly so `postgres_data` here always resolves to
+# salonfacil-prod_postgres_data, never the dev one.
+name: salonfacil-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: salonfacil-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: salonfacil
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: salonfacil
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salonfacil -d salonfacil"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: salonfacil-redis
+    restart: always
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    container_name: salonfacil-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://salonfacil:${POSTGRES_PASSWORD}@postgres:5432/salonfacil
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      BCRYPT_ROUNDS: 12
+      CORS_ORIGINS: https://${APP_DOMAIN}
+      FRONTEND_URL: https://${APP_DOMAIN}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN}
+    container_name: salonfacil-frontend
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: https://${API_DOMAIN}
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: salonfacil-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # nginx's own entrypoint runs envsubst over ./nginx/templates on startup, but only
+      # substitutes $-variables that exist in the container's environment — everything else
+      # (nginx's own $host, $remote_addr, etc.) is left alone, so this is safe to do.
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - frontend
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: salonfacil-certbot
+    restart: always
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    # Renews once a day if the cert is due (certbot no-ops otherwise); the initial certificate
+    # is issued separately by deploy/init-letsencrypt.sh before this loop has anything to renew.
+    entrypoint: >-
+      /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 24h & wait $${!}; done"
+
+volumes:
+  postgres_data:
+  redis_data:
+  certbot_www:
+  certbot_certs:

@@ -1,4 +1,4 @@
-.PHONY: help up down down-v restart logs logs-backend logs-frontend backend-shell frontend-shell db-shell redis-cli test-backend test-frontend migrate studio seed
+.PHONY: help up down down-v restart logs logs-backend logs-frontend backend-shell frontend-shell db-shell redis-cli test-backend test-frontend migrate studio seed prod-up prod-down prod-logs prod-migrate prod-build
 
 help: ## Mostrar ayuda
 	@echo "Comandos disponibles:"
@@ -50,3 +50,20 @@ studio: ## Abrir Prisma Studio
 
 seed: ## Ejecutar seed de datos
 	docker compose exec backend npx prisma db seed
+
+# --- Produccion (ver docs/deploy/hostinger-vps.md) ---
+
+prod-build: ## Construir y levantar el stack de produccion
+	docker compose -f docker-compose.prod.yml up -d --build
+
+prod-up: ## Levantar el stack de produccion (sin reconstruir)
+	docker compose -f docker-compose.prod.yml up -d
+
+prod-down: ## Detener el stack de produccion
+	docker compose -f docker-compose.prod.yml down
+
+prod-logs: ## Ver logs del stack de produccion
+	docker compose -f docker-compose.prod.yml logs -f
+
+prod-migrate: ## Aplicar migraciones de Prisma en produccion
+	docker compose -f docker-compose.prod.yml exec backend npx prisma migrate deploy
