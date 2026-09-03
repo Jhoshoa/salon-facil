@@ -3,26 +3,10 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  CalendarCheck,
-  CalendarDays,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Store,
-  User,
-  Wallet,
-} from 'lucide-react';
-import { useAuthStore } from '@/stores/auth.store';
-import { useLogout } from '@/hooks/use-logout';
-import { Button } from '@/components/ui/button';
+import { CalendarCheck, CalendarDays, LayoutDashboard, Menu, Store, Wallet } from 'lucide-react';
+import { AccountMenu } from '@/components/shared/account-menu';
 import { AppDrawer } from '@/components/shared/app-drawer';
-
-const roleLabels: Record<string, string> = {
-  CLIENT: 'Cliente',
-  OWNER: 'Propietario',
-  ADMIN: 'Administrador',
-};
+import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/dashboard', label: 'Resumen', icon: LayoutDashboard },
@@ -30,7 +14,6 @@ const navItems = [
   { href: '/dashboard/bookings', label: 'Reservas', icon: CalendarCheck },
   { href: '/dashboard/calendar', label: 'Calendario', icon: CalendarDays },
   { href: '/dashboard/earnings', label: 'Ganancias', icon: Wallet },
-  { href: '/dashboard/profile', label: 'Mi perfil', icon: User },
 ];
 
 interface DashboardShellProps {
@@ -62,33 +45,6 @@ const NavLinks = ({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   </nav>
 );
 
-const UserFooter = () => {
-  const user = useAuthStore((state) => state.user);
-  const role = useAuthStore((state) => state.role);
-  const logoutMutation = useLogout();
-
-  return (
-    <div className="space-y-3 border-t pt-4">
-      <div>
-        <p className="truncate text-sm font-medium">{user?.fullName}</p>
-        <span className="sf-badge sf-badge-primary mt-1 inline-flex">
-          {role ? roleLabels[role] : ''}
-        </span>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full justify-start"
-        onClick={() => logoutMutation.mutate()}
-        disabled={logoutMutation.isPending}
-      >
-        <LogOut className="h-4 w-4" />
-        Cerrar sesion
-      </Button>
-    </div>
-  );
-};
-
 export const DashboardShell = ({ children }: DashboardShellProps) => {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -105,7 +61,7 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
         <div className="flex-1">
           <NavLinks pathname={pathname} />
         </div>
-        <UserFooter />
+        <AccountMenu variant="owner" />
       </aside>
 
       <div className="flex min-h-screen flex-1 flex-col">
@@ -128,7 +84,7 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
       <AppDrawer open={drawerOpen} title="Menu" onOpenChange={setDrawerOpen}>
         <div className="flex flex-col gap-6">
           <NavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
-          <UserFooter />
+          <AccountMenu variant="owner" onNavigate={() => setDrawerOpen(false)} />
         </div>
       </AppDrawer>
     </div>

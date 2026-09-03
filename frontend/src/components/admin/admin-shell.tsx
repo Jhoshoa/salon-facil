@@ -14,10 +14,9 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useAuthStore } from '@/stores/auth.store';
-import { useLogout } from '@/hooks/use-logout';
-import { Button } from '@/components/ui/button';
+import { AccountMenu } from '@/components/shared/account-menu';
 import { AppDrawer } from '@/components/shared/app-drawer';
+import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/admin/analytics', label: 'Analitica', icon: BarChart3 },
@@ -57,29 +56,6 @@ const NavLinks = ({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   </nav>
 );
 
-const UserFooter = () => {
-  const user = useAuthStore((state) => state.user);
-  const logoutMutation = useLogout();
-
-  return (
-    <div className="space-y-3 border-t pt-4">
-      <div>
-        <p className="truncate text-sm font-medium">{user?.fullName}</p>
-        <span className="sf-badge sf-badge-primary mt-1 inline-flex">Administrador</span>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full justify-start"
-        onClick={() => logoutMutation.mutate()}
-        disabled={logoutMutation.isPending}
-      >
-        Cerrar sesion
-      </Button>
-    </div>
-  );
-};
-
 export const AdminShell = ({ children }: AdminShellProps) => {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -96,7 +72,7 @@ export const AdminShell = ({ children }: AdminShellProps) => {
         <div className="flex-1">
           <NavLinks pathname={pathname} />
         </div>
-        <UserFooter />
+        <AccountMenu variant="admin" />
       </aside>
 
       <div className="flex min-h-screen flex-1 flex-col">
@@ -119,7 +95,7 @@ export const AdminShell = ({ children }: AdminShellProps) => {
       <AppDrawer open={drawerOpen} title="Menu" onOpenChange={setDrawerOpen}>
         <div className="flex flex-col gap-6">
           <NavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
-          <UserFooter />
+          <AccountMenu variant="admin" onNavigate={() => setDrawerOpen(false)} />
         </div>
       </AppDrawer>
     </div>
