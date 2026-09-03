@@ -53,17 +53,17 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
   return (
     <div className="min-h-screen bg-muted/30 lg:flex">
       <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r bg-background p-4 lg:flex">
-        <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-1">
-          <span className="sf-logo">
-            <CalendarCheck className="h-5 w-5" />
-          </span>
-          <span className="text-base font-bold">SalonFacil</span>
-        </Link>
+        <div className="mb-6 flex items-center justify-between px-1">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <span className="sf-logo">
+              <CalendarCheck className="h-5 w-5" />
+            </span>
+            <span className="text-base font-bold">SalonFacil</span>
+          </Link>
+          <NotificationBell align="left" />
+        </div>
         <div className="flex-1">
           <NavLinks pathname={pathname} />
-        </div>
-        <div className="mb-2 flex justify-end px-1">
-          <NotificationBell align="left" />
         </div>
         <AccountMenu variant="owner" />
       </aside>
