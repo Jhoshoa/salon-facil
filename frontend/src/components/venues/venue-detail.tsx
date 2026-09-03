@@ -9,12 +9,8 @@ import {
   CalendarClock,
   Check,
   Clock,
-  Facebook,
-  Instagram,
   Map,
   MapPin,
-  Music2,
-  Phone,
   Star,
   Users,
   X,
@@ -27,6 +23,12 @@ import { AvailabilityCalendar } from '@/components/booking/availability-calendar
 import { BookingForm } from '@/components/booking/booking-form';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
 import { ErrorState } from '@/components/shared/error-state';
+import {
+  FacebookIcon,
+  InstagramIcon,
+  TikTokIcon,
+  WhatsAppIcon,
+} from '@/components/shared/brand-icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -211,7 +213,7 @@ export const VenueDetail = ({
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
                     style={{ backgroundColor: '#25D366' }}
                   >
-                    <Phone className="h-4 w-4" />
+                    <WhatsAppIcon className="h-4 w-4" />
                   </a>
                 ) : null}
                 {venue.facebookUrl ? (
@@ -224,7 +226,7 @@ export const VenueDetail = ({
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
                     style={{ backgroundColor: '#1877F2' }}
                   >
-                    <Facebook className="h-4 w-4" />
+                    <FacebookIcon className="h-4 w-4" />
                   </a>
                 ) : null}
                 {venue.instagramUrl ? (
@@ -240,7 +242,7 @@ export const VenueDetail = ({
                         'linear-gradient(45deg, #FEDA75, #FA7E1E, #D62976, #962FBF, #4F5BD5)',
                     }}
                   >
-                    <Instagram className="h-4 w-4" />
+                    <InstagramIcon className="h-4 w-4" />
                   </a>
                 ) : null}
                 {venue.tiktokUrl ? (
@@ -252,7 +254,7 @@ export const VenueDetail = ({
                     title="TikTok"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-90"
                   >
-                    <Music2 className="h-4 w-4" />
+                    <TikTokIcon className="h-4 w-4" />
                   </a>
                 ) : null}
               </div>
