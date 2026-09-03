@@ -196,7 +196,7 @@ export interface Venue {
   ownerId: string;
   name: string;
   slug: string;
-  description: string;
+  description: string | null;
   shortDescription: string | null;
   address: string;
   district: string;
@@ -290,7 +290,7 @@ export interface VenueOpeningHourInput {
 
 export interface VenueFormPayload {
   name: string;
-  description: string;
+  description?: string;
   shortDescription?: string;
   address: string;
   district: string;

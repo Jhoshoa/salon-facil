@@ -201,7 +201,9 @@ export const VenueDetail = ({
               </p>
             ) : null}
           </div>
-          <p className="mt-4 leading-7 text-muted-foreground">{venue.description}</p>
+          {venue.description ? (
+            <p className="mt-4 leading-7 text-muted-foreground">{venue.description}</p>
+          ) : null}
         </section>
 
         {/* Summary */}

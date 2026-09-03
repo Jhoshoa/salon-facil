@@ -187,7 +187,7 @@ model Venue {
   ownerId            String       @map("owner_id")
   name               String
   slug               String       @unique
-  description        String       @db.Text
+  description        String?      @db.Text
   shortDescription   String?      @map("short_description") @db.VarChar(255)
   address            String
   district           String

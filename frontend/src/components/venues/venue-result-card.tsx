@@ -98,9 +98,11 @@ export const VenueResultCard = ({
           </div>
         </div>
 
-        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-          {venue.shortDescription ?? venue.description}
-        </p>
+        {venue.shortDescription || venue.description ? (
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {venue.shortDescription ?? venue.description}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className="gap-1.5">

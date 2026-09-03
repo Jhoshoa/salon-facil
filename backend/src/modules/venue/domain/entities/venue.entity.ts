@@ -23,7 +23,7 @@ export class VenueEntity {
   ownerId!: string;
   name!: string;
   slug!: string;
-  description!: string;
+  description: string | null = null;
   shortDescription: string | null = null;
   address!: string;
   district!: string;

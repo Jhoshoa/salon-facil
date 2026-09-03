@@ -131,7 +131,7 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
 
   return {
     name: venue.name,
-    description: venue.description,
+    description: venue.description ?? '',
     shortDescription: venue.shortDescription ?? '',
     address: venue.address,
     district: venue.district,
@@ -169,7 +169,7 @@ const toPayload = (
   existingVenue?: Venue,
 ): VenueFormPayload => ({
   name: values.name,
-  description: values.description,
+  description: values.description || undefined,
   shortDescription: values.shortDescription || undefined,
   address: values.address,
   district: values.district,
@@ -511,7 +511,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
               </div>
 
               <div className="sf-form-group">
-                <Label htmlFor="shortDescription">Descripcion corta</Label>
+                <Label htmlFor="shortDescription">Descripcion corta (opcional)</Label>
                 <Input
                   id="shortDescription"
                   placeholder="Salon elegante con escenario y parqueo"
@@ -523,7 +523,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
               </div>
 
               <div className="sf-form-group">
-                <Label htmlFor="description">Descripcion completa</Label>
+                <Label htmlFor="description">Descripcion completa (opcional)</Label>
                 <textarea
                   id="description"
                   rows={5}
@@ -985,7 +985,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
           {activeTab === 'rules' ? (
             <div className="space-y-5">
               <div className="sf-form-group">
-                <Label htmlFor="rules">Reglas del espacio</Label>
+                <Label htmlFor="rules">Reglas del espacio (opcional)</Label>
                 <textarea
                   id="rules"
                   rows={4}
@@ -993,9 +993,10 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                   placeholder="Musica hasta las 2:00 AM. No se permite pirotecnia..."
                   {...form.register('rules')}
                 />
+                {errors.rules ? <p className="sf-form-error">{errors.rules.message}</p> : null}
               </div>
               <div className="sf-form-group">
-                <Label htmlFor="cancellationPolicy">Politica de cancelacion</Label>
+                <Label htmlFor="cancellationPolicy">Politica de cancelacion (opcional)</Label>
                 <textarea
                   id="cancellationPolicy"
                   rows={4}
@@ -1003,6 +1004,9 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                   placeholder="Reserva reembolsable hasta 30 dias antes del evento..."
                   {...form.register('cancellationPolicy')}
                 />
+                {errors.cancellationPolicy ? (
+                  <p className="sf-form-error">{errors.cancellationPolicy.message}</p>
+                ) : null}
               </div>
             </div>
           ) : null}

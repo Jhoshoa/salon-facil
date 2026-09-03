@@ -504,7 +504,7 @@ export class VenueRepository implements IVenueRepository {
     const createData: Prisma.VenueCreateInput = {
       name: venueData.name as string,
       slug: venueData.slug as string,
-      description: venueData.description as string,
+      description: venueData.description as string | undefined,
       shortDescription: venueData.shortDescription as string | undefined,
       address: venueData.address as string,
       district: venueData.district as string,

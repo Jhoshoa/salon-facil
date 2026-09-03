@@ -21,10 +21,7 @@ export const venueOpeningHourSchema = z.object({
 
 export const venueFormSchema = z.object({
   name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres').max(100),
-  description: z
-    .string()
-    .min(20, 'La descripcion debe tener al menos 20 caracteres')
-    .max(2000),
+  description: z.string().max(5000, 'La descripcion no puede exceder 5000 caracteres').optional().or(z.literal('')),
   shortDescription: z.string().max(255).optional().or(z.literal('')),
   address: z.string().min(5, 'Ingresa una direccion valida'),
   district: z.string().min(2, 'Ingresa el distrito o zona'),
@@ -44,7 +41,7 @@ export const venueFormSchema = z.object({
   minimumHours: z.coerce.number().min(1).max(24),
   instantBooking: z.boolean(),
   allowsMultipleDays: z.boolean(),
-  rules: z.string().max(2000).optional().or(z.literal('')),
+  rules: z.string().max(5000, 'Las reglas no pueden exceder 5000 caracteres').optional().or(z.literal('')),
   cancellationPolicy: z.string().max(2000).optional().or(z.literal('')),
   basePrice: z.coerce
     .number({ invalid_type_error: 'Ingresa un precio base' })

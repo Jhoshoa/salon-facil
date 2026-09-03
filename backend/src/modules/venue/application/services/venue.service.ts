@@ -312,7 +312,6 @@ export class VenueService {
 
   private computeCompletion(venue: VenueEntity): VenueCompletion {
     const checks: { label: string; done: boolean; required: boolean }[] = [
-      { label: 'Nombre y descripcion', done: venue.description.length >= 20, required: true },
       {
         label: 'Direccion y distrito',
         done: Boolean(venue.address && venue.district),
@@ -337,8 +336,6 @@ export class VenueService {
         done: (venue.uses?.length ?? 0) > 0,
         required: false,
       },
-      { label: 'Descripcion corta', done: Boolean(venue.shortDescription), required: false },
-      { label: 'Reglas del espacio', done: Boolean(venue.rules), required: false },
       {
         label: 'Ubicacion en el mapa',
         done: venue.latitude != null && venue.longitude != null,

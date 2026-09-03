@@ -178,10 +178,10 @@ export class CreateVenueDto {
   @MaxLength(100, { message: 'El nombre no puede exceder 100 caracteres' })
   name!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(20, { message: 'La descripción debe tener al menos 20 caracteres' })
-  @MaxLength(2000, { message: 'La descripción no puede exceder 2000 caracteres' })
-  description!: string;
+  @MaxLength(5000, { message: 'La descripción no puede exceder 5000 caracteres' })
+  description?: string;
 
   @IsOptional()
   @IsString()
@@ -262,6 +262,7 @@ export class CreateVenueDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(5000, { message: 'Las reglas no pueden exceder 5000 caracteres' })
   rules?: string;
 
   @IsOptional()
