@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AmenityCategory, Venue } from '@/types/api';
+import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
 
 interface VenueDetailProps {
@@ -113,6 +114,10 @@ export const VenueDetail = ({
     initialStartDate ? { start: initialStartDate, end: initialEndDate ?? initialStartDate } : undefined,
   );
   const [staleRangeNotice, setStaleRangeNotice] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({
+    open: false,
+    index: 0,
+  });
 
   const rangeValidationQuery = useQuery({
     queryKey: ['venue-availability-range-check', query.data?.id, initialStartDate, initialEndDate],
@@ -158,29 +163,49 @@ export const VenueDetail = ({
       <div className="min-w-0 flex-1 space-y-6">
         {/* Gallery */}
         <section className="grid gap-2 md:grid-cols-[2fr_1fr]">
-          <div className="sf-result-image min-h-[280px] shadow-sm md:min-h-[360px]">
-            {mainPhoto ? (
+          {mainPhoto ? (
+            <button
+              type="button"
+              onClick={() => setLightbox({ open: true, index: 0 })}
+              aria-label="Ver foto ampliada"
+              className="sf-result-image min-h-[280px] block w-full cursor-zoom-in border-0 p-0 shadow-sm md:min-h-[360px]"
+            >
               <Image src={mainPhoto} alt={venue.name} fill className="object-cover" priority />
-            ) : (
+            </button>
+          ) : (
+            <div className="sf-result-image min-h-[280px] shadow-sm md:min-h-[360px]">
               <div className="sf-gradient-subtle flex h-full items-center justify-center text-muted-foreground">
                 Sin foto
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-            {photos.slice(1, 3).map((photo, index) => (
-              <div
-                key={`${photo}-${index}`}
-                className="relative min-h-32 overflow-hidden rounded-lg bg-muted shadow-sm"
-              >
-                <Image
-                  src={photo}
-                  alt={`${venue.name} ${index + 2}`}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            ))}
+            {photos.slice(1, 3).map((photo, index) => {
+              const photoIndex = index + 1;
+              const extraCount = photos.length - 3;
+              const showMoreOverlay = index === 1 && extraCount > 0;
+              return (
+                <button
+                  key={`${photo}-${index}`}
+                  type="button"
+                  onClick={() => setLightbox({ open: true, index: photoIndex })}
+                  aria-label={showMoreOverlay ? `Ver las ${photos.length} fotos` : 'Ver foto ampliada'}
+                  className="relative min-h-32 cursor-zoom-in overflow-hidden rounded-lg border-0 bg-muted p-0 shadow-sm"
+                >
+                  <Image
+                    src={photo}
+                    alt={`${venue.name} ${photoIndex + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                  {showMoreOverlay ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-semibold text-white">
+                      +{extraCount}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
             {!photos.slice(1, 3).length ? (
               <div className="sf-gradient-subtle flex min-h-32 items-center justify-center rounded-lg text-sm text-muted-foreground">
                 Galeria pendiente
@@ -188,6 +213,15 @@ export const VenueDetail = ({
             ) : null}
           </div>
         </section>
+
+        <PhotoLightbox
+          photos={photos}
+          alt={venue.name}
+          index={lightbox.index}
+          open={lightbox.open}
+          onOpenChange={(open) => setLightbox((prev) => ({ ...prev, open }))}
+          onIndexChange={(index) => setLightbox((prev) => ({ ...prev, index }))}
+        />
 
         {/* Header */}
         <section className="sf-detail-section">
