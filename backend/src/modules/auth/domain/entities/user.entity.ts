@@ -10,9 +10,6 @@ export class UserEntity {
   city: string | null = null;
   district: string | null = null;
   whatsappPhone: string | null = null;
-  facebookUrl: string | null = null;
-  instagramUrl: string | null = null;
-  tiktokUrl: string | null = null;
   emailVerifiedAt: Date | null = null;
   phoneVerifiedAt: Date | null = null;
   createdAt!: Date;

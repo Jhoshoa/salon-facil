@@ -9,9 +9,6 @@ interface AuthUserDto {
   city: string | null;
   district: string | null;
   whatsappPhone: string | null;
-  facebookUrl: string | null;
-  instagramUrl: string | null;
-  tiktokUrl: string | null;
 }
 
 // Internal shape used between AuthService and the controller — includes the raw tokens so the

@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Matches,
   Max,
@@ -197,6 +198,25 @@ export class CreateVenueDto {
 
   @IsEnum(Departamento)
   departamento!: Departamento;
+
+  // Independiente del whatsappPhone del perfil del propietario — cada local completa el suyo
+  // por separado (puede estar a cargo de otra persona), sin heredar nada del perfil.
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsUrl({}, { message: 'facebookUrl debe ser una URL valida' })
+  facebookUrl?: string;
+
+  @IsOptional()
+  @IsUrl({}, { message: 'instagramUrl debe ser una URL valida' })
+  instagramUrl?: string;
+
+  @IsOptional()
+  @IsUrl({}, { message: 'tiktokUrl debe ser una URL valida' })
+  tiktokUrl?: string;
 
   @IsOptional()
   @IsNumber()

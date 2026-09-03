@@ -108,6 +108,10 @@ const fieldTab: Record<keyof VenueFormValues, TabKey> = {
   address: 'location',
   district: 'location',
   departamento: 'location',
+  contactPhone: 'location',
+  facebookUrl: 'location',
+  instagramUrl: 'location',
+  tiktokUrl: 'location',
   latitude: 'location',
   longitude: 'location',
   capacityMin: 'pricing',
@@ -136,6 +140,10 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     address: venue.address,
     district: venue.district,
     departamento: venue.departamento,
+    contactPhone: venue.contactPhone ?? '',
+    facebookUrl: venue.facebookUrl ?? '',
+    instagramUrl: venue.instagramUrl ?? '',
+    tiktokUrl: venue.tiktokUrl ?? '',
     latitude: venue.latitude != null ? String(venue.latitude) : '',
     longitude: venue.longitude != null ? String(venue.longitude) : '',
     capacityMin: venue.capacityMin,
@@ -174,6 +182,10 @@ const toPayload = (
   address: values.address,
   district: values.district,
   departamento: values.departamento,
+  contactPhone: values.contactPhone || undefined,
+  facebookUrl: values.facebookUrl || undefined,
+  instagramUrl: values.instagramUrl || undefined,
+  tiktokUrl: values.tiktokUrl || undefined,
   latitude: values.latitude ? Number(values.latitude) : undefined,
   longitude: values.longitude ? Number(values.longitude) : undefined,
   capacityMax: values.capacityMax,
@@ -609,6 +621,59 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                 </Select>
                 {errors.departamento ? (
                   <p className="sf-form-error">{errors.departamento.message}</p>
+                ) : null}
+              </div>
+
+              <div className="sf-form-group">
+                <Label htmlFor="contactPhone">Telefono de contacto de este local (opcional)</Label>
+                <Input
+                  id="contactPhone"
+                  placeholder="+59171234567"
+                  {...form.register('contactPhone')}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Independiente del WhatsApp de tu perfil — util si este local lo maneja otra
+                  persona.
+                </p>
+                {errors.contactPhone ? (
+                  <p className="sf-form-error">{errors.contactPhone.message}</p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="sf-form-group">
+                  <Label htmlFor="facebookUrl">Facebook (opcional)</Label>
+                  <Input
+                    id="facebookUrl"
+                    placeholder="https://facebook.com/tu-local"
+                    {...form.register('facebookUrl')}
+                  />
+                  {errors.facebookUrl ? (
+                    <p className="sf-form-error">{errors.facebookUrl.message}</p>
+                  ) : null}
+                </div>
+                <div className="sf-form-group">
+                  <Label htmlFor="instagramUrl">Instagram (opcional)</Label>
+                  <Input
+                    id="instagramUrl"
+                    placeholder="https://instagram.com/tu-local"
+                    {...form.register('instagramUrl')}
+                  />
+                  {errors.instagramUrl ? (
+                    <p className="sf-form-error">{errors.instagramUrl.message}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="sf-form-group">
+                <Label htmlFor="tiktokUrl">TikTok (opcional)</Label>
+                <Input
+                  id="tiktokUrl"
+                  placeholder="https://tiktok.com/@tu-local"
+                  {...form.register('tiktokUrl')}
+                />
+                {errors.tiktokUrl ? (
+                  <p className="sf-form-error">{errors.tiktokUrl.message}</p>
                 ) : null}
               </div>
 

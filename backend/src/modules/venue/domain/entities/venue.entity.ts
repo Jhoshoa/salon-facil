@@ -29,6 +29,10 @@ export class VenueEntity {
   district!: string;
   departamento!: Departamento;
   country: string = 'Bolivia';
+  contactPhone: string | null = null;
+  facebookUrl: string | null = null;
+  instagramUrl: string | null = null;
+  tiktokUrl: string | null = null;
   latitude: number | null = null;
   longitude: number | null = null;
   capacityMin: number = 0;

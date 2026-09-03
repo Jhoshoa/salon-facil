@@ -509,6 +509,10 @@ export class VenueRepository implements IVenueRepository {
       address: venueData.address as string,
       district: venueData.district as string,
       departamento: venueData.departamento as Departamento,
+      contactPhone: venueData.contactPhone as string | undefined,
+      facebookUrl: venueData.facebookUrl as string | undefined,
+      instagramUrl: venueData.instagramUrl as string | undefined,
+      tiktokUrl: venueData.tiktokUrl as string | undefined,
       latitude:
         venueData.latitude != null ? new Prisma.Decimal(venueData.latitude as number) : undefined,
       longitude:
@@ -633,6 +637,10 @@ export class VenueRepository implements IVenueRepository {
     if (venueData.departamento != null) {
       updateInput.departamento = venueData.departamento as Departamento;
     }
+    if (venueData.contactPhone != null) updateInput.contactPhone = venueData.contactPhone;
+    if (venueData.facebookUrl != null) updateInput.facebookUrl = venueData.facebookUrl;
+    if (venueData.instagramUrl != null) updateInput.instagramUrl = venueData.instagramUrl;
+    if (venueData.tiktokUrl != null) updateInput.tiktokUrl = venueData.tiktokUrl;
     if (venueData.latitude != null)
       updateInput.latitude = new Prisma.Decimal(venueData.latitude as number);
     if (venueData.longitude != null)
@@ -972,6 +980,10 @@ export class VenueRepository implements IVenueRepository {
       district: raw.district,
       departamento: raw.departamento,
       country: raw.country,
+      contactPhone: raw.contactPhone ?? null,
+      facebookUrl: raw.facebookUrl ?? null,
+      instagramUrl: raw.instagramUrl ?? null,
+      tiktokUrl: raw.tiktokUrl ?? null,
       latitude: raw.latitude != null ? Number(raw.latitude) : null,
       longitude: raw.longitude != null ? Number(raw.longitude) : null,
       capacityMin: raw.capacityMin,

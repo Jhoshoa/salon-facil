@@ -24,9 +24,6 @@ export interface IAuthRepository {
       district: string;
       avatarUrl: string;
       whatsappPhone: string;
-      facebookUrl: string;
-      instagramUrl: string;
-      tiktokUrl: string;
     }>,
   ): Promise<UserEntity>;
   exists(email: string, phone: string): Promise<boolean>;

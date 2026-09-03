@@ -24,9 +24,6 @@ export const OwnerProfileForm = () => {
       city: user?.city ?? '',
       district: user?.district ?? '',
       whatsappPhone: user?.whatsappPhone ?? '',
-      facebookUrl: user?.facebookUrl ?? '',
-      instagramUrl: user?.instagramUrl ?? '',
-      tiktokUrl: user?.tiktokUrl ?? '',
     },
   });
 
@@ -37,9 +34,6 @@ export const OwnerProfileForm = () => {
         city: values.city || undefined,
         district: values.district || undefined,
         whatsappPhone: values.whatsappPhone || undefined,
-        facebookUrl: values.facebookUrl || undefined,
-        instagramUrl: values.instagramUrl || undefined,
-        tiktokUrl: values.tiktokUrl || undefined,
       }),
     onSuccess: (updatedUser) => {
       updateUser(updatedUser);
@@ -80,41 +74,6 @@ export const OwnerProfileForm = () => {
               placeholder="+59171234567"
               {...form.register('whatsappPhone')}
             />
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="sf-form-group">
-              <Label htmlFor="facebookUrl">Facebook</Label>
-              <Input
-                id="facebookUrl"
-                placeholder="https://facebook.com/tu-pagina"
-                {...form.register('facebookUrl')}
-              />
-              {errors.facebookUrl ? (
-                <p className="sf-form-error">{errors.facebookUrl.message}</p>
-              ) : null}
-            </div>
-            <div className="sf-form-group">
-              <Label htmlFor="instagramUrl">Instagram</Label>
-              <Input
-                id="instagramUrl"
-                placeholder="https://instagram.com/tu-cuenta"
-                {...form.register('instagramUrl')}
-              />
-              {errors.instagramUrl ? (
-                <p className="sf-form-error">{errors.instagramUrl.message}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="sf-form-group">
-            <Label htmlFor="tiktokUrl">TikTok</Label>
-            <Input
-              id="tiktokUrl"
-              placeholder="https://tiktok.com/@tu-cuenta"
-              {...form.register('tiktokUrl')}
-            />
-            {errors.tiktokUrl ? <p className="sf-form-error">{errors.tiktokUrl.message}</p> : null}
           </div>
         </CardContent>
       </Card>

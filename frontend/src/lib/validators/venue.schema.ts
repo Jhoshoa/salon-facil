@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+const optionalUrl = z
+  .string()
+  .trim()
+  .url('Ingresa una URL valida (ej. https://facebook.com/tu-pagina)')
+  .optional()
+  .or(z.literal(''));
+
 export const departamentoValues = [
   'LA_PAZ',
   'SANTA_CRUZ',
@@ -28,6 +35,10 @@ export const venueFormSchema = z.object({
   departamento: z.enum(departamentoValues, {
     errorMap: () => ({ message: 'Selecciona un departamento' }),
   }),
+  contactPhone: z.string().max(20, 'Maximo 20 caracteres').optional().or(z.literal('')),
+  facebookUrl: optionalUrl,
+  instagramUrl: optionalUrl,
+  tiktokUrl: optionalUrl,
   latitude: z.string().optional().or(z.literal('')),
   longitude: z.string().optional().or(z.literal('')),
   capacityMin: z.coerce.number().min(0).default(0),
@@ -69,6 +80,10 @@ export const venueFormDefaults: VenueFormValues = {
   address: '',
   district: '',
   departamento: 'LA_PAZ',
+  contactPhone: '',
+  facebookUrl: '',
+  instagramUrl: '',
+  tiktokUrl: '',
   latitude: '',
   longitude: '',
   capacityMin: 0,

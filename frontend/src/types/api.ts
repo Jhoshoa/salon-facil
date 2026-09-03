@@ -24,9 +24,6 @@ export interface AuthUser {
   city: string | null;
   district: string | null;
   whatsappPhone: string | null;
-  facebookUrl: string | null;
-  instagramUrl: string | null;
-  tiktokUrl: string | null;
 }
 
 export interface UpdateProfilePayload {
@@ -35,9 +32,6 @@ export interface UpdateProfilePayload {
   district?: string;
   avatarUrl?: string;
   whatsappPhone?: string;
-  facebookUrl?: string;
-  instagramUrl?: string;
-  tiktokUrl?: string;
 }
 
 export type UserRole = 'CLIENT' | 'OWNER' | 'ADMIN';
@@ -201,6 +195,10 @@ export interface Venue {
   address: string;
   district: string;
   departamento: Departamento;
+  contactPhone: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
   latitude: number | null;
   longitude: number | null;
   capacityMin: number;
@@ -295,6 +293,10 @@ export interface VenueFormPayload {
   address: string;
   district: string;
   departamento: Departamento;
+  contactPhone?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
   latitude?: number;
   longitude?: number;
   capacityMax: number;

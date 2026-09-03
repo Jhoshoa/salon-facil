@@ -25,16 +25,4 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(20)
   whatsappPhone?: string;
-
-  @IsOptional()
-  @IsUrl({}, { message: 'facebookUrl debe ser una URL valida' })
-  facebookUrl?: string;
-
-  @IsOptional()
-  @IsUrl({}, { message: 'instagramUrl debe ser una URL valida' })
-  instagramUrl?: string;
-
-  @IsOptional()
-  @IsUrl({}, { message: 'tiktokUrl debe ser una URL valida' })
-  tiktokUrl?: string;
 }

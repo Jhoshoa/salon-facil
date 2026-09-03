@@ -331,16 +331,13 @@ describe('Auth (e2e)', () => {
       });
     });
 
-    it('should update the authenticated user profile and social fields', async () => {
+    it('should update the authenticated user profile', async () => {
       const res = await agentA
         .put('/api/v1/auth/me')
         .send({
           fullName: 'Updated Name A',
           city: 'El Alto',
           whatsappPhone: '+59171112222',
-          facebookUrl: 'https://facebook.com/user-a',
-          instagramUrl: 'https://instagram.com/user-a',
-          tiktokUrl: 'https://tiktok.com/@user-a',
         })
         .expect(200);
 
@@ -348,9 +345,6 @@ describe('Auth (e2e)', () => {
       expect(res.body.fullName).toBe('Updated Name A');
       expect(res.body.city).toBe('El Alto');
       expect(res.body.whatsappPhone).toBe('+59171112222');
-      expect(res.body.facebookUrl).toBe('https://facebook.com/user-a');
-      expect(res.body.instagramUrl).toBe('https://instagram.com/user-a');
-      expect(res.body.tiktokUrl).toBe('https://tiktok.com/@user-a');
     });
 
     it('should not let a different user be affected by another user update', async () => {
@@ -367,8 +361,8 @@ describe('Auth (e2e)', () => {
         .expect(401);
     });
 
-    it('should return 400 for an invalid social URL', () => {
-      return agentA.put('/api/v1/auth/me').send({ facebookUrl: 'not-a-valid-url' }).expect(400);
+    it('should return 400 for an invalid avatar URL', () => {
+      return agentA.put('/api/v1/auth/me').send({ avatarUrl: 'not-a-valid-url' }).expect(400);
     });
   });
 

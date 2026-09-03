@@ -5,7 +5,20 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Check, Clock, Map, MapPin, Star, Users, X } from 'lucide-react';
+import {
+  CalendarClock,
+  Check,
+  Clock,
+  Facebook,
+  Instagram,
+  Map,
+  MapPin,
+  Music2,
+  Phone,
+  Star,
+  Users,
+  X,
+} from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
@@ -349,6 +362,59 @@ export const VenueDetail = ({
             </div>
           )}
         </section>
+
+        {/* Contact & social */}
+        {venue.contactPhone || venue.facebookUrl || venue.instagramUrl || venue.tiktokUrl ? (
+          <section className="sf-detail-section">
+            <h2 className="sf-detail-title">Contacto</h2>
+            <div className="mt-2 flex flex-wrap gap-3">
+              {venue.contactPhone ? (
+                <a
+                  href={`https://wa.me/${venue.contactPhone.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sf-filter-chip inline-flex items-center gap-1.5"
+                >
+                  <Phone className="h-4 w-4" />
+                  {venue.contactPhone}
+                </a>
+              ) : null}
+              {venue.facebookUrl ? (
+                <a
+                  href={venue.facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sf-filter-chip inline-flex items-center gap-1.5"
+                >
+                  <Facebook className="h-4 w-4" />
+                  Facebook
+                </a>
+              ) : null}
+              {venue.instagramUrl ? (
+                <a
+                  href={venue.instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sf-filter-chip inline-flex items-center gap-1.5"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Instagram
+                </a>
+              ) : null}
+              {venue.tiktokUrl ? (
+                <a
+                  href={venue.tiktokUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sf-filter-chip inline-flex items-center gap-1.5"
+                >
+                  <Music2 className="h-4 w-4" />
+                  TikTok
+                </a>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         <AvailabilityCalendar
           venueId={venue.id}

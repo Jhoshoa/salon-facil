@@ -42,9 +42,6 @@ const toProfileDto = (user: UserEntity) => ({
   city: user.city,
   district: user.district,
   whatsappPhone: user.whatsappPhone,
-  facebookUrl: user.facebookUrl,
-  instagramUrl: user.instagramUrl,
-  tiktokUrl: user.tiktokUrl,
 });
 
 // Strips accessToken/refreshToken before they'd ever reach a JSON response body — they only
