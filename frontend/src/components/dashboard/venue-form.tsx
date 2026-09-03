@@ -92,8 +92,8 @@ type TabKey = 'general' | 'location' | 'pricing' | 'amenities' | 'hours' | 'rule
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'general', label: 'General' },
   { key: 'location', label: 'Ubicacion' },
-  { key: 'pricing', label: 'Precios y capacidad' },
   { key: 'amenities', label: 'Comodidades' },
+  { key: 'pricing', label: 'Precios y capacidad' },
   { key: 'hours', label: 'Horarios' },
   { key: 'rules', label: 'Reglas' },
 ];
@@ -123,7 +123,7 @@ const fieldTab: Record<keyof VenueFormValues, TabKey> = {
   instantBooking: 'pricing',
   allowsMultipleDays: 'pricing',
   basePrice: 'pricing',
-  amenityIds: 'amenities',
+  amenities: 'amenities',
   useTypes: 'general',
   openingHours: 'hours',
   rules: 'rules',
@@ -158,7 +158,11 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     rules: venue.rules ?? '',
     cancellationPolicy: venue.cancellationPolicy ?? '',
     basePrice,
-    amenityIds: (venue.amenities ?? []).map((a) => a.amenity.id),
+    amenities: (venue.amenities ?? []).map((a) => ({
+      amenityId: a.amenity.id,
+      isIncluded: a.isIncluded,
+      extraCost: a.extraCost ?? undefined,
+    })),
     useTypes: (venue.uses ?? []).map((u) => u.useTypeId),
     openingHours: Array.from({ length: 7 }).map((_, dayOfWeek) => {
       const existing = hoursByDay.get(dayOfWeek);
@@ -219,7 +223,7 @@ const toPayload = (
         discountLabel: price.discountLabel ?? undefined,
       })),
   ],
-  amenities: values.amenityIds.map((amenityId) => ({ amenityId, isIncluded: true })),
+  amenities: values.amenities,
   useTypes: values.useTypes.map((useTypeId, index) => ({
     useTypeId,
     isPrimary: index === 0,
@@ -431,7 +435,7 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
     },
   });
 
-  const amenityIds = form.watch('amenityIds');
+  const amenities = form.watch('amenities');
   const useTypes = form.watch('useTypes');
   const openingHours = form.watch('openingHours');
   const spaceType = form.watch('spaceType');
@@ -449,10 +453,31 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
       seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR'));
 
   const toggleAmenity = (id: string) => {
-    const next = amenityIds.includes(id)
-      ? amenityIds.filter((item) => item !== id)
-      : [...amenityIds, id];
-    form.setValue('amenityIds', next, { shouldDirty: true });
+    const exists = amenities.some((item) => item.amenityId === id);
+    const next = exists
+      ? amenities.filter((item) => item.amenityId !== id)
+      : [...amenities, { amenityId: id, isIncluded: true, extraCost: undefined }];
+    form.setValue('amenities', next, { shouldDirty: true });
+  };
+
+  const setAmenityIncluded = (id: string, isIncluded: boolean) => {
+    form.setValue(
+      'amenities',
+      amenities.map((item) =>
+        item.amenityId === id
+          ? { ...item, isIncluded, extraCost: isIncluded ? undefined : item.extraCost }
+          : item,
+      ),
+      { shouldDirty: true },
+    );
+  };
+
+  const setAmenityExtraCost = (id: string, extraCost: number | undefined) => {
+    form.setValue(
+      'amenities',
+      amenities.map((item) => (item.amenityId === id ? { ...item, extraCost } : item)),
+      { shouldDirty: true },
+    );
   };
 
   const toggleUseType = (value: string) => {
@@ -993,17 +1018,55 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                       {category.replace('_', ' ')}
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {items?.map((amenity) => (
-                        <label key={amenity.id} className="sf-filter-option cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={amenityIds.includes(amenity.id)}
-                            onChange={() => toggleAmenity(amenity.id)}
-                            className="h-4 w-4 rounded border-input accent-primary"
-                          />
-                          {amenity.name}
-                        </label>
-                      ))}
+                      {items?.map((amenity) => {
+                        const entry = amenities.find((item) => item.amenityId === amenity.id);
+                        return (
+                          <div key={amenity.id} className="sf-surface space-y-2 rounded-[var(--radius)] p-2.5">
+                            <label className="sf-filter-option cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(entry)}
+                                onChange={() => toggleAmenity(amenity.id)}
+                                className="h-4 w-4 rounded border-input accent-primary"
+                              />
+                              {amenity.name}
+                            </label>
+                            {entry ? (
+                              <div className="flex flex-wrap items-center gap-2 pl-6">
+                                <button
+                                  type="button"
+                                  onClick={() => setAmenityIncluded(amenity.id, true)}
+                                  className={entry.isIncluded ? 'sf-badge-primary' : 'sf-badge-outline'}
+                                >
+                                  Incluido
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAmenityIncluded(amenity.id, false)}
+                                  className={!entry.isIncluded ? 'sf-badge-primary' : 'sf-badge-outline'}
+                                >
+                                  Costo extra
+                                </button>
+                                {!entry.isIncluded ? (
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="Bs"
+                                    className="sf-surface h-8 w-24"
+                                    value={entry.extraCost ?? ''}
+                                    onChange={(e) =>
+                                      setAmenityExtraCost(
+                                        amenity.id,
+                                        e.target.value ? Number(e.target.value) : undefined,
+                                      )
+                                    }
+                                  />
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))
