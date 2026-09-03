@@ -292,6 +292,21 @@ export class BookingRepository implements IBookingRepository {
     });
   }
 
+  async countPendingByOwner(ownerId: string): Promise<number> {
+    return this.prisma.booking.count({
+      where: {
+        status: BookingStatus.PENDING,
+        venue: { ownerId },
+      },
+    });
+  }
+
+  async countAllPending(): Promise<number> {
+    return this.prisma.booking.count({
+      where: { status: BookingStatus.PENDING },
+    });
+  }
+
   async incrementVenueBookingCount(venueId: string): Promise<void> {
     await this.prisma.venue.update({
       where: { id: venueId },

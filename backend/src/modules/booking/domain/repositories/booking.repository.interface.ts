@@ -47,6 +47,10 @@ export interface IBookingRepository {
 
   // Counts
   countByVenueAndStatus(venueId: string, status: BookingStatus): Promise<number>;
+  /** Pending bookings across every venue owned by `ownerId`. */
+  countPendingByOwner(ownerId: string): Promise<number>;
+  /** Pending bookings platform-wide (ADMIN queue). */
+  countAllPending(): Promise<number>;
   incrementVenueBookingCount(venueId: string): Promise<void>;
 
   // Reminders

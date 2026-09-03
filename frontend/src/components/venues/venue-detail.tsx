@@ -210,10 +210,10 @@ export const VenueDetail = ({
                     rel="noopener noreferrer"
                     aria-label="WhatsApp"
                     title="WhatsApp"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: '#25D366' }}
+                    className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ color: '#25D366' }}
                   >
-                    <WhatsAppIcon className="h-4 w-4" />
+                    <WhatsAppIcon className="h-6 w-6" />
                   </a>
                 ) : null}
                 {venue.facebookUrl ? (
@@ -223,10 +223,10 @@ export const VenueDetail = ({
                     rel="noopener noreferrer"
                     aria-label="Facebook"
                     title="Facebook"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: '#1877F2' }}
+                    className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ color: '#1877F2' }}
                   >
-                    <FacebookIcon className="h-4 w-4" />
+                    <FacebookIcon className="h-6 w-6" />
                   </a>
                 ) : null}
                 {venue.instagramUrl ? (
@@ -236,13 +236,10 @@ export const VenueDetail = ({
                     rel="noopener noreferrer"
                     aria-label="Instagram"
                     title="Instagram"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
-                    style={{
-                      backgroundImage:
-                        'linear-gradient(45deg, #FEDA75, #FA7E1E, #D62976, #962FBF, #4F5BD5)',
-                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ color: '#E4405F' }}
                   >
-                    <InstagramIcon className="h-4 w-4" />
+                    <InstagramIcon className="h-6 w-6" />
                   </a>
                 ) : null}
                 {venue.tiktokUrl ? (
@@ -252,9 +249,9 @@ export const VenueDetail = ({
                     rel="noopener noreferrer"
                     aria-label="TikTok"
                     title="TikTok"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-90"
+                    className="inline-flex h-9 w-9 items-center justify-center text-black transition-opacity hover:opacity-80"
                   >
-                    <TikTokIcon className="h-4 w-4" />
+                    <TikTokIcon className="h-6 w-6" />
                   </a>
                 ) : null}
               </div>

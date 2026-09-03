@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
+import { PhoneInput } from '@/components/shared/phone-input';
 import { Button } from '@/components/ui/button';
 import type { PriceUnit, Venue, VenueFormPayload, VenuePriceInput } from '@/types/api';
 
@@ -626,10 +627,12 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
 
               <div className="sf-form-group">
                 <Label htmlFor="contactPhone">Telefono de contacto de este local (opcional)</Label>
-                <Input
+                <PhoneInput
                   id="contactPhone"
-                  placeholder="+59171234567"
-                  {...form.register('contactPhone')}
+                  value={form.watch('contactPhone') ?? ''}
+                  onChange={(value) =>
+                    form.setValue('contactPhone', value, { shouldValidate: true, shouldDirty: true })
+                  }
                 />
                 <p className="text-xs text-muted-foreground">
                   Independiente del WhatsApp de tu perfil — util si este local lo maneja otra

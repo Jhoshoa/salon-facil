@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PHONE_REGEX } from '@/lib/validators/auth.schema';
 
 const optionalUrl = z
   .string()
@@ -35,7 +36,11 @@ export const venueFormSchema = z.object({
   departamento: z.enum(departamentoValues, {
     errorMap: () => ({ message: 'Selecciona un departamento' }),
   }),
-  contactPhone: z.string().max(20, 'Maximo 20 caracteres').optional().or(z.literal('')),
+  contactPhone: z
+    .string()
+    .regex(PHONE_REGEX, 'Ingresa los 8 digitos del celular')
+    .optional()
+    .or(z.literal('')),
   facebookUrl: optionalUrl,
   instagramUrl: optionalUrl,
   tiktokUrl: optionalUrl,

@@ -2,9 +2,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { CalendarCheck, CreditCard, Store } from 'lucide-react';
+import { CalendarCheck, CreditCard, Inbox, Store } from 'lucide-react';
 import { getMyVenues } from '@/lib/api/venues.api';
 import { getPendingOwnerPayments } from '@/lib/api/payments.api';
+import { getPendingOwnerBookingsCount } from '@/lib/api/bookings.api';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { Button } from '@/components/ui/button';
@@ -16,11 +17,15 @@ export const OwnerDashboard = () => {
     queryKey: ['owner-pending-payments'],
     queryFn: getPendingOwnerPayments,
   });
+  const bookingsQuery = useQuery({
+    queryKey: ['owner-pending-bookings'],
+    queryFn: getPendingOwnerBookingsCount,
+  });
 
   if (venuesQuery.isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
+      <div className="grid gap-4 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-28 w-full" />
         ))}
       </div>
@@ -49,11 +54,12 @@ export const OwnerDashboard = () => {
   }
 
   const activeVenues = venuesQuery.data.filter((venue) => venue.status === 'ACTIVE').length;
+  const pendingBookings = bookingsQuery.data ?? 0;
   const pendingPayments = paymentsQuery.data?.length ?? 0;
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <section className="rounded-md border bg-card p-4 shadow-sm">
           <Store className="h-5 w-5 text-emerald-600" />
           <p className="mt-3 text-2xl font-semibold">{venuesQuery.data.length}</p>
@@ -63,6 +69,11 @@ export const OwnerDashboard = () => {
           <CalendarCheck className="h-5 w-5 text-sky-600" />
           <p className="mt-3 text-2xl font-semibold">{activeVenues}</p>
           <p className="text-sm text-muted-foreground">Salones activos</p>
+        </section>
+        <section className="rounded-md border bg-card p-4 shadow-sm">
+          <Inbox className="h-5 w-5 text-rose-600" />
+          <p className="mt-3 text-2xl font-semibold">{pendingBookings}</p>
+          <p className="text-sm text-muted-foreground">Solicitudes pendientes</p>
         </section>
         <section className="rounded-md border bg-card p-4 shadow-sm">
           <CreditCard className="h-5 w-5 text-amber-600" />

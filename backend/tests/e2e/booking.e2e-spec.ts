@@ -290,4 +290,42 @@ describe('Bookings (e2e)', () => {
       return users.otherOwnerAgent.put(`/api/v1/bookings/${bookingId}/no-show`).expect(403);
     });
   });
+
+  describe('GET /api/v1/bookings/owner/pending-count', () => {
+    it('increases by 1 when a new PENDING booking is requested on the owner venue', async () => {
+      const before = await users.ownerAgent.get('/api/v1/bookings/owner/pending-count').expect(200);
+
+      await users.clientAgent
+        .post(`/api/v1/venues/${venueId}/bookings`)
+        .send({
+          eventType: 'Test',
+          eventDate: futureDate(210),
+          startTime: '14:00',
+          endTime: '18:00',
+          guestCount: 10,
+        })
+        .expect(201);
+
+      const after = await users.ownerAgent.get('/api/v1/bookings/owner/pending-count').expect(200);
+
+      expect(after.body.count).toBe(before.body.count + 1);
+    });
+
+    it("does not leak another owner's pending bookings", () => {
+      return users.otherOwnerAgent
+        .get('/api/v1/bookings/owner/pending-count')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.count).toBe(0);
+        });
+    });
+
+    it('returns 403 for CLIENT role', () => {
+      return users.clientAgent.get('/api/v1/bookings/owner/pending-count').expect(403);
+    });
+
+    it('returns 401 when not authenticated', () => {
+      return request(app.getHttpServer()).get('/api/v1/bookings/owner/pending-count').expect(401);
+    });
+  });
 });

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
+import { PhoneInput } from '@/components/shared/phone-input';
 
 export const OwnerProfileForm = () => {
   const user = useAuthStore((state) => state.user);
@@ -69,11 +70,14 @@ export const OwnerProfileForm = () => {
 
           <div className="sf-form-group">
             <Label htmlFor="whatsappPhone">WhatsApp / telefono de contacto</Label>
-            <Input
+            <PhoneInput
               id="whatsappPhone"
-              placeholder="+59171234567"
-              {...form.register('whatsappPhone')}
+              value={form.watch('whatsappPhone') ?? ''}
+              onChange={(value) =>
+                form.setValue('whatsappPhone', value, { shouldValidate: true, shouldDirty: true })
+              }
             />
+            {errors.whatsappPhone ? <p className="sf-form-error">{errors.whatsappPhone.message}</p> : null}
           </div>
         </CardContent>
       </Card>

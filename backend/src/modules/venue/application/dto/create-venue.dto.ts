@@ -202,8 +202,9 @@ export class CreateVenueDto {
   // Independiente del whatsappPhone del perfil del propietario — cada local completa el suyo
   // por separado (puede estar a cargo de otra persona), sin heredar nada del perfil.
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
+  @Matches(/^\+591\d{8}$/, {
+    message: 'El teléfono debe ser válido de Bolivia (+591XXXXXXXX)',
+  })
   contactPhone?: string;
 
   @IsOptional()

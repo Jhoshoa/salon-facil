@@ -37,6 +37,16 @@ export class BookingDetailController {
     return this.bookingService.getMyBookings(user.id);
   }
 
+  @Get('owner/pending-count')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Contar reservas pendientes de mis locales (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Cantidad de reservas pendientes' })
+  async getPendingOwnerBookingsCount(@CurrentUser() user: { id: string; role: UserRole }) {
+    const count = await this.bookingService.getPendingOwnerBookingsCount(user.id, user.role);
+    return { count };
+  }
+
   @Get(':id')
   @Roles(UserRole.CLIENT, UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()

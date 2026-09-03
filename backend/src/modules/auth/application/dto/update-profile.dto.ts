@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUrl, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -22,7 +22,8 @@ export class UpdateProfileDto {
   avatarUrl?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
+  @Matches(/^\+591\d{8}$/, {
+    message: 'El teléfono debe ser válido de Bolivia (+591XXXXXXXX)',
+  })
   whatsappPhone?: string;
 }

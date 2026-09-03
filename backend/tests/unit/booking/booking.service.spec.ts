@@ -82,6 +82,8 @@ describe('BookingService', () => {
     deleteCalendarBlock: jest.Mock;
     isDateBlocked: jest.Mock;
     countByVenueAndStatus: jest.Mock;
+    countPendingByOwner: jest.Mock;
+    countAllPending: jest.Mock;
     incrementVenueBookingCount: jest.Mock;
     findBookingsDueForReminder: jest.Mock;
     markReminderSent: jest.Mock;
@@ -122,6 +124,8 @@ describe('BookingService', () => {
       deleteCalendarBlock: jest.fn(),
       isDateBlocked: jest.fn(),
       countByVenueAndStatus: jest.fn(),
+      countPendingByOwner: jest.fn(),
+      countAllPending: jest.fn(),
       incrementVenueBookingCount: jest.fn(),
       findBookingsDueForReminder: jest.fn(),
       markReminderSent: jest.fn(),
@@ -839,6 +843,28 @@ describe('BookingService', () => {
         (call) => call[1],
       );
       expect(queriedFields).toEqual(['reminder7SentAt', 'reminder3SentAt', 'reminder1SentAt']);
+    });
+  });
+
+  describe('getPendingOwnerBookingsCount', () => {
+    it('scopes to the requesting owner for OWNER role', async () => {
+      mockBookingRepository.countPendingByOwner.mockResolvedValue(3);
+
+      const count = await service.getPendingOwnerBookingsCount('owner-1', UserRole.OWNER);
+
+      expect(count).toBe(3);
+      expect(mockBookingRepository.countPendingByOwner).toHaveBeenCalledWith('owner-1');
+      expect(mockBookingRepository.countAllPending).not.toHaveBeenCalled();
+    });
+
+    it('returns the platform-wide pending count for ADMIN role', async () => {
+      mockBookingRepository.countAllPending.mockResolvedValue(11);
+
+      const count = await service.getPendingOwnerBookingsCount('admin-1', UserRole.ADMIN);
+
+      expect(count).toBe(11);
+      expect(mockBookingRepository.countAllPending).toHaveBeenCalled();
+      expect(mockBookingRepository.countPendingByOwner).not.toHaveBeenCalled();
     });
   });
 });

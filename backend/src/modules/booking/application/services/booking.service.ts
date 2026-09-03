@@ -391,6 +391,15 @@ export class BookingService {
     return this.bookingRepository.findByVenue(venueId);
   }
 
+  // Mirrors PaymentService.getPendingOwnerPayments: an ADMIN's own id never matches any
+  // venue's ownerId, so ADMIN gets the platform-wide pending queue instead of an owner-scoped one.
+  async getPendingOwnerBookingsCount(ownerId: string, userRole: UserRole): Promise<number> {
+    if (userRole === UserRole.ADMIN) {
+      return this.bookingRepository.countAllPending();
+    }
+    return this.bookingRepository.countPendingByOwner(ownerId);
+  }
+
   async approveBooking(
     bookingId: string,
     venueOwnerId: string,
