@@ -24,6 +24,7 @@ import { departamentoLabels, priceUnitLabels } from '@/components/venues/venue-f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { PhoneInput } from '@/components/shared/phone-input';
@@ -32,6 +33,12 @@ import type { PriceUnit, Venue, VenueFormPayload, VenuePriceInput } from '@/type
 
 interface VenueFormProps {
   venue?: Venue;
+  /** When provided (along with onTabChange), the parent controls which tab is active and
+   * VenueForm skips rendering its own horizontal tab bar — used by the owner edit page, which
+   * renders the tab nav itself in its sidebar. Standalone callers (e.g. the "new venue" page)
+   * omit both and VenueForm manages its own tab state with its usual horizontal bar. */
+  activeTab?: TabKey;
+  onTabChange?: (tab: TabKey) => void;
 }
 
 type PricingMode = 'single' | 'weekday' | 'weekday_season';
@@ -87,9 +94,9 @@ const buildInitialPricingMode = (venue?: Venue): PricingMode => {
   return 'single';
 };
 
-type TabKey = 'general' | 'location' | 'pricing' | 'amenities' | 'hours' | 'rules';
+export type TabKey = 'general' | 'location' | 'pricing' | 'amenities' | 'hours' | 'rules';
 
-const tabs: { key: TabKey; label: string }[] = [
+export const tabs: { key: TabKey; label: string }[] = [
   { key: 'general', label: 'General' },
   { key: 'location', label: 'Ubicacion' },
   { key: 'amenities', label: 'Comodidades' },
@@ -231,10 +238,13 @@ const toPayload = (
   openingHours: values.openingHours,
 });
 
-export const VenueForm = ({ venue }: VenueFormProps) => {
+export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: VenueFormProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabKey>('general');
+  const [internalTab, setInternalTab] = useState<TabKey>('general');
+  const isTabControlled = controlledTab !== undefined && onTabChange !== undefined;
+  const activeTab = isTabControlled ? controlledTab : internalTab;
+  const setActiveTab = isTabControlled ? onTabChange : setInternalTab;
   const isEdit = Boolean(venue);
 
   const form = useForm<VenueFormValues>({
@@ -518,25 +528,27 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
 
   return (
     <form className="space-y-5" onSubmit={form.handleSubmit(onValid, onInvalid)}>
-      <div className="flex flex-wrap gap-2 border-b pb-3">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            {tab.label}
-            {tabsWithErrors.has(tab.key) ? (
-              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-destructive" />
-            ) : null}
-          </button>
-        ))}
-      </div>
+      {!isTabControlled ? (
+        <div className="flex flex-wrap gap-2 border-b pb-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              {tab.label}
+              {tabsWithErrors.has(tab.key) ? (
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-destructive" />
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="space-y-5 pt-5">
@@ -1033,34 +1045,30 @@ export const VenueForm = ({ venue }: VenueFormProps) => {
                             </label>
                             {entry ? (
                               <div className="flex flex-wrap items-center gap-2 pl-6">
-                                <button
-                                  type="button"
-                                  onClick={() => setAmenityIncluded(amenity.id, true)}
-                                  className={entry.isIncluded ? 'sf-badge-primary' : 'sf-badge-outline'}
-                                >
-                                  Incluido
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setAmenityIncluded(amenity.id, false)}
-                                  className={!entry.isIncluded ? 'sf-badge-primary' : 'sf-badge-outline'}
-                                >
-                                  Costo extra
-                                </button>
+                                <span className="w-12 text-xs text-muted-foreground">
+                                  {entry.isIncluded ? 'Incluido' : 'Extra'}
+                                </span>
+                                <Switch
+                                  checked={!entry.isIncluded}
+                                  onCheckedChange={(checked) => setAmenityIncluded(amenity.id, !checked)}
+                                  aria-label={`${amenity.name} con costo extra`}
+                                />
                                 {!entry.isIncluded ? (
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    placeholder="Bs"
-                                    className="sf-surface h-8 w-24"
-                                    value={entry.extraCost ?? ''}
-                                    onChange={(e) =>
-                                      setAmenityExtraCost(
-                                        amenity.id,
-                                        e.target.value ? Number(e.target.value) : undefined,
-                                      )
-                                    }
-                                  />
+                                  <div className="sf-surface flex h-8 items-center gap-1 rounded-[var(--radius)] pl-2 pr-1">
+                                    <span className="text-xs text-muted-foreground">Bs</span>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      className="h-7 w-16 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                                      value={entry.extraCost ?? ''}
+                                      onChange={(e) =>
+                                        setAmenityExtraCost(
+                                          amenity.id,
+                                          e.target.value ? Number(e.target.value) : undefined,
+                                        )
+                                      }
+                                    />
+                                  </div>
                                 ) : null}
                               </div>
                             ) : null}

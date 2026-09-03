@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
 import { getMyVenues } from '@/lib/api/venues.api';
-import { VenueForm } from './venue-form';
+import { VenueForm, tabs, type TabKey } from './venue-form';
 import { VenueMediaManager } from './venue-media-manager';
 import { VenueCompletionCard } from './venue-completion-card';
 import { Breadcrumbs } from '@/components/shared/breadcrumbs';
@@ -17,6 +18,7 @@ interface OwnerVenueEditProps {
 }
 
 export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
+  const [activeTab, setActiveTab] = useState<TabKey>('general');
   const query = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
 
   if (query.isLoading) {
@@ -62,10 +64,26 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
             </Link>
           </Button>
         </div>
-        <VenueForm venue={venue} />
+        <VenueForm venue={venue} activeTab={activeTab} onTabChange={setActiveTab} />
         <VenueMediaManager venue={venue} />
       </div>
-      <div className="lg:sticky lg:top-24 lg:self-start">
+      <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+        <nav className="flex flex-col gap-1 rounded-[var(--radius)] border bg-card p-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-[var(--radius)] px-3 py-2 text-left text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
         <VenueCompletionCard venue={venue} />
       </div>
     </div>
