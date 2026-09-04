@@ -257,7 +257,7 @@ export const BookingForm = ({
         className={`sf-booking-header p-5 ${stickyHeader ? 'sticky top-0 z-10 border-b bg-background' : ''}`}
       >
         <div className="flex items-center gap-2">
-          <CalendarCheck className="h-5 w-5 text-accent" />
+          <CalendarCheck className="h-5 w-5 text-accent-foreground" />
           <h2 className="text-lg font-semibold">Solicitar reserva</h2>
         </div>
         <div className="sf-glass mt-4 rounded-md border p-3">

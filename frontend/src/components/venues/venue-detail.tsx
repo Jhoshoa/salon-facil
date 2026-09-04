@@ -402,7 +402,7 @@ export const VenueDetail = ({
                         key={item.id}
                         className="sf-surface flex items-center gap-2.5 px-3 py-2.5 text-sm"
                       >
-                        <Plus className="h-4 w-4 text-accent" />
+                        <Plus className="h-4 w-4 text-accent-foreground" />
                         <span>{item.amenity.name}</span>
                         {item.extraCost ? (
                           <span className="text-muted-foreground">
