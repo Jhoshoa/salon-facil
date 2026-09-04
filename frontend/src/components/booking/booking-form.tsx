@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { SubmitButton } from '@/components/shared/submit-button';
+import { LoginToBookModal } from './login-to-book-modal';
 
 interface BookingFormProps {
   venue: Venue;
@@ -61,8 +62,9 @@ const computeDefaultSchedule = (venue: Venue, dateStr: string): { startTime: str
 };
 
 export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange }: BookingFormProps) => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, role } = useAuthStore();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const defaultDate = formatDateInput(new Date(Date.now() + 24 * 60 * 60 * 1000));
   const defaultSchedule = computeDefaultSchedule(venue, defaultDate);
@@ -301,13 +303,16 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange
         ) : null}
       </div>
 
-      {!isAuthenticated ? (
-        <div className="sf-warning m-4 rounded-md border p-3 text-sm">
-          Inicia sesion como cliente para solicitar una reserva.
-        </div>
-      ) : null}
-
-      <form className="space-y-4 p-4" onSubmit={form.handleSubmit(() => setConfirmOpen(true))}>
+      <form
+        className="space-y-4 p-4"
+        onSubmit={form.handleSubmit(() => {
+          if (!isAuthenticated || role !== 'CLIENT') {
+            setLoginModalOpen(true);
+            return;
+          }
+          setConfirmOpen(true);
+        })}
+      >
         <div className="space-y-2">
           <Label htmlFor="eventType">Tipo de evento</Label>
           <Input
@@ -527,7 +532,7 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange
         <SubmitButton
           className="sf-action h-11 w-full"
           type="submit"
-          disabled={!canSubmit || !isAuthenticated}
+          disabled={!canSubmit}
           isLoading={mutation.isPending}
         >
           Enviar solicitud
@@ -547,6 +552,8 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange
         onOpenChange={setConfirmOpen}
         onConfirm={handleConfirm}
       />
+
+      <LoginToBookModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
     </div>
   );
 };

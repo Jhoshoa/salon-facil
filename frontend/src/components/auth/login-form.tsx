@@ -9,12 +9,20 @@ import { toast } from 'sonner';
 import { login } from '@/lib/api/auth.api';
 import { loginSchema, type LoginFormValues } from '@/lib/validators/auth.schema';
 import { useAuthStore } from '@/stores/auth.store';
+import type { PublicAuthResponse } from '@/types/api';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { SubmitButton } from '@/components/shared/submit-button';
 
-export const LoginForm = () => {
+interface LoginFormProps {
+  /** When provided, the form hands control back to the caller instead of navigating away —
+   * used when this form is embedded in a modal (e.g. "log in to book") so the page underneath
+   * stays exactly as the user left it. Omit for the standalone /login page's usual redirect. */
+  onSuccess?: (session: PublicAuthResponse) => void;
+}
+
+export const LoginForm = ({ onSuccess }: LoginFormProps = {}) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
@@ -30,6 +38,11 @@ export const LoginForm = () => {
     onSuccess: (session) => {
       setSession(session);
       toast.success('Sesion iniciada');
+
+      if (onSuccess) {
+        onSuccess(session);
+        return;
+      }
 
       const next = searchParams.get('next');
       const isSafeNext = next?.startsWith('/') && !next.startsWith('//');
