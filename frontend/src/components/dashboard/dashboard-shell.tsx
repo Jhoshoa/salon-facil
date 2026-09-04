@@ -89,9 +89,11 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
       </div>
 
       <AppDrawer open={drawerOpen} title="Menu" onOpenChange={setDrawerOpen}>
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-1 flex-col">
           <NavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
-          <AccountMenu variant="owner" onNavigate={() => setDrawerOpen(false)} />
+          <div className="mt-auto pt-6">
+            <AccountMenu variant="owner" onNavigate={() => setDrawerOpen(false)} />
+          </div>
         </div>
       </AppDrawer>
     </div>
