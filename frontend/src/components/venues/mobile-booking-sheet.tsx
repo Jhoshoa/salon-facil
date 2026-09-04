@@ -53,6 +53,7 @@ export const MobileBookingSheet = ({
             selectedRange={selectedRange}
             onDatesChange={onDatesChange}
             onPriceChange={onPriceChange}
+            stickyHeader
           />
         ) : null}
       </SheetContent>

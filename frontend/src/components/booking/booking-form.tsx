@@ -30,6 +30,11 @@ interface BookingFormProps {
   /** Reports the live total (once a price preview resolves) up to the parent — null while
    * no preview exists yet, so the caller knows to fall back to its own static base price. */
   onPriceChange?: (total: number | null) => void;
+  /** Pins the title + price header to the top of its scroll container instead of scrolling
+   * away with the rest of the form — used inside the mobile bottom sheet, where the form is
+   * long enough to scroll and the price is worth keeping in view. The desktop sticky aside
+   * doesn't scroll independently, so it leaves this off. */
+  stickyHeader?: boolean;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -61,7 +66,13 @@ const computeDefaultSchedule = (venue: Venue, dateStr: string): { startTime: str
   return timeToMinutes(startTime) < endTimeToMinutes(endTime) ? { startTime, endTime } : FALLBACK_SCHEDULE;
 };
 
-export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange }: BookingFormProps) => {
+export const BookingForm = ({
+  venue,
+  selectedRange,
+  onDatesChange,
+  onPriceChange,
+  stickyHeader,
+}: BookingFormProps) => {
   const { isAuthenticated, role } = useAuthStore();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -241,8 +252,10 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange
   const canSubmit = form.formState.isValid && !mutation.isPending && !previewError;
 
   return (
-    <div className="sf-card-strong overflow-hidden">
-      <div className="sf-booking-header p-5">
+    <div className={`sf-card-strong ${stickyHeader ? '' : 'overflow-hidden'}`}>
+      <div
+        className={`sf-booking-header p-5 ${stickyHeader ? 'sticky top-0 z-10 border-b bg-background' : ''}`}
+      >
         <div className="flex items-center gap-2">
           <CalendarCheck className="h-5 w-5 text-accent" />
           <h2 className="text-lg font-semibold">Solicitar reserva</h2>
