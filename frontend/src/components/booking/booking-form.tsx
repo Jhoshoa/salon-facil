@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { CalendarCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -152,6 +152,10 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange
         selectedAmenityIds: values.selectedAmenityIds,
       }),
     enabled: canPreview,
+    // Ticking an extra or nudging a date changes the query key, which would otherwise blank
+    // the price card back to its "no preview yet" state for a beat while the new total loads —
+    // keep showing the last result in the meantime so the number updates smoothly in place.
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
