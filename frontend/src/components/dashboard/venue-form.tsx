@@ -1059,7 +1059,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                                     <Input
                                       type="number"
                                       min={0}
-                                      className="h-6 w-16 border-0 bg-transparent p-0 leading-none shadow-none [appearance:textfield] focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                      className="h-6 w-16 rounded-sm border border-input bg-background px-1.5 py-0 text-sm leading-none shadow-none [appearance:textfield] focus-visible:ring-1 focus-visible:ring-primary/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                       value={entry.extraCost ?? ''}
                                       onChange={(e) =>
                                         setAmenityExtraCost(
