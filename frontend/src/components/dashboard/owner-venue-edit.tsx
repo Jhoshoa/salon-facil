@@ -64,10 +64,35 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
             </Link>
           </Button>
         </div>
+        {/* Mobile/tablet only: below `lg` the sidebar column stacks to the bottom of the
+         * page (after the whole form and the photo manager), which would bury both the tab
+         * nav and the completion status somewhere a user has to scroll past everything to
+         * reach. Show compact equivalents right here instead; the lg+ sidebar versions below
+         * take over once there's room for a persistent side column. */}
+        <div className="space-y-4 lg:hidden">
+          <VenueCompletionCard venue={venue} />
+          <nav className="flex flex-wrap gap-2 rounded-[var(--radius)] border bg-card p-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-[var(--radius)] px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === tab.key
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
         <VenueForm venue={venue} activeTab={activeTab} onTabChange={setActiveTab} />
         <VenueMediaManager venue={venue} />
       </div>
-      <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+      <div className="hidden space-y-6 lg:block lg:sticky lg:top-24 lg:self-start">
         <nav className="flex flex-col gap-1 rounded-[var(--radius)] border bg-card p-2">
           {tabs.map((tab) => (
             <button
