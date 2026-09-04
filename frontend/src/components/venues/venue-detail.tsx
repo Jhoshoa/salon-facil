@@ -19,6 +19,7 @@ import {
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { departamentoLabels } from './venue-filter-labels';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
@@ -34,6 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { AmenityCategory, Venue } from '@/types/api';
+import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
 
@@ -121,6 +123,9 @@ export const VenueDetail = ({
     open: false,
     index: 0,
   });
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [liveTotal, setLiveTotal] = useState<number | null>(null);
+  const [mobileBookingOpen, setMobileBookingOpen] = useState(false);
 
   const rangeValidationQuery = useQuery({
     queryKey: ['venue-availability-range-check', query.data?.id, initialStartDate, initialEndDate],
@@ -163,9 +168,11 @@ export const VenueDetail = ({
   ][];
   const primaryUses = venue.uses?.filter((item) => item.isPrimary) ?? [];
   const secondaryUses = venue.uses?.filter((item) => !item.isPrimary).slice(0, 6) ?? [];
+  const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
+  const displayedPrice = liveTotal ?? basePrice;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${!isDesktop ? 'pb-24' : ''}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <div className="min-w-0 flex-1 space-y-6">
         {/* Gallery */}
@@ -508,23 +515,58 @@ export const VenueDetail = ({
         ) : null}
       </div>
 
-      <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
-        {staleRangeNotice ? (
-          <div className="sf-warning flex items-start justify-between gap-2 rounded-md border p-3 text-sm">
-            <p>{staleRangeNotice}</p>
-            <button
-              type="button"
-              onClick={() => setStaleRangeNotice(null)}
-              aria-label="Cerrar aviso"
-              className="shrink-0"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ) : null}
-        <BookingForm venue={venue} selectedRange={selectedRange} onDatesChange={handleRangeChange} />
-      </aside>
+      {isDesktop ? (
+        <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
+          {staleRangeNotice ? (
+            <div className="sf-warning flex items-start justify-between gap-2 rounded-md border p-3 text-sm">
+              <p>{staleRangeNotice}</p>
+              <button
+                type="button"
+                onClick={() => setStaleRangeNotice(null)}
+                aria-label="Cerrar aviso"
+                className="shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
+          <BookingForm
+            venue={venue}
+            selectedRange={selectedRange}
+            onDatesChange={handleRangeChange}
+            onPriceChange={setLiveTotal}
+          />
+        </aside>
+      ) : null}
       </div>
+
+      {!isDesktop ? (
+        <>
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {liveTotal != null ? 'Total estimado' : 'Precio base'}
+                </p>
+                <p className="text-lg font-bold">
+                  {displayedPrice > 0 ? formatCurrency(displayedPrice) : 'Consultar'}
+                </p>
+              </div>
+              <Button onClick={() => setMobileBookingOpen(true)}>Solicitar reserva</Button>
+            </div>
+          </div>
+          <MobileBookingSheet
+            open={mobileBookingOpen}
+            onOpenChange={setMobileBookingOpen}
+            venue={venue}
+            selectedRange={selectedRange}
+            onDatesChange={handleRangeChange}
+            onPriceChange={setLiveTotal}
+            staleRangeNotice={staleRangeNotice}
+            onDismissStaleNotice={() => setStaleRangeNotice(null)}
+          />
+        </>
+      ) : null}
 
       {similarQuery.data?.length ? (
         <section className="sf-detail-section">

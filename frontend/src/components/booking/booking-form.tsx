@@ -26,6 +26,9 @@ interface BookingFormProps {
   venue: Venue;
   selectedRange?: { start: string; end: string };
   onDatesChange?: (start: string, end: string) => void;
+  /** Reports the live total (once a price preview resolves) up to the parent — null while
+   * no preview exists yet, so the caller knows to fall back to its own static base price. */
+  onPriceChange?: (total: number | null) => void;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -57,7 +60,7 @@ const computeDefaultSchedule = (venue: Venue, dateStr: string): { startTime: str
   return timeToMinutes(startTime) < endTimeToMinutes(endTime) ? { startTime, endTime } : FALLBACK_SCHEDULE;
 };
 
-export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingFormProps) => {
+export const BookingForm = ({ venue, selectedRange, onDatesChange, onPriceChange }: BookingFormProps) => {
   const { isAuthenticated } = useAuthStore();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -150,6 +153,11 @@ export const BookingForm = ({ venue, selectedRange, onDatesChange }: BookingForm
       }),
     enabled: canPreview,
   });
+
+  useEffect(() => {
+    onPriceChange?.(previewQuery.data?.totalPrice ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewQuery.data]);
 
   const extraAmenities = useMemo(
     () => (venue.amenities ?? []).filter((item) => !item.isIncluded && item.extraCost),
