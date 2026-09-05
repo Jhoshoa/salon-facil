@@ -166,7 +166,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="sf-print absolute bottom-0 left-[16%] z-30 hidden w-[210px] rotate-[2deg] sm:block">
+          <div className="sf-print absolute bottom-8 left-[30%] z-30 hidden w-[210px] rotate-[2deg] sm:block sm:bottom-10 lg:bottom-14 lg:left-[34%]">
             <span className="sf-print-pin" />
             <div className="relative h-[190px]">
               <Image
