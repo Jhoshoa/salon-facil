@@ -550,10 +550,14 @@
     @apply relative inline-flex h-20 w-20 shrink-0 -rotate-[8deg] items-center justify-center rounded-full border border-current p-2 text-center font-serif text-[0.6rem] italic leading-tight text-accent-foreground;
   }
 
-  /* Foto tipo polaroid: tarjeta blanca con padding, sombra y "pin" dorado. */
+  /* Foto tipo polaroid: tarjeta blanca con padding, sombra y "pin" dorado. La
+     inclinacion de reposo llega como --sway-rotate (inline, por instancia —
+     ver PinnedPrint) en vez de una utility rotate-*, para que el keyframe de
+     abajo pueda oscilar alrededor de esa inclinacion real en vez de pisarla. */
   .sf-print {
     @apply relative rounded-none border border-border bg-card p-2 pb-8 shadow-md;
     transform-origin: 50% 0%;
+    transform: rotate(var(--sway-rotate, 0deg));
   }
 
   .sf-print-pin {
@@ -596,36 +600,41 @@
      — en tablet/mobile no hay gesto equivalente al hover, asi que ahi no se
      activa. Comparten el mismo keyframe la barra de busqueda (sf-journal-bar,
      colgada de 2 pines) y las fotos del corkboard (sf-print, colgadas de 1). */
-  /* Cada tramo trae su propia curva: rapido y directo para el "empujon"
-     inicial, suave para el vaiven, y un tramo final largo en ease-out (mas de
-     un tercio de la duracion total) para que vuelva al reposo deslizandose,
-     en vez de cortar en seco. */
+  /* El 0% y el 100% son EXACTAMENTE la inclinacion de reposo (--sway-rotate,
+     0deg en la barra de busqueda que no tiene tilt) — el balanceo se suma con
+     calc() encima de esa base, nunca la reemplaza, para que no haya un salto
+     al entrar (a la posicion "vertical") ni al salir (de vuelta a como
+     estaba). Cada tramo trae ademas su propia curva: directo para el primer
+     empujon (mas largo que el resto, para que se note), suave para el
+     vaiven, y un tramo final largo (ultimo 30% de la duracion) en una curva
+     de frenado para que el regreso al reposo se sienta como un deslizamiento
+     y no un corte. */
   @keyframes sf-journal-sway {
     0% {
-      transform: rotate(0deg) skewX(0deg) translateY(0);
-      animation-timing-function: ease-out;
-    }
-    18% {
-      transform: rotate(-1.4deg) skewX(-0.9deg) translateY(2px);
+      transform: rotate(var(--sway-rotate, 0deg)) skewX(0deg) translateY(0);
       animation-timing-function: ease-in-out;
     }
-    42% {
-      transform: rotate(0.9deg) skewX(0.55deg) translateY(-1px);
+    24% {
+      transform: rotate(calc(var(--sway-rotate, 0deg) - 1.8deg)) skewX(-1.1deg) translateY(2.6px);
       animation-timing-function: ease-in-out;
     }
-    62% {
-      transform: rotate(-0.35deg) skewX(-0.2deg) translateY(0.4px);
+    46% {
+      transform: rotate(calc(var(--sway-rotate, 0deg) + 1.2deg)) skewX(0.7deg) translateY(-1.3px);
+      animation-timing-function: ease-in-out;
+    }
+    68% {
+      transform: rotate(calc(var(--sway-rotate, 0deg) - 0.5deg)) skewX(-0.3deg) translateY(0.55px);
       animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
     }
     100% {
-      transform: rotate(0deg) skewX(0deg) translateY(0);
+      transform: rotate(var(--sway-rotate, 0deg)) skewX(0deg) translateY(0);
     }
   }
 
   @media (min-width: 1024px) and (hover: hover) {
     .sf-journal-bar.is-swaying,
     .sf-print.is-swaying {
-      animation: sf-journal-sway 1.3s ease 1;
+      animation: sf-journal-sway 1.5s ease 1;
     }
   }
 
