@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, MouseEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Search, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,6 +24,15 @@ export const HomeSearchForm = () => {
   const [endDate, setEndDate] = useState('');
   const [capacity, setCapacity] = useState('');
   const [errors, setErrors] = useState<SearchErrors>({});
+  const [isSwaying, setIsSwaying] = useState(false);
+
+  /** Starts the "hung fabric" hover sway (see .sf-journal-bar in globals.css) — a class
+   * toggle instead of a plain CSS :hover trigger so the animation always plays to
+   * completion even if the pointer leaves right away, instead of snapping back mid-swing. */
+  const handleMouseEnter = (event: MouseEvent<HTMLFormElement>) => {
+    if ((event.target as HTMLElement).closest('input')) return;
+    setIsSwaying(true);
+  };
 
   const validate = () => {
     const parsedCapacity = Number(capacity);
@@ -102,7 +111,12 @@ export const HomeSearchForm = () => {
   };
 
   return (
-    <form className="sf-journal-bar" onSubmit={handleSubmit}>
+    <form
+      className={`sf-journal-bar ${isSwaying ? 'is-swaying' : ''}`}
+      onSubmit={handleSubmit}
+      onMouseEnter={handleMouseEnter}
+      onAnimationEnd={() => setIsSwaying(false)}
+    >
       <p className="sf-journal-title">Busca disponibilidad real</p>
       <p className="sf-journal-subtitle">
         Fecha e invitados son obligatorios para resultados relevantes

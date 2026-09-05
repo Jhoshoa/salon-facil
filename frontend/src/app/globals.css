@@ -587,9 +587,13 @@
   }
 
   /* Al pasar el mouse, se comporta como tela colgada de esos dos pines: un
-     balanceo que decae, como si se le hubiera dado un empujon. No se
-     dispara al pasar sobre los inputs mismos (:has), para no mover el
-     objetivo justo cuando el usuario esta por hacer click en un campo. */
+     balanceo que decae, como si se le hubiera dado un empujon. La clase
+     is-swaying la agrega/quita home-search-form.tsx (mouseenter / animationend)
+     en vez de disparar con :hover directo, para que la secuencia siempre
+     termine aunque el mouse salga enseguida, en vez de cortarse a mitad de
+     camino. Solo aplica en desktop (>=1024px) con dispositivo con hover real
+     — en tablet/mobile no hay gesto equivalente al hover, asi que ahi no se
+     activa. */
   @keyframes sf-journal-sway {
     0% {
       transform: rotate(0deg) skewX(0deg) translateY(0);
@@ -614,14 +618,14 @@
     }
   }
 
-  @media (hover: hover) {
-    .sf-journal-bar:hover:not(:has(input:hover)) {
+  @media (min-width: 1024px) and (hover: hover) {
+    .sf-journal-bar.is-swaying {
       animation: sf-journal-sway 1.1s cubic-bezier(0.45, 0, 0.55, 1) 1;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sf-journal-bar:hover {
+    .sf-journal-bar.is-swaying {
       animation: none;
     }
   }
