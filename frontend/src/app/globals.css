@@ -697,7 +697,14 @@
     @apply mb-1.5 block text-[0.68rem] font-bold uppercase tracking-wider text-muted-foreground;
   }
 
+  /* En mobile/tablet los campos se apilan en 1-2 columnas con poco espacio
+     entre filas, asi que el error se queda en el flujo (empuja lo que sigue,
+     igual que antes). Recien en lg: la grilla pasa a una sola fila de 5
+     columnas — ahi no hay nada debajo del campo dentro del form, asi que se
+     vuelve absoluto (no empuja el boton ni el resto) igual que
+     .sf-field-popover en /venues, sin la caja/flecha de popover, solo el
+     texto flotando debajo del campo. */
   .sf-journal-error {
-    @apply mt-1.5 text-xs font-medium text-destructive;
+    @apply relative mt-1.5 w-48 text-xs font-medium leading-snug text-destructive lg:absolute lg:left-0 lg:top-full lg:z-20 lg:mt-1;
   }
 }

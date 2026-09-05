@@ -123,7 +123,7 @@ export const HomeSearchForm = () => {
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_0.8fr_auto] lg:items-end lg:gap-5">
-        <div className="min-w-0">
+        <div className="relative min-w-0">
           <Label htmlFor="homeQuery" className="sf-journal-label">
             <Search className="mr-1.5 inline h-3.5 w-3.5" />
             Buscar
@@ -137,7 +137,7 @@ export const HomeSearchForm = () => {
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="relative min-w-0">
           <Label htmlFor="homeStartDate" className="sf-journal-label">
             <CalendarDays className="mr-1.5 inline h-3.5 w-3.5" />
             Fecha inicio
@@ -153,7 +153,7 @@ export const HomeSearchForm = () => {
           {errors.startDate ? <p className="sf-journal-error">{errors.startDate}</p> : null}
         </div>
 
-        <div className="min-w-0">
+        <div className="relative min-w-0">
           <Label htmlFor="homeEndDate" className="sf-journal-label">
             Fecha fin (opcional)
           </Label>
@@ -168,7 +168,7 @@ export const HomeSearchForm = () => {
           {errors.endDate ? <p className="sf-journal-error">{errors.endDate}</p> : null}
         </div>
 
-        <div className="min-w-0">
+        <div className="relative min-w-0">
           <Label htmlFor="homeCapacity" className="sf-journal-label">
             <Users className="mr-1.5 inline h-3.5 w-3.5" />
             Invitados
