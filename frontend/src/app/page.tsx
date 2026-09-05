@@ -5,7 +5,7 @@ import { HomeSearchForm } from '@/components/venues/home-search-form';
 import { SiteHeader } from '@/components/shared/site-header';
 import { SiteFooter } from '@/components/shared/site-footer';
 import { PinnedPrint } from '@/components/shared/pinned-print';
-import { LegendCarousel } from '@/components/shared/legend-carousel';
+import { LegendMarquee } from '@/components/shared/legend-marquee';
 import { Button } from '@/components/ui/button';
 
 import verdeManzanaGarden from '@/assets/images/venue-verde-manzana-garden.jpg';
@@ -196,10 +196,8 @@ export default function HomePage() {
       </section>
 
       {/* Legend strip */}
-      <section className="border-y border-border">
-        <div className="sf-container py-4">
-          <LegendCarousel items={legendItems} />
-        </div>
+      <section className="border-y border-border py-4">
+        <LegendMarquee items={legendItems} />
       </section>
 
       {/* Gallery */}

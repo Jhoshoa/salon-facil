@@ -645,21 +645,44 @@
     }
   }
 
-  /* Fundido de entrada para cada tanda del legend-strip rotativo
-     (LegendCarousel) — sube key en cada rotacion para forzar el remount. */
-  @keyframes sf-legend-fade {
+  /* Legend-strip: ticker continuo de derecha a izquierda (LegendMarquee). El
+     track duplica la lista de items y anima de translateX(0) a
+     translateX(-50%) — exactamente el ancho de una copia — asi que el loop
+     no se nota (el item 1 de la segunda copia llega justo cuando el item 1
+     de la primera ya salio). mask-image difumina los bordes del contenedor
+     en vez de cortar los items en seco. */
+  .sf-legend-marquee {
+    @apply overflow-hidden;
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  }
+
+  .sf-legend-track {
+    @apply flex w-max items-center;
+    animation: sf-legend-scroll 34s linear infinite;
+  }
+
+  .sf-legend-marquee:hover .sf-legend-track {
+    animation-play-state: paused;
+  }
+
+  .sf-legend-item {
+    @apply flex shrink-0 items-center gap-2.5 whitespace-nowrap px-4 text-sm text-foreground sm:px-5;
+  }
+
+  @keyframes sf-legend-scroll {
     from {
-      opacity: 0;
-      transform: translateY(2px);
+      transform: translateX(0);
     }
     to {
-      opacity: 1;
-      transform: translateY(0);
+      transform: translateX(-50%);
     }
   }
 
-  .sf-legend-fade {
-    animation: sf-legend-fade 0.5s ease;
+  @media (prefers-reduced-motion: reduce) {
+    .sf-legend-track {
+      animation: none;
+    }
   }
 
   .sf-journal-title {
