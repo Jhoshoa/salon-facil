@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import { HomeSearchForm } from '@/components/venues/home-search-form';
 import { SiteHeader } from '@/components/shared/site-header';
 import { SiteFooter } from '@/components/shared/site-footer';
+import { PinnedPrint } from '@/components/shared/pinned-print';
 import { Button } from '@/components/ui/button';
 
 import verdeManzanaGarden from '@/assets/images/venue-verde-manzana-garden.jpg';
@@ -128,7 +129,7 @@ export default function HomePage() {
         </div>
 
         <div className="relative min-h-[380px] sm:min-h-[440px] lg:order-2 lg:min-h-[480px]">
-          <div className="sf-print absolute left-0 top-0 z-20 w-[68%] rotate-[-4deg] sm:w-[280px]">
+          <PinnedPrint className="absolute left-0 top-0 z-20 w-[68%] rotate-[-4deg] sm:w-[280px]">
             <span className="sf-print-pin" />
             <div className="relative h-[240px] sm:h-[320px]">
               <Image
@@ -145,9 +146,9 @@ export default function HomePage() {
             <p className="absolute bottom-2.5 right-3 text-[0.62rem] font-bold uppercase tracking-wider text-accent-foreground">
               Santa Cruz
             </p>
-          </div>
+          </PinnedPrint>
 
-          <div className="sf-print absolute right-0 top-[190px] z-10 w-[58%] rotate-[3deg] sm:top-[50px] sm:w-[230px]">
+          <PinnedPrint className="absolute right-0 top-[190px] z-10 w-[58%] rotate-[3deg] sm:top-[50px] sm:w-[230px]">
             <span className="sf-print-pin" />
             <div className="relative h-[140px] sm:h-[170px]">
               <Image
@@ -164,9 +165,9 @@ export default function HomePage() {
             <p className="absolute bottom-2.5 right-3 text-[0.62rem] font-bold uppercase tracking-wider text-accent-foreground">
               El Alto
             </p>
-          </div>
+          </PinnedPrint>
 
-          <div className="sf-print absolute bottom-8 left-[30%] z-30 hidden w-[210px] rotate-[2deg] sm:block sm:bottom-10 lg:bottom-14 lg:left-[34%]">
+          <PinnedPrint className="absolute bottom-8 left-[30%] z-30 hidden w-[210px] rotate-[2deg] sm:block sm:bottom-10 lg:bottom-14 lg:left-[34%]">
             <span className="sf-print-pin" />
             <div className="relative h-[190px]">
               <Image
@@ -183,7 +184,7 @@ export default function HomePage() {
             <p className="absolute bottom-2.5 right-3 text-[0.62rem] font-bold uppercase tracking-wider text-accent-foreground">
               El Alto
             </p>
-          </div>
+          </PinnedPrint>
         </div>
       </section>
 
