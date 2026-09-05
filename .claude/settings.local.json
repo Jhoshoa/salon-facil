@@ -140,7 +140,11 @@
       "Bash(cp /c/Users/josoe/AppData/Local/Temp/claude/C--Users-josoe-Documents-salon-facil/0a463068-6c33-4f6a-8eb6-8f1425d338eb/scratchpad/extracted-images/img-01.jpg /c/Users/josoe/Documents/salon-facil/frontend/src/assets/images/venue-verde-manzana-garden.jpg)",
       "Bash(cp /c/Users/josoe/AppData/Local/Temp/claude/C--Users-josoe-Documents-salon-facil/0a463068-6c33-4f6a-8eb6-8f1425d338eb/scratchpad/extracted-images/img-02.jpg /c/Users/josoe/Documents/salon-facil/frontend/src/assets/images/venue-salon-vip-interior.jpg)",
       "Bash(cp /c/Users/josoe/AppData/Local/Temp/claude/C--Users-josoe-Documents-salon-facil/0a463068-6c33-4f6a-8eb6-8f1425d338eb/scratchpad/extracted-images/img-03.jpg /c/Users/josoe/Documents/salon-facil/frontend/src/assets/images/venue-megatron-facade.jpg)",
-      "Bash(cp /c/Users/josoe/AppData/Local/Temp/claude/C--Users-josoe-Documents-salon-facil/0a463068-6c33-4f6a-8eb6-8f1425d338eb/scratchpad/extracted-images/img-04.jpg /c/Users/josoe/Documents/salon-facil/frontend/src/assets/images/venue-verde-manzana-arch-night.jpg)"
+      "Bash(cp /c/Users/josoe/AppData/Local/Temp/claude/C--Users-josoe-Documents-salon-facil/0a463068-6c33-4f6a-8eb6-8f1425d338eb/scratchpad/extracted-images/img-04.jpg /c/Users/josoe/Documents/salon-facil/frontend/src/assets/images/venue-verde-manzana-arch-night.jpg)",
+      "Bash(npm test *)",
+      "Bash(export E2E_DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_test\")",
+      "Bash(export DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_test\")",
+      "Bash(export DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_test\" E2E_DATABASE_URL=\"postgresql://salonfacil:salonfacil_dev_password@localhost:5434/salonfacil_test\" REDIS_URL=\"redis://localhost:6379\")"
     ]
   }
 }
