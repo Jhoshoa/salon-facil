@@ -573,17 +573,15 @@
   .sf-journal-bar::before,
   .sf-journal-bar::after {
     content: '';
-    @apply absolute -top-2 h-3.5 w-8 border border-secondary/35 bg-secondary/20;
+    @apply absolute -top-1.5 h-3 w-3 rounded-full bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.4)];
   }
 
   .sf-journal-bar::before {
     left: 26px;
-    transform: rotate(-3deg);
   }
 
   .sf-journal-bar::after {
     right: 26px;
-    transform: rotate(2deg);
   }
 
   .sf-journal-title {
