@@ -14,6 +14,9 @@ interface SearchErrors {
   capacity?: string;
 }
 
+const journalInputClass =
+  'h-auto w-full rounded-none border-0 border-b border-foreground bg-transparent px-0 pb-1.5 pt-1 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0';
+
 export const HomeSearchForm = () => {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -99,10 +102,15 @@ export const HomeSearchForm = () => {
   };
 
   return (
-    <form className="sf-search-bar" onSubmit={handleSubmit}>
-      <div className="sf-search-grid">
-        <div className="sf-search-field">
-          <Label htmlFor="homeQuery" className="sf-field-label">
+    <form className="sf-journal-bar" onSubmit={handleSubmit}>
+      <p className="sf-journal-title">Busca disponibilidad real</p>
+      <p className="sf-journal-subtitle">
+        Fecha e invitados son obligatorios para resultados relevantes
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_0.8fr_auto] lg:items-end lg:gap-5">
+        <div>
+          <Label htmlFor="homeQuery" className="sf-journal-label">
             <Search className="mr-1.5 inline h-3.5 w-3.5" />
             Buscar
           </Label>
@@ -111,12 +119,12 @@ export const HomeSearchForm = () => {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Salon, zona o servicio"
-            className="sf-field-input"
+            className={journalInputClass}
           />
         </div>
 
-        <div className="sf-search-field" data-error={Boolean(errors.startDate)}>
-          <Label htmlFor="homeStartDate" className="sf-field-label">
+        <div>
+          <Label htmlFor="homeStartDate" className="sf-journal-label">
             <CalendarDays className="mr-1.5 inline h-3.5 w-3.5" />
             Fecha inicio
           </Label>
@@ -126,13 +134,13 @@ export const HomeSearchForm = () => {
             value={startDate}
             onChange={(event) => handleStartDateChange(event.target.value)}
             aria-invalid={Boolean(errors.startDate)}
-            className="sf-field-input"
+            className={journalInputClass}
           />
-          {errors.startDate ? <p className="sf-field-popover">{errors.startDate}</p> : null}
+          {errors.startDate ? <p className="sf-journal-error">{errors.startDate}</p> : null}
         </div>
 
-        <div className="sf-search-field">
-          <Label htmlFor="homeEndDate" className="sf-field-label">
+        <div>
+          <Label htmlFor="homeEndDate" className="sf-journal-label">
             Fecha fin (opcional)
           </Label>
           <Input
@@ -141,13 +149,13 @@ export const HomeSearchForm = () => {
             value={endDate}
             onChange={(event) => handleEndDateChange(event.target.value)}
             aria-invalid={Boolean(errors.endDate)}
-            className="sf-field-input"
+            className={journalInputClass}
           />
-          {errors.endDate ? <p className="sf-field-popover">{errors.endDate}</p> : null}
+          {errors.endDate ? <p className="sf-journal-error">{errors.endDate}</p> : null}
         </div>
 
-        <div className="sf-search-field" data-error={Boolean(errors.capacity)}>
-          <Label htmlFor="homeCapacity" className="sf-field-label">
+        <div>
+          <Label htmlFor="homeCapacity" className="sf-journal-label">
             <Users className="mr-1.5 inline h-3.5 w-3.5" />
             Invitados
           </Label>
@@ -159,17 +167,15 @@ export const HomeSearchForm = () => {
             min="1"
             placeholder="100"
             aria-invalid={Boolean(errors.capacity)}
-            className="sf-field-input"
+            className={journalInputClass}
           />
-          {errors.capacity ? <p className="sf-field-popover">{errors.capacity}</p> : null}
+          {errors.capacity ? <p className="sf-journal-error">{errors.capacity}</p> : null}
         </div>
 
-        <div className="sf-search-submit">
-          <Button type="submit" size="xl" className="h-full w-full md:w-auto">
-            <Search className="h-4 w-4" />
-            Buscar
-          </Button>
-        </div>
+        <Button type="submit" size="xl" className="w-full lg:w-auto">
+          <Search className="h-4 w-4" />
+          Buscar
+        </Button>
       </div>
     </form>
   );

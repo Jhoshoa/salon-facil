@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
-import { CalendarCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -47,6 +46,11 @@ const unitLabels: Record<'EVENT' | 'HOUR' | 'DAY', string> = {
 };
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+const fieldInputClass =
+  'h-auto w-full rounded-none border-0 border-b border-foreground bg-transparent px-0 pb-1.5 pt-1 text-sm shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0';
+
+const fieldLabelClass = 'mb-1.5 block text-[0.68rem] font-bold uppercase tracking-wider text-muted-foreground';
 
 /** A sensible startTime/endTime to preload the form with — the venue's own opening hours for
  * that weekday, rather than an arbitrary fixed range that may fall outside them (a HOUR-unit
@@ -254,17 +258,19 @@ export const BookingForm = ({
   return (
     <div className={`sf-card-strong ${stickyHeader ? '' : 'overflow-hidden'}`}>
       <div
-        className={`sf-booking-header p-5 ${stickyHeader ? 'sticky top-0 z-10 border-b bg-background' : ''}`}
+        className={`p-6 pb-5 ${stickyHeader ? 'sticky top-0 z-10 border-b border-border bg-card' : ''}`}
       >
-        <div className="flex items-center gap-2">
-          <CalendarCheck className="h-5 w-5 text-accent-foreground" />
-          <h2 className="text-lg font-semibold">Solicitar reserva</h2>
-        </div>
-        <div className="sf-glass mt-4 rounded-md border p-3">
-          <p className="sf-glass-muted text-xs">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Solicitud de reserva
+        </p>
+        <p className="mb-5 mt-0.5 truncate font-serif text-sm italic text-accent-foreground">
+          {venue.name}
+        </p>
+        <div>
+          <p className="text-xs text-muted-foreground">
             {previewQuery.data ? 'Total estimado' : 'Precio base'}
           </p>
-          <p className="text-2xl font-bold tracking-normal">
+          <p className="font-serif text-3xl font-semibold text-primary">
             {previewQuery.data
               ? formatCurrency(previewQuery.data.totalPrice)
               : basePrice > 0
@@ -272,7 +278,7 @@ export const BookingForm = ({
                 : 'Consultar'}
           </p>
           {previewQuery.data && pricingModeLabel ? (
-            <p className="sf-glass-muted mt-0.5 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               {pricingModeLabel}
               {singleDayHours != null
                 ? ` · ${singleDayHours} ${singleDayHours === 1 ? 'hora' : 'horas'} · ${formatCurrency(
@@ -281,15 +287,15 @@ export const BookingForm = ({
                 : ''}
             </p>
           ) : !previewQuery.data && basePrice > 0 ? (
-            <p className="sf-glass-muted mt-0.5 text-xs">{capitalize(unitLabels[venue.priceUnit])}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{capitalize(unitLabels[venue.priceUnit])}</p>
           ) : null}
           {previewQuery.data?.extrasTotal ? (
-            <p className="sf-glass-muted mt-0.5 text-xs">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Incluye {formatCurrency(previewQuery.data.extrasTotal)} en extras
             </p>
           ) : null}
           {previewQuery.data && isMultiDay ? (
-            <ul className="sf-glass-muted mt-2 space-y-1 text-xs">
+            <ul className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
               {previewQuery.data.days.map((day) => {
                 const hours = day.unit === 'HOUR' ? hoursForDate(day.date) : null;
                 const rate = hours && hours > 0 ? Math.round((day.appliedPrice / hours) * 100) / 100 : null;
@@ -310,14 +316,14 @@ export const BookingForm = ({
           ) : null}
         </div>
         {previewError ? (
-          <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <p className="mt-3 border-l-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive">
             {previewError}
           </p>
         ) : null}
       </div>
 
       <form
-        className="space-y-4 p-4"
+        className="space-y-5 p-6 pt-2"
         onSubmit={form.handleSubmit(() => {
           if (!isAuthenticated || role !== 'CLIENT') {
             setLoginModalOpen(true);
@@ -326,27 +332,31 @@ export const BookingForm = ({
           setConfirmOpen(true);
         })}
       >
-        <div className="space-y-2">
-          <Label htmlFor="eventType">Tipo de evento</Label>
+        <div>
+          <Label htmlFor="eventType" className={fieldLabelClass}>
+            Tipo de evento
+          </Label>
           <Input
             id="eventType"
             placeholder="Boda, cumpleanos, graduacion"
-            className="sf-surface"
+            className={fieldInputClass}
             {...form.register('eventType')}
           />
           {form.formState.errors.eventType ? (
-            <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
+            <p className="mt-1 text-xs text-destructive">{form.formState.errors.eventType.message}</p>
           ) : null}
         </div>
 
         <div className={venue.allowsMultipleDays ? 'grid gap-4 sm:grid-cols-2' : 'grid gap-4'}>
-          <div className="space-y-2">
-            <Label htmlFor="eventDate">{venue.allowsMultipleDays ? 'Fecha inicio' : 'Fecha'}</Label>
+          <div>
+            <Label htmlFor="eventDate" className={fieldLabelClass}>
+              {venue.allowsMultipleDays ? 'Fecha inicio' : 'Fecha'}
+            </Label>
             <Input
               id="eventDate"
               type="date"
               min={formatDateInput()}
-              className="sf-surface"
+              className={fieldInputClass}
               {...form.register('eventDate', {
                 onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                   const end = form.getValues('endDate');
@@ -360,17 +370,19 @@ export const BookingForm = ({
               })}
             />
             {form.formState.errors.eventDate ? (
-              <p className="text-sm text-destructive">{form.formState.errors.eventDate.message}</p>
+              <p className="mt-1 text-xs text-destructive">{form.formState.errors.eventDate.message}</p>
             ) : null}
           </div>
           {venue.allowsMultipleDays ? (
-            <div className="space-y-2">
-              <Label htmlFor="endDate">Fecha fin</Label>
+            <div>
+              <Label htmlFor="endDate" className={fieldLabelClass}>
+                Fecha fin
+              </Label>
               <Input
                 id="endDate"
                 type="date"
                 min={values.eventDate || formatDateInput()}
-                className="sf-surface"
+                className={fieldInputClass}
                 {...form.register('endDate', {
                   onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                     onDatesChange?.(form.getValues('eventDate'), event.target.value);
@@ -378,31 +390,35 @@ export const BookingForm = ({
                 })}
               />
               {form.formState.errors.endDate ? (
-                <p className="text-sm text-destructive">{form.formState.errors.endDate.message}</p>
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.endDate.message}</p>
               ) : null}
             </div>
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="guestCount">Invitados</Label>
+        <div>
+          <Label htmlFor="guestCount" className={fieldLabelClass}>
+            Invitados
+          </Label>
           <Input
             id="guestCount"
             type="number"
             min={1}
             max={venue.capacityMax}
-            className="sf-surface"
+            className={fieldInputClass}
             {...form.register('guestCount')}
           />
           {form.formState.errors.guestCount ? (
-            <p className="text-sm text-destructive">{form.formState.errors.guestCount.message}</p>
+            <p className="mt-1 text-xs text-destructive">{form.formState.errors.guestCount.message}</p>
           ) : null}
         </div>
 
         {isMixedUnits ? (
-          <div className="space-y-2">
-            <Label htmlFor="startTime">Horario para los dias por hora</Label>
-            <p className="text-xs text-muted-foreground">
+          <div>
+            <Label htmlFor="startTime" className={fieldLabelClass}>
+              Horario para los dias por hora
+            </Label>
+            <p className="mb-2 text-xs text-muted-foreground">
               Este local cobra por hora algunos dias del rango elegido y por dia completo
               otros. Se usa por defecto en los dias por hora; podes ajustarlo
               individualmente mas abajo.
@@ -411,76 +427,82 @@ export const BookingForm = ({
               <Input
                 id="startTime"
                 type="time"
-                className="sf-surface w-full"
+                className={`${fieldInputClass} w-full`}
                 {...form.register('startTime')}
               />
               <span className="text-sm text-muted-foreground">a</span>
               <Input
                 id="endTime"
                 type="time"
-                className="sf-surface w-full"
+                className={`${fieldInputClass} w-full`}
                 {...form.register('endTime')}
               />
             </div>
             {form.formState.errors.startTime ? (
-              <p className="text-sm text-destructive">{form.formState.errors.startTime.message}</p>
+              <p className="mt-1 text-xs text-destructive">{form.formState.errors.startTime.message}</p>
             ) : null}
             {form.formState.errors.endTime ? (
-              <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
+              <p className="mt-1 text-xs text-destructive">{form.formState.errors.endTime.message}</p>
             ) : null}
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="startTime">Inicio</Label>
+            <div>
+              <Label htmlFor="startTime" className={fieldLabelClass}>
+                Inicio
+              </Label>
               <Input
                 id="startTime"
                 type="time"
-                className="sf-surface"
+                className={fieldInputClass}
                 {...form.register('startTime')}
               />
               {form.formState.errors.startTime ? (
-                <p className="text-sm text-destructive">{form.formState.errors.startTime.message}</p>
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.startTime.message}</p>
               ) : null}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="endTime">Fin</Label>
-              <Input id="endTime" type="time" className="sf-surface" {...form.register('endTime')} />
+            <div>
+              <Label htmlFor="endTime" className={fieldLabelClass}>
+                Fin
+              </Label>
+              <Input id="endTime" type="time" className={fieldInputClass} {...form.register('endTime')} />
               {form.formState.errors.endTime ? (
-                <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.endTime.message}</p>
               ) : null}
             </div>
           </div>
         )}
 
         {isMixedUnits ? (
-          <div className="space-y-2 rounded-[var(--radius)] border p-3">
-            <p className="text-xs font-medium text-muted-foreground">Horario por dia</p>
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className={fieldLabelClass}>Horario por dia</p>
             {previewDays.map((day) => {
               const dayOfWeek = new Date(`${day.date}T00:00:00Z`).getUTCDay();
               const opening = openingHourByWeekday.get(dayOfWeek);
               const schedule = dailySchedule[day.date];
 
               return (
-                <div key={day.date} className="sf-surface rounded-[var(--radius)] border p-3 text-sm">
+                <div key={day.date} className="border-t border-border pt-3 text-sm first:border-t-0 first:pt-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium capitalize">{formatDate(day.date)}</span>
                     {day.unit !== 'HOUR' ? (
-                      <span className="sf-badge-outline">Dia completo</span>
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Dia completo
+                      </span>
                     ) : null}
                   </div>
                   {day.unit === 'HOUR' && schedule ? (
                     <div className="mt-2 flex items-center gap-2">
                       <Input
                         type="time"
-                        className="sf-surface w-full"
+                        className={`${fieldInputClass} w-full`}
                         value={schedule.startTime}
                         onChange={(e) => updateDailySchedule(day.date, { startTime: e.target.value })}
                       />
                       <span className="text-muted-foreground">a</span>
                       <Input
                         type="time"
-                        className="sf-surface w-full"
+                        className={`${fieldInputClass} w-full`}
                         value={schedule.endTime}
                         onChange={(e) => updateDailySchedule(day.date, { endTime: e.target.value })}
                       />
@@ -503,47 +525,51 @@ export const BookingForm = ({
         ) : null}
 
         {extraAmenities.length > 0 ? (
-          <div className="space-y-2">
-            <Label>Extras opcionales</Label>
-            <div className="space-y-2">
+          <div>
+            <p className={fieldLabelClass}>Extras opcionales</p>
+            <div>
               {extraAmenities.map((item) => (
                 <label
                   key={item.id}
-                  className="sf-surface flex items-center justify-between gap-2 rounded-[var(--radius)] border p-3 text-sm"
+                  className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
                 >
                   <span className="flex items-center gap-2.5">
                     <input
                       type="checkbox"
                       checked={selectedAmenityIds.includes(item.amenity.id)}
                       onChange={() => toggleAmenity(item.amenity.id)}
-                      className="h-4 w-4 rounded border-input accent-primary"
+                      className="h-4 w-4 rounded-none border-foreground accent-primary"
                     />
                     {item.amenity.name}
                   </span>
-                  <span className="text-muted-foreground">{formatCurrency(item.extraCost ?? 0)}</span>
+                  <span className="font-serif italic text-accent-foreground">
+                    {formatCurrency(item.extraCost ?? 0)}
+                  </span>
                 </label>
               ))}
             </div>
           </div>
         ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="specialRequests">Solicitudes especiales</Label>
+        <div>
+          <Label htmlFor="specialRequests" className={fieldLabelClass}>
+            Solicitudes especiales
+          </Label>
           <Input
             id="specialRequests"
             placeholder="Opcional"
-            className="sf-surface"
+            className={fieldInputClass}
             {...form.register('specialRequests')}
           />
           {form.formState.errors.specialRequests ? (
-            <p className="text-sm text-destructive">
+            <p className="mt-1 text-xs text-destructive">
               {form.formState.errors.specialRequests.message}
             </p>
           ) : null}
         </div>
 
         <SubmitButton
-          className="sf-action h-11 w-full"
+          className="h-11 w-full font-bold tracking-wide"
           type="submit"
           disabled={!canSubmit}
           isLoading={mutation.isPending}

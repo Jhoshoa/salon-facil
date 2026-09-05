@@ -3,7 +3,7 @@
 import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, parse, startOfMonth } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getVenueCalendar } from '@/lib/api/calendar.api';
 import { formatDate, getCurrentMonth } from '@/lib/formatters';
@@ -178,23 +178,17 @@ export const AvailabilityCalendar = ({
 
   if (query.isError) {
     return (
-      <div className="sf-card p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">Disponibilidad</h2>
-        </div>
+      <div>
+        <h2 className="sf-detail-title mb-4">Disponibilidad</h2>
         <ErrorState title="No se pudo cargar la disponibilidad" onRetry={() => query.refetch()} />
       </div>
     );
   }
 
   return (
-    <div className="sf-card p-5">
+    <div>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">Disponibilidad</h2>
-        </div>
+        <h2 className="sf-detail-title">Disponibilidad</h2>
         {selection.status !== 'empty' ? (
           <Button size="sm" variant="outline" onClick={clearSelection}>
             <X className="h-3.5 w-3.5" />

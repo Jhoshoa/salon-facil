@@ -35,7 +35,7 @@ export const MobileBookingSheet = ({
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-0">
         <SheetTitle className="sr-only">Solicitar reserva</SheetTitle>
         {staleRangeNotice ? (
-          <div className="sf-warning m-4 flex items-start justify-between gap-2 rounded-md border p-3 text-sm">
+          <div className="m-4 flex items-start justify-between gap-2 border-l-2 border-warning bg-warning/10 p-3 text-sm text-foreground">
             <p>{staleRangeNotice}</p>
             <button
               type="button"

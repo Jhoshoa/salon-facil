@@ -9,6 +9,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-fraunces)', 'ui-serif', 'Georgia', 'serif'],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -42,6 +46,13 @@ const config: Config = {
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
+        },
+        'paper-2': 'hsl(var(--paper-2))',
+        'gold-deep': 'hsl(var(--accent-foreground))',
+        city: {
+          green: 'hsl(var(--city-green))',
+          magenta: 'hsl(var(--city-magenta))',
+          cyan: 'hsl(var(--city-cyan))',
         },
       },
       borderRadius: {

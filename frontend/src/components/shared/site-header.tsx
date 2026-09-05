@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { CalendarCheck, LayoutDashboard, LogIn, LogOut, Menu, UserPlus } from 'lucide-react';
+import { LayoutDashboard, LogIn, LogOut, Menu, UserPlus } from 'lucide-react';
 import { useAuthHydrated, useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
@@ -35,14 +35,17 @@ export const SiteHeader = () => {
   return (
     <header className="sf-header">
       <div className="sf-container flex h-full items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <span className="sf-logo">
-            <CalendarCheck className="h-5 w-5" />
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="sf-logo-mark">
+            <svg viewBox="0 0 32 32" fill="none" className="h-full w-full">
+              <circle cx="16" cy="16" r="14.5" stroke="#FFFFFF" strokeWidth="1" opacity=".7" />
+              <path
+                d="M16 6 L18.4 14 L26 16 L18.4 18 L16 26 L13.6 18 L6 16 L13.6 14 Z"
+                fill="#C9A227"
+              />
+            </svg>
           </span>
-          <span className="hidden sm:block">
-            <span className="block text-base font-bold leading-5">SalonFacil</span>
-            <span className="block text-xs text-muted-foreground">Espacios para eventos</span>
-          </span>
+          <span className="sf-wordmark">SalonFacil</span>
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
@@ -69,15 +72,14 @@ export const SiteHeader = () => {
         <div className="flex items-center gap-2">
           {showAuthed ? (
             <>
-              <span className="hidden text-sm text-muted-foreground sm:inline-flex sm:items-center sm:gap-1.5">
+              <span className="hidden text-sm text-primary-foreground/80 sm:inline-flex sm:items-center sm:gap-1.5">
                 {user?.fullName?.split(' ')[0]}
-                <span className="sf-badge sf-badge-primary">
-                  {role ? roleLabels[role] : ''}
-                </span>
+                <span className="sf-badge sf-badge-secondary">{role ? roleLabels[role] : ''}</span>
               </span>
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
                 onClick={() => logoutMutation.mutate()}
                 disabled={logoutMutation.isPending}
               >
@@ -89,13 +91,18 @@ export const SiteHeader = () => {
 
           {showGuest ? (
             <>
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="hidden text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
+              >
                 <Link href="/login">
                   <LogIn className="h-4 w-4" />
                   Iniciar sesion
                 </Link>
               </Button>
-              <Button asChild size="sm">
+              <Button asChild variant="secondary" size="sm">
                 <Link href="/register">
                   <UserPlus className="h-4 w-4" />
                   <span className="hidden sm:inline">Crear cuenta</span>
@@ -108,7 +115,12 @@ export const SiteHeader = () => {
           {!hydrated ? <span className="h-8 w-20" aria-hidden /> : null}
 
           {showAuthed && !canManageVenues ? (
-            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="hidden border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
+            >
               <Link href="/bookings">
                 <LayoutDashboard className="h-4 w-4" />
                 Mis reservas
@@ -119,7 +131,7 @@ export const SiteHeader = () => {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="md:hidden"
+            className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground md:hidden"
             onClick={() => setMenuOpen(true)}
           >
             <Menu className="h-5 w-5" />

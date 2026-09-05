@@ -4,32 +4,45 @@
 
 @layer base {
   :root {
-    /* Core colors — Cobalto Profundo: surface is pure white on purpose (no background
-       tint), the deliberate look for a "professional/serious" register. Neutrals keep a
-       faint blue lean (hue 216, matching primary) instead of a hue-less grey. */
+    /* Core colors — "Bitacora": editorial/journal register. Ink-navy text on pure white
+       paper, hairline borders instead of shadows/boxes, zero corner radius (the "printed",
+       not "app", look the brand calls for). */
     --background: 0 0% 100%;
-    --foreground: 213 65% 17%;
+    --foreground: 209 49% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 213 65% 17%;
+    --card-foreground: 209 49% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 213 65% 17%;
+    --popover-foreground: 209 49% 12%;
     --muted: 216 20% 96%;
-    --muted-foreground: 216 10% 45%;
-    --border: 216 20% 90%;
-    --input: 216 20% 90%;
-    --ring: 216 69% 34%;
-    --radius: 0.625rem;
+    --muted-foreground: 212 10% 40%;
+    /* Solid approximation of "ink at 14% opacity over white" (the mockup's --line), so every
+       existing `border`/`border-border` usage site-wide gets the hairline look for free
+       without needing an alpha modifier appended everywhere. */
+    --border: 210 7% 88%;
+    --input: 209 20% 85%;
+    --ring: 214 52% 25%;
+    --radius: 0px;
 
-    /* Brand colors — Cobalto Profundo: deep cobalt primary, old-gold accent. Semantic
-       colors (success/warning/destructive below) are deliberately untouched. */
-    --primary: 216 69% 34%;
+    /* Brand colors — deep navy primary, warm gold accent (ink #10202F, navy #1E3A5F,
+       gold #C9A227, gold-deep #A9861D). Semantic colors (success/warning/destructive
+       below) are deliberately untouched. */
+    --primary: 214 52% 25%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 43 89% 38%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 46 67% 47%;
+    --secondary-foreground: 209 49% 12%;
     --accent: 43 70% 95%;
-    --accent-foreground: 43 75% 30%;
+    --accent-foreground: 45 71% 39%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
+
+    /* Bitacora-only tokens — no shadcn equivalent. */
+    --paper-2: 41 13% 89%;
+    --city-green: 120 17% 32%;
+    --city-magenta: 331 73% 45%;
+    --city-cyan: 187 76% 42%;
+    /* Literal (non-HSL) hairline color for bespoke Bitacora components that want the exact
+       mockup treatment (ink at 14% opacity) rather than the solid --border approximation. */
+    --line: rgba(16, 32, 47, 0.14);
 
     /* Semantic colors */
     --success: 142 71% 45%;
@@ -66,9 +79,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-      sans-serif;
+    @apply bg-background text-foreground font-sans;
   }
 
   ::selection {
@@ -81,7 +92,7 @@
   h4,
   h5,
   h6 {
-    @apply font-semibold tracking-tight text-foreground;
+    @apply font-serif font-semibold tracking-tight text-foreground;
   }
 }
 
@@ -135,17 +146,36 @@
 
   /* --- Header & Navigation --- */
   .sf-header {
-    @apply sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80;
+    @apply sticky top-0 z-50 bg-primary;
     height: var(--header-height);
   }
 
   .sf-nav-link {
-    @apply text-sm font-medium text-muted-foreground transition-colors hover:text-foreground;
+    @apply relative pb-1 text-sm font-medium text-primary-foreground/85 transition-colors hover:text-primary-foreground;
+  }
+
+  .sf-nav-link::after {
+    content: '';
+    @apply absolute inset-x-0 -bottom-0.5 h-0.5 origin-left scale-x-0 bg-secondary transition-transform duration-200;
+  }
+
+  .sf-nav-link:hover::after {
+    @apply scale-x-100;
+  }
+
+  /* Logo mark: circle + star wordmark, scoped to the public site header only
+     (the shared .sf-logo box is used elsewhere on light backgrounds). */
+  .sf-logo-mark {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center;
+  }
+
+  .sf-wordmark {
+    @apply font-serif text-xl italic text-primary-foreground;
   }
 
   /* --- Footer --- */
   .sf-footer {
-    @apply border-t bg-muted/30;
+    @apply border-t border-border bg-background;
   }
 
   /* --- Forms --- */
@@ -390,17 +420,37 @@
     @apply sf-card flex items-center gap-3 p-4;
   }
 
-  /* --- Venue Detail --- */
+  /* --- Venue Detail: bloques separados por hairline en vez de tarjetas --- */
   .sf-detail-section {
-    @apply sf-card space-y-4 p-5;
+    @apply space-y-4 border-t border-border py-7 first:border-t-0 first:pt-0;
   }
 
   .sf-detail-title {
-    @apply text-lg font-semibold;
+    @apply text-xl;
   }
 
-  .sf-detail-grid {
-    @apply grid gap-3 sm:grid-cols-2 lg:grid-cols-3;
+  /* --- Booking sidebar: la unica excepcion con fondo blanco + sombra --- */
+  .sf-card-strong {
+    @apply relative border border-border bg-card shadow-[0_20px_40px_rgba(16,32,47,0.1)];
+  }
+
+  .sf-card-strong::before {
+    content: '';
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--line) 0 6px,
+      transparent 6px 12px
+    );
+    @apply absolute inset-x-6 top-0 h-px;
+  }
+
+  /* --- Espacios similares: prints en scroll horizontal --- */
+  .sf-carousel-card {
+    @apply block w-[210px] shrink-0 sm:w-auto;
+  }
+
+  .sf-carousel-image {
+    @apply relative h-[130px] overflow-hidden bg-muted;
   }
 
   /* --- Auth Pages --- */
@@ -469,5 +519,86 @@
 
   .sf-link-muted {
     @apply text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline;
+  }
+
+  /* ============================================
+     BITACORA: primitivos editoriales
+     ============================================ */
+
+  /* Label pequeño mayusculas + linea horizontal, con numero de indice opcional
+     en Fraunces italica dorada (ej. "Locales destacados --- n.o 01"). */
+  .sf-kicker {
+    @apply flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  .sf-kicker::after {
+    content: '';
+    @apply h-px flex-1 bg-border;
+  }
+
+  .sf-kicker .idx {
+    @apply font-serif text-base font-medium italic text-accent-foreground tracking-normal;
+  }
+
+  /* Fila separada por linea superior en vez de tarjeta con sombra. */
+  .sf-hairline-row {
+    @apply border-t border-border py-4;
+  }
+
+  /* Sello circular "verificado", reemplaza el badge con icono de check. */
+  .sf-stamp {
+    @apply relative inline-flex h-20 w-20 shrink-0 -rotate-[8deg] items-center justify-center rounded-full border border-current p-2 text-center font-serif text-[0.6rem] italic leading-tight text-accent-foreground;
+  }
+
+  /* Foto tipo polaroid: tarjeta blanca con padding, sombra y "pin" dorado. */
+  .sf-print {
+    @apply relative rounded-none border border-border bg-card p-2 pb-8 shadow-md;
+  }
+
+  .sf-print-pin {
+    @apply absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-secondary shadow-[0_1px_3px_rgba(0,0,0,0.4)];
+  }
+
+  .sf-print-caption {
+    @apply mt-2 text-center font-serif text-sm italic text-muted-foreground;
+  }
+
+  /* Barra de busqueda "cuaderno" del hero de landing: campos subrayados sin
+     caja, con dos pedazos de "cinta" dorada arriba. Escopada a home-search-form
+     (no comparte clases con la barra de busqueda de /venues). */
+  .sf-journal-bar {
+    @apply relative border border-[color:var(--line)] bg-paper-2/35 p-6 pb-5 shadow-[0_20px_40px_rgba(16,32,47,0.06)];
+  }
+
+  .sf-journal-bar::before,
+  .sf-journal-bar::after {
+    content: '';
+    @apply absolute -top-2 h-3.5 w-8 border border-secondary/35 bg-secondary/20;
+  }
+
+  .sf-journal-bar::before {
+    left: 26px;
+    transform: rotate(-3deg);
+  }
+
+  .sf-journal-bar::after {
+    right: 26px;
+    transform: rotate(2deg);
+  }
+
+  .sf-journal-title {
+    @apply font-serif text-base italic text-foreground;
+  }
+
+  .sf-journal-subtitle {
+    @apply mb-4 text-xs text-muted-foreground;
+  }
+
+  .sf-journal-label {
+    @apply mb-1.5 block text-[0.68rem] font-bold uppercase tracking-wider text-muted-foreground;
+  }
+
+  .sf-journal-error {
+    @apply mt-1.5 text-xs font-medium text-destructive;
   }
 }
