@@ -573,7 +573,7 @@
      a home-search-form (no comparte clases con la barra de busqueda de
      /venues). */
   .sf-journal-bar {
-    @apply relative border border-[color:var(--line)] bg-paper-2/70 p-6 pb-5 shadow-[0_20px_40px_rgba(16,32,47,0.1)] backdrop-blur-md;
+    @apply relative border border-[color:var(--line)] bg-paper-2 p-6 pb-5 shadow-[0_20px_40px_rgba(16,32,47,0.1)];
     transform-origin: 50% 0%;
   }
 
