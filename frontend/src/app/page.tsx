@@ -108,7 +108,7 @@ export default function HomePage() {
       <SiteHeader />
 
       {/* Hero */}
-      <section className="sf-container grid gap-12 py-10 lg:grid-cols-2 lg:items-center lg:gap-10 lg:py-16">
+      <section className="sf-container grid gap-8 py-10 lg:grid-cols-2 lg:items-center lg:gap-10 lg:py-16">
         <div>
           <p className="mb-4 font-serif text-sm italic text-accent-foreground">
             Cuaderno de bitacora — N.º 001
@@ -121,13 +121,13 @@ export default function HomePage() {
             No agregamos listados al azar. Cada salon, jardin o cholet que ves aqui fue visitado,
             medido y fotografiado — para que compares con datos reales, no con promesas.
           </p>
-
-          <div className="mt-8">
-            <HomeSearchForm />
-          </div>
         </div>
 
-        <div className="relative min-h-[380px] sm:min-h-[440px] lg:min-h-[480px]">
+        <div className="relative z-40 mt-8 lg:order-3 lg:col-span-2 lg:-mt-16">
+          <HomeSearchForm />
+        </div>
+
+        <div className="relative min-h-[380px] sm:min-h-[440px] lg:order-2 lg:min-h-[480px]">
           <div className="sf-print absolute left-0 top-0 z-20 w-[68%] rotate-[-4deg] sm:w-[280px]">
             <span className="sf-print-pin" />
             <div className="relative h-[240px] sm:h-[320px]">
