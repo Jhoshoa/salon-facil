@@ -596,24 +596,26 @@
      — en tablet/mobile no hay gesto equivalente al hover, asi que ahi no se
      activa. Comparten el mismo keyframe la barra de busqueda (sf-journal-bar,
      colgada de 2 pines) y las fotos del corkboard (sf-print, colgadas de 1). */
+  /* Cada tramo trae su propia curva: rapido y directo para el "empujon"
+     inicial, suave para el vaiven, y un tramo final largo en ease-out (mas de
+     un tercio de la duracion total) para que vuelva al reposo deslizandose,
+     en vez de cortar en seco. */
   @keyframes sf-journal-sway {
     0% {
       transform: rotate(0deg) skewX(0deg) translateY(0);
+      animation-timing-function: ease-out;
     }
-    15% {
-      transform: rotate(-1.3deg) skewX(-0.8deg) translateY(2px);
+    18% {
+      transform: rotate(-1.4deg) skewX(-0.9deg) translateY(2px);
+      animation-timing-function: ease-in-out;
     }
-    32% {
-      transform: rotate(1deg) skewX(0.6deg) translateY(-1.5px);
+    42% {
+      transform: rotate(0.9deg) skewX(0.55deg) translateY(-1px);
+      animation-timing-function: ease-in-out;
     }
-    50% {
-      transform: rotate(-0.6deg) skewX(-0.4deg) translateY(1px);
-    }
-    68% {
-      transform: rotate(0.35deg) skewX(0.2deg) translateY(0);
-    }
-    84% {
-      transform: rotate(-0.15deg) skewX(-0.1deg);
+    62% {
+      transform: rotate(-0.35deg) skewX(-0.2deg) translateY(0.4px);
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
     }
     100% {
       transform: rotate(0deg) skewX(0deg) translateY(0);
@@ -623,7 +625,7 @@
   @media (min-width: 1024px) and (hover: hover) {
     .sf-journal-bar.is-swaying,
     .sf-print.is-swaying {
-      animation: sf-journal-sway 1.1s cubic-bezier(0.45, 0, 0.55, 1) 1;
+      animation: sf-journal-sway 1.3s ease 1;
     }
   }
 
