@@ -5,6 +5,7 @@ import { HomeSearchForm } from '@/components/venues/home-search-form';
 import { SiteHeader } from '@/components/shared/site-header';
 import { SiteFooter } from '@/components/shared/site-footer';
 import { PinnedPrint } from '@/components/shared/pinned-print';
+import { LegendCarousel } from '@/components/shared/legend-carousel';
 import { Button } from '@/components/ui/button';
 
 import verdeManzanaGarden from '@/assets/images/venue-verde-manzana-garden.jpg';
@@ -21,8 +22,14 @@ import elAltoTowerAerial from '@/assets/images/venue-el-alto-tower-aerial.jpg';
 const legendItems = [
   { label: 'Santa Cruz — jardines y toldos', colorClass: 'bg-city-green' },
   { label: 'El Alto — cholets y salones VIP', colorClass: 'bg-city-magenta' },
-  { label: 'Cochabamba — tinglados', colorClass: 'bg-secondary' },
+  { label: 'Cochabamba — salones VIP y jardines', colorClass: 'bg-secondary' },
   { label: 'La Paz — terrazas urbanas', colorClass: 'bg-city-cyan' },
+  { label: 'Oruro — salones para el carnaval', colorClass: 'bg-city-green' },
+  { label: 'Potosi — salones coloniales', colorClass: 'bg-city-magenta' },
+  { label: 'Chuquisaca — jardines en Sucre', colorClass: 'bg-secondary' },
+  { label: 'Tarija — fincas y vinedos', colorClass: 'bg-city-cyan' },
+  { label: 'Beni — salones tropicales', colorClass: 'bg-city-green' },
+  { label: 'Pando — espacios en la amazonia', colorClass: 'bg-city-magenta' },
 ];
 
 const galleryPrints = [
@@ -190,13 +197,8 @@ export default function HomePage() {
 
       {/* Legend strip */}
       <section className="border-y border-border">
-        <div className="sf-container flex flex-wrap justify-center gap-6 py-4 sm:gap-9">
-          {legendItems.map((item) => (
-            <div key={item.label} className="flex items-center gap-2.5 text-sm text-foreground">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${item.colorClass}`} />
-              {item.label}
-            </div>
-          ))}
+        <div className="sf-container py-4">
+          <LegendCarousel items={legendItems} />
         </div>
       </section>
 
