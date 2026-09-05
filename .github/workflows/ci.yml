@@ -81,6 +81,10 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Prepare test database
+        working-directory: backend
+        run: node scripts/setup-e2e-db.js
+
       - name: Run unit tests
         working-directory: backend
         run: npm run test

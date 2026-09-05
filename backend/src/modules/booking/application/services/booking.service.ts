@@ -149,7 +149,11 @@ export class BookingService {
       venue.priceUnit,
       schedule.map((day) => ({ date: day.date, hours: day.hours })),
     );
-    const priceCalculation = this.applySelectedExtras(venue, dto.selectedAmenityIds, rangeCalculation);
+    const priceCalculation = this.applySelectedExtras(
+      venue,
+      dto.selectedAmenityIds,
+      rangeCalculation,
+    );
 
     const bookingData: CreateBookingData = {
       venueId,
