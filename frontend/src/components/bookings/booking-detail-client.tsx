@@ -53,12 +53,12 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
   const deleteReviewMutation = useMutation({
     mutationFn: () => deleteReview(reviewQuery.data!.id),
     onSuccess: async () => {
-      toast.success('Resena borrada');
+      toast.success('Reseña borrada');
       setDeleteReviewOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['booking', bookingId, 'review'] });
     },
     onError: (error: { message?: string }) => {
-      toast.error('No se pudo borrar la resena', { description: error.message });
+      toast.error('No se pudo borrar la reseña', { description: error.message });
     },
   });
 
@@ -121,7 +121,7 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             {showPaymentAction ? (
               <Button onClick={() => setPaymentOpen(true)}>
                 <CreditCard className="h-4 w-4" />
-                Pagar sena
+                Pagar anticipo
               </Button>
             ) : null}
             {showCancelAction ? (
@@ -144,7 +144,7 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             <p className="font-semibold">{formatCurrency(booking.totalPrice)}</p>
           </div>
           <div className="rounded-md bg-muted p-3">
-            <p className="text-xs text-muted-foreground">Sena</p>
+            <p className="text-xs text-muted-foreground">Anticipo</p>
             <p className="font-semibold">{formatCurrency(booking.depositAmount)}</p>
           </div>
           <div className="rounded-md bg-muted p-3">
@@ -206,15 +206,15 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
       {reviewQuery.data ? (
         <section className="rounded-md border bg-card p-4 shadow-sm">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="mb-3 text-base font-semibold">Tu resena</h2>
+            <h2 className="mb-3 text-base font-semibold">Tu reseña</h2>
             <div className="flex gap-2">
               <Button size="icon-sm" variant="ghost" onClick={() => setReviewOpen(true)}>
                 <Pencil className="h-4 w-4" />
-                <span className="sr-only">Editar resena</span>
+                <span className="sr-only">Editar reseña</span>
               </Button>
               <Button size="icon-sm" variant="ghost" onClick={() => setDeleteReviewOpen(true)}>
                 <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Borrar resena</span>
+                <span className="sr-only">Borrar reseña</span>
               </Button>
             </div>
           </div>
@@ -245,7 +245,7 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
       />
       <ConfirmDialog
         open={deleteReviewOpen}
-        title="Borrar resena"
+        title="Borrar reseña"
         description="Esta accion no se puede deshacer."
         confirmLabel="Borrar"
         isLoading={deleteReviewMutation.isPending}

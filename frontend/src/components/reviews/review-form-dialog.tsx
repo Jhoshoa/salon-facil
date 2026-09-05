@@ -49,12 +49,12 @@ export const ReviewFormDialog = ({
         ? updateReview(existingReview.id, { rating, comment: comment.trim() || undefined })
         : createReview(bookingId, { rating, comment: comment.trim() || undefined }),
     onSuccess: async () => {
-      toast.success(isEditing ? 'Resena actualizada' : 'Gracias por tu resena');
+      toast.success(isEditing ? 'Reseña actualizada' : 'Gracias por tu reseña');
       onOpenChange(false);
       await queryClient.invalidateQueries({ queryKey: ['booking', bookingId, 'review'] });
     },
     onError: (error: { message?: string }) => {
-      toast.error('No se pudo enviar tu resena', { description: error.message });
+      toast.error('No se pudo enviar tu reseña', { description: error.message });
     },
   });
 
@@ -64,7 +64,7 @@ export const ReviewFormDialog = ({
         <DialogHeader>
           <DialogTitle>
             {isEditing
-              ? 'Editar resena'
+              ? 'Editar reseña'
               : venueName
                 ? `Calificar ${venueName}`
                 : 'Calificar reserva'}
@@ -96,7 +96,7 @@ export const ReviewFormDialog = ({
             onClick={() => mutation.mutate()}
             disabled={rating === 0 || mutation.isPending}
           >
-            {isEditing ? 'Guardar cambios' : 'Enviar resena'}
+            {isEditing ? 'Guardar cambios' : 'Enviar reseña'}
           </Button>
         </DialogFooter>
       </DialogContent>

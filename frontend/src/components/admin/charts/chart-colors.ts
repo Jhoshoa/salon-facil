@@ -20,7 +20,7 @@ export const CHART_PALETTE = [
 export const BOOKING_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendiente',
   APPROVED: 'Aprobada',
-  DEPOSIT_PAID: 'Sena pagada',
+  DEPOSIT_PAID: 'Anticipo pagado',
   FULLY_PAID: 'Pagada',
   CANCELLED_BY_CLIENT: 'Cancelada (cliente)',
   CANCELLED_BY_OWNER: 'Cancelada (propietario)',

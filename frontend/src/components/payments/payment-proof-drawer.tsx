@@ -60,7 +60,7 @@ export const PaymentProofDrawer = ({ booking, open, onOpenChange }: PaymentProof
       open={open}
       onOpenChange={onOpenChange}
       title="Subir comprobante"
-      description="El owner revisara el pago de sena."
+      description="El owner revisara el pago del anticipo."
     >
       <div className="space-y-4">
         <div className="space-y-2">

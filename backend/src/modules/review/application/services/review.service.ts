@@ -99,7 +99,7 @@ export class ReviewService {
     const review = await this.getReviewOrThrow(reviewId);
 
     if (!review.canBeEditedBy(clientId)) {
-      throw new ForbiddenException('No puedes editar una resena que no escribiste');
+      throw new ForbiddenException('No puedes editar una reseña que no escribiste');
     }
 
     return this.reviewRepository.update(reviewId, {
@@ -112,7 +112,7 @@ export class ReviewService {
     const review = await this.getReviewOrThrow(reviewId);
 
     if (!review.canBeEditedBy(userId) && userRole !== UserRole.ADMIN) {
-      throw new ForbiddenException('No puedes borrar una resena que no escribiste');
+      throw new ForbiddenException('No puedes borrar una reseña que no escribiste');
     }
 
     await this.reviewRepository.delete(reviewId);
@@ -128,11 +128,11 @@ export class ReviewService {
     const venue = await this.venueService.getVenueById(review.venueId);
 
     if (!venue.canBeEditedBy(ownerUserId, userRole)) {
-      throw new ForbiddenException('No tienes permiso para responder resenas de este local');
+      throw new ForbiddenException('No tienes permiso para responder reseñas de este local');
     }
 
     if (review.hasOwnerResponse()) {
-      throw new BadRequestException('Esta resena ya tiene una respuesta');
+      throw new BadRequestException('Esta reseña ya tiene una respuesta');
     }
 
     const updated = await this.reviewRepository.setOwnerResponse(reviewId, dto.response);
@@ -140,7 +140,7 @@ export class ReviewService {
     this.notify({
       userId: review.clientId,
       type: NotificationType.REVIEW_RESPONSE,
-      title: `${venue.name} respondio tu resena`,
+      title: `${venue.name} respondio tu reseña`,
       content: dto.response,
       recipientEmail: review.client?.email,
     });
@@ -151,7 +151,7 @@ export class ReviewService {
   private async getReviewOrThrow(reviewId: string) {
     const review = await this.reviewRepository.findById(reviewId);
     if (!review) {
-      throw new NotFoundException(`Resena con ID '${reviewId}' no encontrada`);
+      throw new NotFoundException(`Reseña con ID '${reviewId}' no encontrada`);
     }
     return review;
   }

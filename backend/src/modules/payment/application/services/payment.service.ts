@@ -64,11 +64,11 @@ export class PaymentService {
     }
 
     if (dto.paymentType === PaymentType.DEPOSIT && booking.depositPaid) {
-      throw new BadRequestException('La sena de esta reserva ya fue pagada');
+      throw new BadRequestException('El anticipo de esta reserva ya fue pagado');
     }
 
     if (dto.paymentType === PaymentType.DEPOSIT && dto.amount !== booking.depositAmount) {
-      throw new BadRequestException(`El monto de sena esperado es ${booking.depositAmount}`);
+      throw new BadRequestException(`El monto de anticipo esperado es ${booking.depositAmount}`);
     }
 
     // Only DEPOSIT was checked here before — a client could create a FULL/REMAINING payment

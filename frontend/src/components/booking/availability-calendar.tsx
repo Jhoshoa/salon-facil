@@ -31,7 +31,7 @@ const MAX_MONTHS_AHEAD = 18;
 const statusLabel: Record<BookingStatus, string> = {
   PENDING: 'Pendiente',
   APPROVED: 'Aprobada',
-  DEPOSIT_PAID: 'Sena',
+  DEPOSIT_PAID: 'Anticipo',
   FULLY_PAID: 'Pagada',
   CANCELLED_BY_CLIENT: 'Cancelada',
   CANCELLED_BY_OWNER: 'Cancelada',

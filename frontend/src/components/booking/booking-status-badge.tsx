@@ -8,7 +8,7 @@ interface BookingStatusBadgeProps {
 const statusLabels: Record<string, string> = {
   PENDING: 'Pendiente',
   APPROVED: 'Aprobada',
-  DEPOSIT_PAID: 'Sena pagada',
+  DEPOSIT_PAID: 'Anticipo pagado',
   FULLY_PAID: 'Pagada',
   CANCELLED_BY_CLIENT: 'Cancelada por cliente',
   CANCELLED_BY_OWNER: 'Cancelada por owner',

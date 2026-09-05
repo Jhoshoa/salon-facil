@@ -240,7 +240,7 @@ export const VenueDetail = ({
                     <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                     {venue.averageRating.toFixed(1)}
                     <span className="font-normal text-muted-foreground">
-                      ({venue.reviewCount} {venue.reviewCount === 1 ? 'resena' : 'resenas'})
+                      ({venue.reviewCount} {venue.reviewCount === 1 ? 'reseña' : 'reseñas'})
                     </span>
                   </span>
                 ) : null}

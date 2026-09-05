@@ -472,7 +472,7 @@ export class BookingService {
         userId: booking.client.id,
         type: NotificationType.BOOKING_CONFIRMED,
         title: `Tu reserva en ${venue.name} fue aprobada`,
-        content: `El propietario aprobo tu solicitud para el ${this.toDateOnly(booking.eventDate)}. Ya podes subir el comprobante de la sena desde "Mis reservas".`,
+        content: `El propietario aprobo tu solicitud para el ${this.toDateOnly(booking.eventDate)}. Ya podes subir el comprobante del anticipo desde "Mis reservas".`,
         recipientEmail: booking.client.email,
       });
     }
@@ -566,12 +566,12 @@ export class BookingService {
     }
 
     if (booking.status !== BookingStatus.APPROVED) {
-      throw new BadRequestException('Solo se puede registrar seña en reservas aprobadas');
+      throw new BadRequestException('Solo se puede registrar el anticipo en reservas aprobadas');
     }
 
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
-      throw new ForbiddenException('No tienes permiso para registrar la seña de esta reserva');
+      throw new ForbiddenException('No tienes permiso para registrar el anticipo de esta reserva');
     }
 
     return this.bookingRepository.markDepositPaid(bookingId);
@@ -603,7 +603,7 @@ export class BookingService {
         userId: booking.client.id,
         type: NotificationType.REVIEW_REQUEST,
         title: `¿Que tal estuvo tu evento en ${venueName}?`,
-        content: 'Contanos tu experiencia — tu resena ayuda a otros a elegir mejor.',
+        content: 'Contanos tu experiencia — tu reseña ayuda a otros a elegir mejor.',
         recipientEmail: booking.client.email,
       });
     }

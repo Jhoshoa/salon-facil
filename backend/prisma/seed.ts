@@ -177,7 +177,7 @@ async function main(): Promise<void> {
 
   const useTypeSeed = [
     { key: 'WEDDING', name: 'Boda', icon: 'Heart', sortOrder: 1 },
-    { key: 'BIRTHDAY', name: 'Cumpleanos', icon: 'PartyPopper', sortOrder: 2 },
+    { key: 'BIRTHDAY', name: 'Cumpleaños', icon: 'PartyPopper', sortOrder: 2 },
     { key: 'CORPORATE_EVENT', name: 'Corporativo', icon: 'Briefcase', sortOrder: 3 },
     { key: 'PRIVATE_PARTY', name: 'Fiesta privada', icon: 'Sparkles', sortOrder: 4 },
     { key: 'GRADUATION', name: 'Graduacion', icon: 'GraduationCap', sortOrder: 5 },
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
     },
     {
       key: 'bathrooms',
-      name: 'Banos',
+      name: 'Baños',
       category: AmenityCategory.FACILITY,
       icon: 'Bath',
       sortOrder: 2,
@@ -363,7 +363,7 @@ async function main(): Promise<void> {
       name: 'Salon Imperial',
       slug: 'salon-imperial-villa-adela',
       description:
-        'Salon amplio para bodas, quinceaneras y promociones, con escenario, cocina equipada y parqueo propio.',
+        'Salon amplio para bodas, quinceañeras y promociones, con escenario, cocina equipada y parqueo propio.',
       shortDescription: 'Salon elegante con escenario y parqueo.',
       address: 'Av. Bolivia 1234',
       district: 'Villa Adela',
@@ -402,7 +402,7 @@ async function main(): Promise<void> {
       name: 'Espacio Fiesta',
       slug: 'espacio-fiesta-rio-seco',
       description:
-        'Local practico para cumpleanos, bautizos y reuniones familiares. Ubicado cerca de transporte publico.',
+        'Local practico para cumpleaños, bautizos y reuniones familiares. Ubicado cerca de transporte publico.',
       shortDescription: 'Local familiar y accesible.',
       address: 'Calle 8 de Rio Seco 456',
       district: 'Rio Seco',
@@ -857,7 +857,7 @@ async function main(): Promise<void> {
     data: {
       venueId: venueImperial.id,
       clientId: clientAna.id,
-      eventType: 'Quinceanera',
+      eventType: 'Quinceañera',
       eventDate: new Date('2026-09-15'),
       endDate: new Date('2026-09-15'),
       startTime: new Date('1970-01-01T18:00:00.000Z'),
@@ -877,7 +877,7 @@ async function main(): Promise<void> {
     data: {
       venueId: venueFiesta.id,
       clientId: clientPedro.id,
-      eventType: 'Cumpleanos',
+      eventType: 'Cumpleaños',
       eventDate: new Date('2026-08-20'),
       endDate: new Date('2026-08-20'),
       startTime: new Date('1970-01-01T19:00:00.000Z'),
@@ -889,7 +889,7 @@ async function main(): Promise<void> {
       depositAmount: 240,
       depositPaid: true,
       status: BookingStatus.COMPLETED,
-      specialRequests: 'Decoracion tematica para nino de 8 anos.',
+      specialRequests: 'Decoracion tematica para niño de 8 años.',
     },
   });
 

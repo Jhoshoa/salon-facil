@@ -93,8 +93,8 @@ export class BookingDetailController {
   @Put(':id/deposit-paid')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Registrar seña pagada (OWNER/ADMIN)' })
-  @ApiResponse({ status: 200, description: 'Seña registrada' })
+  @ApiOperation({ summary: 'Registrar anticipo pagado (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Anticipo registrado' })
   async markDepositPaid(
     @Param('id') id: string,
     @CurrentUser() user: { id: string; role: UserRole },

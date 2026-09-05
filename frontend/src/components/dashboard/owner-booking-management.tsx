@@ -304,7 +304,7 @@ export const OwnerBookingManagement = () => {
       <ConfirmDialog
         open={Boolean(paymentToConfirm)}
         title="Confirmar pago"
-        description="La reserva pasara a sena pagada cuando el pago sea de tipo sena."
+        description="La reserva pasara a anticipo pagado cuando el pago sea de tipo anticipo."
         confirmLabel="Confirmar pago"
         isLoading={confirmPaymentMutation.isPending}
         onOpenChange={(open) => {

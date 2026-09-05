@@ -111,7 +111,7 @@ export const BookingForm = ({
       createBooking(venue.id, values),
     onSuccess: (response) => {
       toast.success('Reserva solicitada', {
-        description: `Sena requerida: ${formatCurrency(response.booking.depositAmount)}`,
+        description: `Anticipo requerido: ${formatCurrency(response.booking.depositAmount)}`,
       });
       form.reset();
       setConfirmOpen(false);
@@ -338,7 +338,7 @@ export const BookingForm = ({
           </Label>
           <Input
             id="eventType"
-            placeholder="Boda, cumpleanos, graduacion"
+            placeholder="Boda, cumpleaños, graduacion"
             className={fieldInputClass}
             {...form.register('eventType')}
           />
@@ -583,8 +583,8 @@ export const BookingForm = ({
         title="Confirmar solicitud"
         description={
           isMultiDay
-            ? `Solicitaras ${venue.name} del ${values.eventDate} al ${values.endDate}. El owner debe aprobar antes del pago de sena.`
-            : `Solicitaras ${venue.name} para ${values.eventDate || 'la fecha seleccionada'}. El owner debe aprobar antes del pago de sena.`
+            ? `Solicitaras ${venue.name} del ${values.eventDate} al ${values.endDate}. El owner debe aprobar antes del pago del anticipo.`
+            : `Solicitaras ${venue.name} para ${values.eventDate || 'la fecha seleccionada'}. El owner debe aprobar antes del pago del anticipo.`
         }
         confirmLabel="Solicitar"
         isLoading={mutation.isPending}

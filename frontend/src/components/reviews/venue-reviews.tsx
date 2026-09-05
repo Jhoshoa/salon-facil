@@ -49,7 +49,7 @@ const OwnerResponseForm = ({ review, venueId, onDone }: OwnerResponseFormProps) 
         rows={3}
         maxLength={1000}
         className="flex w-full rounded-[var(--radius)] border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-        placeholder="Responde a esta resena..."
+        placeholder="Responde a esta reseña..."
         value={response}
         onChange={(event) => setResponse(event.target.value)}
       />
@@ -91,13 +91,13 @@ export const VenueReviews = ({ venueId, ownerId, averageRating, reviewCount }: V
   return (
     <section className="sf-detail-section">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="sf-detail-title">Resenas</h2>
+        <h2 className="sf-detail-title">Reseñas</h2>
         {averageRating ? (
           <p className="flex items-center gap-1.5 text-sm font-medium">
             <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
             {averageRating.toFixed(1)}
             <span className="font-normal text-muted-foreground">
-              ({reviewCount ?? 0} {reviewCount === 1 ? 'resena' : 'resenas'})
+              ({reviewCount ?? 0} {reviewCount === 1 ? 'reseña' : 'reseñas'})
             </span>
           </p>
         ) : null}
@@ -113,7 +113,7 @@ export const VenueReviews = ({ venueId, ownerId, averageRating, reviewCount }: V
       {query.isError ? (
         <ErrorState
           className="mt-4"
-          title="No se pudieron cargar las resenas"
+          title="No se pudieron cargar las reseñas"
           onRetry={() => query.refetch()}
         />
       ) : null}
@@ -122,8 +122,8 @@ export const VenueReviews = ({ venueId, ownerId, averageRating, reviewCount }: V
         <EmptyState
           className="mt-4"
           icon={MessageSquare}
-          title="Este local aun no tiene resenas"
-          description="Las resenas apareceran cuando clientes con reservas completadas dejen su calificacion."
+          title="Este local aun no tiene reseñas"
+          description="Las reseñas apareceran cuando clientes con reservas completadas dejen su calificacion."
         />
       ) : null}
 

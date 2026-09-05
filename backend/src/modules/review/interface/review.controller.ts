@@ -46,8 +46,8 @@ export class VenueReviewController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Listar resenas de un local' })
-  @ApiResponse({ status: 200, description: 'Resenas paginadas del local' })
+  @ApiOperation({ summary: 'Listar reseñas de un local' })
+  @ApiResponse({ status: 200, description: 'Reseñas paginadas del local' })
   async getVenueReviews(
     @Param('venueId') venueId: string,
     @Query('page') page?: string,
@@ -70,8 +70,8 @@ export class BookingReviewController {
   @Get()
   @Roles(UserRole.CLIENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Obtener mi resena de una reserva (CLIENT)' })
-  @ApiResponse({ status: 200, description: 'Resena existente o null' })
+  @ApiOperation({ summary: 'Obtener mi reseña de una reserva (CLIENT)' })
+  @ApiResponse({ status: 200, description: 'Reseña existente o null' })
   async getMyReview(@Param('bookingId') bookingId: string, @CurrentUser() user: { id: string }) {
     const review = await this.reviewService.getReviewByBooking(bookingId, user.id);
     return review ? toPublicReviewDto(review) : null;
@@ -82,7 +82,7 @@ export class BookingReviewController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Calificar una reserva completada (CLIENT)' })
-  @ApiResponse({ status: 201, description: 'Resena creada' })
+  @ApiResponse({ status: 201, description: 'Reseña creada' })
   @ApiResponse({ status: 400, description: 'La reserva no esta completada' })
   @ApiResponse({ status: 403, description: 'No es tu reserva' })
   @ApiResponse({ status: 409, description: 'Ya calificaste esta reserva' })
@@ -104,9 +104,9 @@ export class ReviewController {
   @Put()
   @Roles(UserRole.CLIENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Editar mi resena (CLIENT, autor)' })
-  @ApiResponse({ status: 200, description: 'Resena actualizada' })
-  @ApiResponse({ status: 403, description: 'No es tu resena' })
+  @ApiOperation({ summary: 'Editar mi reseña (CLIENT, autor)' })
+  @ApiResponse({ status: 200, description: 'Reseña actualizada' })
+  @ApiResponse({ status: 403, description: 'No es tu reseña' })
   async updateReview(
     @Param('reviewId') reviewId: string,
     @Body() dto: UpdateReviewDto,
@@ -120,8 +120,8 @@ export class ReviewController {
   @Roles(UserRole.CLIENT, UserRole.ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Borrar una resena (autor o ADMIN)' })
-  @ApiResponse({ status: 204, description: 'Resena borrada' })
+  @ApiOperation({ summary: 'Borrar una reseña (autor o ADMIN)' })
+  @ApiResponse({ status: 204, description: 'Reseña borrada' })
   async deleteReview(
     @Param('reviewId') reviewId: string,
     @CurrentUser() user: { id: string; role: UserRole },
@@ -132,9 +132,9 @@ export class ReviewController {
   @Post('response')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Responder a una resena (OWNER del local, o ADMIN)' })
+  @ApiOperation({ summary: 'Responder a una reseña (OWNER del local, o ADMIN)' })
   @ApiResponse({ status: 201, description: 'Respuesta guardada' })
-  @ApiResponse({ status: 400, description: 'Esta resena ya tiene respuesta' })
+  @ApiResponse({ status: 400, description: 'Esta reseña ya tiene respuesta' })
   @ApiResponse({ status: 403, description: 'No sos el propietario de este local' })
   async respond(
     @Param('reviewId') reviewId: string,
