@@ -33,10 +33,6 @@ export const logout = async (allDevices?: boolean): Promise<{ message: string }>
   });
 };
 
-export const getMe = async (): Promise<AuthUser> => {
-  return apiRequest<AuthUser>('/auth/me');
-};
-
 export const updateProfile = async (payload: UpdateProfilePayload): Promise<AuthUser> => {
   return apiRequest<AuthUser>('/auth/me', {
     method: 'PUT',

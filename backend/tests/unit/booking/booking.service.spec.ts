@@ -84,7 +84,6 @@ describe('BookingService', () => {
     countByVenueAndStatus: jest.Mock;
     countPendingByOwner: jest.Mock;
     countAllPending: jest.Mock;
-    incrementVenueBookingCount: jest.Mock;
     findBookingsDueForReminder: jest.Mock;
     markReminderSent: jest.Mock;
   };
@@ -126,7 +125,6 @@ describe('BookingService', () => {
       countByVenueAndStatus: jest.fn(),
       countPendingByOwner: jest.fn(),
       countAllPending: jest.fn(),
-      incrementVenueBookingCount: jest.fn(),
       findBookingsDueForReminder: jest.fn(),
       markReminderSent: jest.fn(),
     };

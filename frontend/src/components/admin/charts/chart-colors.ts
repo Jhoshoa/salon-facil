@@ -9,14 +9,6 @@ export const CHART_COLORS = {
   muted: 'hsl(216, 20%, 70%)',
 } as const;
 
-export const CHART_PALETTE = [
-  CHART_COLORS.primary,
-  CHART_COLORS.success,
-  CHART_COLORS.warning,
-  CHART_COLORS.destructive,
-  CHART_COLORS.accent,
-];
-
 export const BOOKING_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendiente',
   APPROVED: 'Aprobada',

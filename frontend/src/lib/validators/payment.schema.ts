@@ -6,8 +6,6 @@ export const paymentProofSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
-export type PaymentProofFormValues = z.infer<typeof paymentProofSchema>;
-
 export const validateProofFile = (file: File | null): string | null => {
   if (!file) return 'El comprobante es requerido';
 

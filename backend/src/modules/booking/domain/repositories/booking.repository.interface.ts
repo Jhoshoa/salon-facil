@@ -51,7 +51,6 @@ export interface IBookingRepository {
   countPendingByOwner(ownerId: string): Promise<number>;
   /** Pending bookings platform-wide (ADMIN queue). */
   countAllPending(): Promise<number>;
-  incrementVenueBookingCount(venueId: string): Promise<void>;
 
   // Reminders
   /** Confirmed bookings (APPROVED/DEPOSIT_PAID/FULLY_PAID) whose event lands on `eventDate`

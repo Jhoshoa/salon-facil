@@ -2,7 +2,6 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
-  IsEnum,
   IsInt,
   IsNotEmpty,
   IsObject,
@@ -17,7 +16,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { BookingStatus } from '../../domain/entities/booking.entity';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -170,16 +168,6 @@ export class PreviewPriceDto {
   @IsArray()
   @IsUUID('4', { each: true })
   selectedAmenityIds?: string[];
-}
-
-export class UpdateBookingStatusDto {
-  @IsEnum(BookingStatus, { message: 'Estado no valido' })
-  status!: BookingStatus;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
 }
 
 export class CreateCalendarBlockDto {

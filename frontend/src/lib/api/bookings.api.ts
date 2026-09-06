@@ -1,7 +1,6 @@
 import { apiRequest } from './client';
 import type {
   AvailabilityRangeEntry,
-  AvailabilityResult,
   Booking,
   CreateBookingPayload,
   CreateBookingResponse,
@@ -16,15 +15,6 @@ export const createBooking = async (
   return apiRequest<CreateBookingResponse>(`/venues/${venueId}/bookings`, {
     method: 'POST',
     body: JSON.stringify(payload),
-  });
-};
-
-export const checkAvailability = async (
-  venueId: string,
-  date: string,
-): Promise<AvailabilityResult> => {
-  return apiRequest<AvailabilityResult>(`/venues/${venueId}/bookings/availability?date=${date}`, {
-    auth: false,
   });
 };
 

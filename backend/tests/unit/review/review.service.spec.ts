@@ -123,7 +123,6 @@ describe('ReviewService', () => {
       countByVenueAndStatus: jest.fn(),
       countPendingByOwner: jest.fn(),
       countAllPending: jest.fn(),
-      incrementVenueBookingCount: jest.fn(),
       findBookingsDueForReminder: jest.fn(),
       markReminderSent: jest.fn(),
     };

@@ -308,13 +308,6 @@ export class BookingRepository implements IBookingRepository {
     });
   }
 
-  async incrementVenueBookingCount(venueId: string): Promise<void> {
-    await this.prisma.venue.update({
-      where: { id: venueId },
-      data: { bookingCount: { increment: 1 } },
-    });
-  }
-
   async findBookingsDueForReminder(
     eventDate: Date,
     reminderField: ReminderField,
