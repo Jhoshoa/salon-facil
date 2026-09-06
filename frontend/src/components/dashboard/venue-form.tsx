@@ -383,12 +383,12 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
 
     if (pricingMode === 'weekday_season') {
       for (const rule of seasonRules) {
-        if (!rule.name.trim()) return 'Cada temporada necesita un nombre';
-        if (!rule.startDate || !rule.endDate) return `Faltan fechas para "${rule.name || 'temporada'}"`;
+        const label = rule.name || 'temporada';
+        if (!rule.startDate || !rule.endDate) return `Faltan fechas para "${label}"`;
         if (rule.endDate < rule.startDate) {
-          return `"${rule.name}": la fecha de fin debe ser igual o posterior a la de inicio`;
+          return `"${label}": la fecha de fin debe ser igual o posterior a la de inicio`;
         }
-        if (!rule.price || Number(rule.price) < 0) return `Falta el precio para "${rule.name}"`;
+        if (!rule.price || Number(rule.price) < 0) return `Falta el precio para "${label}"`;
       }
     }
 
@@ -415,7 +415,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
           endDate: r.endDate,
           price: Number(r.price),
           unit: r.unit || undefined,
-          discountLabel: r.name,
+          discountLabel: r.name.trim() || undefined,
         })),
       );
     }
@@ -927,7 +927,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                         ) : null}
                         <div className="grid gap-3 sm:grid-cols-2">
                           <Input
-                            placeholder="Nombre (ej. Fin de año)"
+                            placeholder="Nombre (opcional, ej. Fin de año)"
                             value={rule.name}
                             onChange={(e) => updateSeasonRule(rule.key, { name: e.target.value })}
                           />
