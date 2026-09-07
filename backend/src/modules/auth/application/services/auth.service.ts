@@ -24,6 +24,24 @@ import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { NotificationService } from '../../../notification/application/services/notification.service';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
+const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
+const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 segundos
+
+/** A Google account has no Bolivian phone to give us — this placeholder satisfies the
+ * NOT NULL + UNIQUE `phone` column (unique per Google account since providerId is) without
+ * making `phone` nullable across the whole codebase. It deliberately never matches the
+ * +591XXXXXXXX format, so `hasCompletedProfile` below (and anything reusing that same regex)
+ * reads it as "profile incomplete" until the user sets a real number. See
+ * docs/auth-improvement/oauth-redirects-verification.md §1. */
+const pendingPhonePlaceholder = (providerId: string) => `pending:${providerId}`;
+
+export interface GoogleProfile {
+  providerId: string;
+  email: string;
+  emailVerified: boolean;
+  fullName: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -61,20 +79,8 @@ export class AuthService {
 
     const tokens = await this.issueTokens(user);
 
-    this.notificationService
-      .enqueue({
-        userId: user.id,
-        type: NotificationType.WELCOME,
-        title: `Bienvenido a SalonFacil, ${user.fullName.split(' ')[0]}`,
-        content:
-          user.role === UserRole.OWNER
-            ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
-            : 'Gracias por registrarte. Ya podes buscar y reservar locales para tu proximo evento.',
-        recipientEmail: user.email,
-      })
-      .catch(() => {
-        // Best-effort — a failed welcome notification should never block registration itself.
-      });
+    this.sendWelcomeNotification(user);
+    await this.issueEmailVerificationCode(user);
 
     return this.buildAuthResponse(user, tokens);
   }
@@ -94,7 +100,15 @@ export class AuthService {
       throw new UnauthorizedException('Tu cuenta esta suspendida o inactiva');
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const passwordHash = user.passwordHash;
+    if (!passwordHash) {
+      this.logger.warn(`Login rejected — OAuth-only account has no password: ${user.id}`);
+      throw new UnauthorizedException(
+        'Esta cuenta usa Google para iniciar sesion. Usa el boton de Google.',
+      );
+    }
+
+    const isPasswordValid = await bcrypt.compare(dto.password, passwordHash);
     if (!isPasswordValid) {
       this.logger.warn(`Login failed — wrong password for user: ${user.id}`);
       throw new UnauthorizedException('Credenciales invalidas');
@@ -105,6 +119,126 @@ export class AuthService {
     const tokens = await this.issueTokens(user);
 
     return this.buildAuthResponse(user, tokens);
+  }
+
+  /** Called for a fresh Google identity that doesn't match any existing account by provider ID
+   * or (Google-verified) email — creates a brand-new account. When it DOES match an existing
+   * password-based account by email, that account is linked instead (see the caller,
+   * loginOrRegisterWithGoogle) rather than a duplicate being created — the `email` column is
+   * @unique so a duplicate isn't even possible without this being handled explicitly. */
+  async loginOrRegisterWithGoogle(
+    profile: GoogleProfile,
+    intent?: 'CLIENT' | 'OWNER',
+  ): Promise<AuthResponseDto> {
+    const existingIdentity = await this.authRepository.findIdentity('google', profile.providerId);
+    if (existingIdentity) {
+      const user = await this.authRepository.findById(existingIdentity.userId);
+      if (!user) {
+        throw new UnauthorizedException('Usuario no encontrado');
+      }
+      if (!user.isActive()) {
+        throw new UnauthorizedException('Tu cuenta esta suspendida o inactiva');
+      }
+      await this.authRepository.updateLastLogin(user.id);
+      const tokens = await this.issueTokens(user);
+      return this.buildAuthResponse(user, tokens);
+    }
+
+    // Google already proved this mailbox is real (emailVerified) — that's at least as strong a
+    // proof of identity as our own (unverified-until-clicked) email/password registration, so an
+    // existing account with that email gets linked automatically instead of erroring or
+    // duplicating. See docs/auth-improvement/oauth-redirects-verification.md §3.
+    const existingByEmail = profile.emailVerified
+      ? await this.authRepository.findByEmail(profile.email)
+      : null;
+
+    if (existingByEmail) {
+      if (!existingByEmail.isActive()) {
+        throw new UnauthorizedException('Tu cuenta esta suspendida o inactiva');
+      }
+      await this.authRepository.createIdentity({
+        userId: existingByEmail.id,
+        provider: 'google',
+        providerId: profile.providerId,
+        email: profile.email,
+      });
+      if (!existingByEmail.isVerified()) {
+        await this.authRepository.markEmailVerified(existingByEmail.id);
+      }
+      await this.authRepository.updateLastLogin(existingByEmail.id);
+      const tokens = await this.issueTokens(existingByEmail);
+      return this.buildAuthResponse(existingByEmail, tokens);
+    }
+
+    const role = intent === UserRole.OWNER ? UserRole.OWNER : UserRole.CLIENT;
+    const user = await this.authRepository.create({
+      email: profile.email,
+      phone: pendingPhonePlaceholder(profile.providerId),
+      fullName: profile.fullName,
+      role,
+      emailVerifiedAt: profile.emailVerified ? new Date() : undefined,
+    });
+    await this.authRepository.createIdentity({
+      userId: user.id,
+      provider: 'google',
+      providerId: profile.providerId,
+      email: profile.email,
+    });
+
+    this.sendWelcomeNotification(user);
+
+    const tokens = await this.issueTokens(user);
+    return this.buildAuthResponse(user, tokens);
+  }
+
+  /** Types the code, checked in the "verifica tu email" modal — see
+   * docs/auth-improvement/oauth-redirects-verification.md §4. */
+  async verifyEmail(userId: string, code: string): Promise<{ message: string }> {
+    const record = await this.authRepository.findLatestActiveEmailVerificationCode(userId);
+    if (!record || record.expiresAt <= new Date()) {
+      throw new BadRequestException('El codigo expiro o no existe. Pedi uno nuevo.');
+    }
+    if (record.attempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS) {
+      throw new BadRequestException(
+        'Superaste el numero de intentos permitidos. Pedi un codigo nuevo.',
+      );
+    }
+
+    const isValid = this.tokenService.hashToken(code) === record.codeHash;
+    if (!isValid) {
+      await this.authRepository.incrementEmailVerificationAttempts(record.id);
+      const remaining = EMAIL_VERIFICATION_MAX_ATTEMPTS - (record.attempts + 1);
+      throw new BadRequestException(
+        remaining > 0
+          ? `Codigo incorrecto. Te quedan ${remaining} intentos.`
+          : 'Codigo incorrecto. Superaste el numero de intentos — pedi uno nuevo.',
+      );
+    }
+
+    await this.authRepository.markEmailVerificationCodeUsed(record.id);
+    await this.authRepository.markEmailVerified(userId);
+    return { message: 'Email verificado exitosamente' };
+  }
+
+  async resendVerificationCode(userId: string): Promise<{ message: string }> {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+    if (user.isVerified()) {
+      return { message: 'Tu email ya esta verificado' };
+    }
+
+    const existing = await this.authRepository.findLatestActiveEmailVerificationCode(userId);
+    if (existing && existing.expiresAt > new Date()) {
+      const issuedAt = existing.expiresAt.getTime() - EMAIL_VERIFICATION_CODE_TTL_MS;
+      if (Date.now() - issuedAt < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) {
+        throw new BadRequestException('Espera un momento antes de pedir otro codigo.');
+      }
+    }
+
+    await this.issueEmailVerificationCode(user);
+    return { message: 'Te enviamos un nuevo codigo' };
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthResponseDto> {
@@ -149,7 +283,18 @@ export class AuthService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<UserEntity> {
-    return this.authRepository.updateProfile(userId, dto);
+    try {
+      return await this.authRepository.updateProfile(userId, dto);
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException('Ese telefono ya esta en uso por otra cuenta');
+      }
+      throw error;
+    }
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
   }
 
   async logout(userId: string, refreshToken?: string): Promise<{ message: string }> {
@@ -263,10 +408,53 @@ export class AuthService {
         city: user.city,
         district: user.district,
         whatsappPhone: user.whatsappPhone,
+        emailVerified: user.isVerified(),
       },
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       expiresIn: tokens.expiresIn,
     };
+  }
+
+  /** Best-effort — a failed welcome notification should never block registration/signup. */
+  private sendWelcomeNotification(user: UserEntity): void {
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.WELCOME,
+        title: `Bienvenido a SalonFacil, ${user.fullName.split(' ')[0]}`,
+        content:
+          user.role === UserRole.OWNER
+            ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
+            : 'Gracias por registrarte. Ya podes buscar y reservar locales para tu proximo evento.',
+        recipientEmail: user.email,
+      })
+      .catch(() => {
+        // Best-effort — see method doc.
+      });
+  }
+
+  /** Generates and sends a fresh 6-digit code, invalidating any still-active one first so a user
+   * can never have two valid codes at once (avoids ambiguity about which one is checked). */
+  private async issueEmailVerificationCode(user: UserEntity): Promise<void> {
+    const code = this.tokenService.generateEmailVerificationCode();
+    await this.authRepository.invalidateActiveEmailVerificationCodes(user.id);
+    await this.authRepository.createEmailVerificationCode({
+      userId: user.id,
+      codeHash: this.tokenService.hashToken(code),
+      expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_CODE_TTL_MS),
+    });
+
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.EMAIL_VERIFICATION,
+        title: 'Verifica tu email en SalonFacil',
+        content: `Tu codigo de verificacion es: ${code}. Vence en 15 minutos.`,
+        recipientEmail: user.email,
+      })
+      .catch(() => {
+        // Best-effort — see sendWelcomeNotification.
+      });
   }
 }

@@ -2,7 +2,9 @@ export class UserEntity {
   id!: string;
   email!: string;
   phone!: string;
-  passwordHash!: string;
+  /** Null for accounts created via an OAuth identity (Google, etc.) — they have no password of
+   * their own. Password-based login must reject these before ever calling bcrypt.compare. */
+  passwordHash!: string | null;
   fullName!: string;
   role!: UserRole;
   status!: UserStatus;
@@ -24,8 +26,12 @@ export class UserEntity {
     return this.status === UserStatus.ACTIVE;
   }
 
+  /** Gates trust/money actions (sending a booking request, publishing a venue) — deliberately
+   * email-only, not phone: phone verification isn't implemented (WhatsApp/SMS has a per-message
+   * cost that wasn't worth it for this), so requiring it here would make this permanently false.
+   * See docs/auth-improvement/oauth-redirects-verification.md §4. */
   isVerified(): boolean {
-    return this.emailVerifiedAt !== null && this.phoneVerifiedAt !== null;
+    return this.emailVerifiedAt !== null;
   }
 
   canCreateVenue(): boolean {
@@ -34,6 +40,12 @@ export class UserEntity {
 
   canAccessAdminPanel(): boolean {
     return this.role === UserRole.ADMIN;
+  }
+
+  /** False for accounts that only ever signed in via an OAuth identity (Google, etc.) — they
+   * never set a password, so login-by-password must be rejected before comparing anything. */
+  hasPassword(): boolean {
+    return this.passwordHash !== null;
   }
 }
 

@@ -9,11 +9,21 @@ import { toast } from 'sonner';
 import { login } from '@/lib/api/auth.api';
 import { loginSchema, type LoginFormValues } from '@/lib/validators/auth.schema';
 import { useAuthStore } from '@/stores/auth.store';
-import type { PublicAuthResponse } from '@/types/api';
+import type { PublicAuthResponse, UserRole } from '@/types/api';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { SubmitButton } from '@/components/shared/submit-button';
+import { GoogleAuthButton } from '@/components/auth/google-auth-button';
+
+// Same table the backend's own OAuth-callback redirect uses (see auth.controller.ts) — kept in
+// sync manually since each side needs its own copy (one runs before any client JS, the other
+// after a normal JSON login).
+const defaultRedirectForRole = (role: UserRole) => {
+  if (role === 'OWNER') return '/dashboard';
+  if (role === 'ADMIN') return '/admin';
+  return '/bookings';
+};
 
 interface LoginFormProps {
   /** When provided, the form hands control back to the caller instead of navigating away —
@@ -54,7 +64,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps = {}) => {
         return;
       }
 
-      router.push(session.user.role === 'OWNER' ? '/dashboard' : '/bookings');
+      router.push(defaultRedirectForRole(session.user.role));
     },
     onError: (error: { message?: string }) => {
       toast.error('No se pudo iniciar sesion', { description: error.message });
@@ -80,11 +90,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps = {}) => {
             Olvidaste tu contrasena?
           </Link>
         </div>
-        <PasswordInput
-          id="password"
-          placeholder="Tu contrasena"
-          {...form.register('password')}
-        />
+        <PasswordInput id="password" placeholder="Tu contrasena" {...form.register('password')} />
         {form.formState.errors.password ? (
           <p className="sf-form-error">{form.formState.errors.password.message}</p>
         ) : null}
@@ -93,6 +99,14 @@ export const LoginForm = ({ onSuccess }: LoginFormProps = {}) => {
       <SubmitButton className="w-full" disabled={!canSubmit} isLoading={mutation.isPending}>
         Iniciar sesion
       </SubmitButton>
+
+      <div className="relative flex items-center py-1">
+        <span className="flex-grow border-t" />
+        <span className="mx-3 text-xs text-muted-foreground">o</span>
+        <span className="flex-grow border-t" />
+      </div>
+
+      <GoogleAuthButton next={searchParams.get('next') ?? undefined} />
 
       <p className="text-center text-sm text-muted-foreground">
         No tienes cuenta?{' '}

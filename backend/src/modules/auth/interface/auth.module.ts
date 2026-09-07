@@ -11,6 +11,8 @@ import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { AuthRepository } from '../infrastructure/repositories/auth.repository';
 import { AUTH_REPOSITORY } from '../domain/repositories/auth.repository.interface';
 import { JwtStrategy } from '../infrastructure/strategies/jwt.strategy';
+import { GoogleStrategy } from '../infrastructure/strategies/google.strategy';
+import { GoogleAuthGuard } from '../infrastructure/guards/google-auth.guard';
 import { NotificationModule } from '../../notification/interface/notification.module';
 
 @Module({
@@ -28,6 +30,8 @@ import { NotificationModule } from '../../notification/interface/notification.mo
     RefreshTokenUseCase,
     LogoutUseCase,
     JwtStrategy,
+    GoogleStrategy,
+    GoogleAuthGuard,
     {
       provide: AUTH_REPOSITORY,
       useClass: AuthRepository,

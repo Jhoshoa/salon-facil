@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, User as PrismaUser } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { IAuthRepository } from '../../domain/repositories/auth.repository.interface';
+import {
+  IAuthRepository,
+  UserIdentityRecord,
+} from '../../domain/repositories/auth.repository.interface';
 import { UserEntity, UserRole, UserStatus } from '../../domain/entities/user.entity';
 
 @Injectable()
@@ -26,22 +29,28 @@ export class AuthRepository implements IAuthRepository {
   async create(data: {
     email: string;
     phone: string;
-    passwordHash: string;
+    passwordHash?: string;
     fullName: string;
     role: string;
     city?: string;
     district?: string;
+    emailVerifiedAt?: Date;
   }): Promise<UserEntity> {
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
         phone: data.phone,
-        passwordHash: data.passwordHash,
+        passwordHash: data.passwordHash ?? null,
         fullName: data.fullName,
         role: data.role as UserRole,
+        // Account-lifecycle status (can this user use the platform at all) is deliberately
+        // independent of email-verification status (emailVerifiedAt / isVerified()) — the
+        // former is an admin-controlled lever, the latter gates specific trust/money actions.
+        // See docs/auth-improvement/oauth-redirects-verification.md §4.
         status: UserStatus.ACTIVE,
         city: data.city ?? null,
         district: data.district ?? null,
+        emailVerifiedAt: data.emailVerifiedAt ?? null,
       },
     });
     return this.toEntity(user);
@@ -62,6 +71,7 @@ export class AuthRepository implements IAuthRepository {
       district: string;
       avatarUrl: string;
       whatsappPhone: string;
+      phone: string;
     }>,
   ): Promise<UserEntity> {
     const user = await this.prisma.user.update({ where: { id }, data });
@@ -200,6 +210,82 @@ export class AuthRepository implements IAuthRepository {
   async updateStatus(userId: string, status: UserStatus): Promise<UserEntity> {
     const user = await this.prisma.user.update({ where: { id: userId }, data: { status } });
     return this.toEntity(user);
+  }
+
+  async findIdentity(provider: string, providerId: string): Promise<UserIdentityRecord | null> {
+    return this.prisma.userIdentity.findUnique({
+      where: { provider_providerId: { provider, providerId } },
+      select: { id: true, userId: true, provider: true, providerId: true, email: true },
+    });
+  }
+
+  async createIdentity(data: {
+    userId: string;
+    provider: string;
+    providerId: string;
+    email?: string;
+  }): Promise<UserIdentityRecord> {
+    return this.prisma.userIdentity.create({
+      data: {
+        userId: data.userId,
+        provider: data.provider,
+        providerId: data.providerId,
+        email: data.email ?? null,
+      },
+      select: { id: true, userId: true, provider: true, providerId: true, email: true },
+    });
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerifiedAt: new Date() },
+    });
+  }
+
+  async createEmailVerificationCode(data: {
+    userId: string;
+    codeHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.prisma.emailVerificationCode.create({ data });
+  }
+
+  async findLatestActiveEmailVerificationCode(userId: string): Promise<{
+    id: string;
+    codeHash: string;
+    attempts: number;
+    expiresAt: Date;
+    usedAt: Date | null;
+  } | null> {
+    return this.prisma.emailVerificationCode.findFirst({
+      where: { userId, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, codeHash: true, attempts: true, expiresAt: true, usedAt: true },
+    });
+  }
+
+  async incrementEmailVerificationAttempts(id: string): Promise<void> {
+    await this.prisma.emailVerificationCode.update({
+      where: { id },
+      data: { attempts: { increment: 1 } },
+    });
+  }
+
+  async markEmailVerificationCodeUsed(id: string): Promise<void> {
+    await this.prisma.emailVerificationCode.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  }
+
+  async invalidateActiveEmailVerificationCodes(userId: string): Promise<void> {
+    // "Invalidate" by marking used rather than deleting — keeps a full audit trail of every code
+    // ever issued, same principle as revoking (not deleting) refresh tokens above.
+    await this.prisma.emailVerificationCode.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
   }
 
   private toEntity(prismaUser: PrismaUser): UserEntity {

@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -18,7 +19,7 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '
 import { Public } from '../../../shared/decorators/public.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { Roles } from '../../../shared/decorators/roles.decorator';
-import { UserRole } from '../../auth/domain/entities/user.entity';
+import { UserEntity, UserRole } from '../../auth/domain/entities/user.entity';
 import { CreateVenueDto } from '../application/dto/create-venue.dto';
 import { UpdateVenueDto } from '../application/dto/update-venue.dto';
 import { VenueFilterDto } from '../application/dto/venue-filter.dto';
@@ -234,7 +235,12 @@ export class VenueController {
   @ApiOperation({ summary: 'Enviar local a revision (OWNER/ADMIN)' })
   @ApiResponse({ status: 200, description: 'Local enviado a revision (PENDING)' })
   @ApiResponse({ status: 400, description: 'Faltan datos requeridos para publicar' })
-  async publish(@Param('id') id: string, @CurrentUser() user: { id: string; role: UserRole }) {
+  async publish(@Param('id') id: string, @CurrentUser() user: UserEntity) {
+    // Only gates the OWNER themselves — an ADMIN publishing on an owner's behalf isn't the one
+    // whose trust is being vouched for here, so their own verification status is irrelevant.
+    if (user.role === UserRole.OWNER && !user.isVerified()) {
+      throw new ForbiddenException('Tenes que verificar tu email antes de publicar un local');
+    }
     return this.venueService.submitForReview(id, user.id, user.role);
   }
 

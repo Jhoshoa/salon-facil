@@ -1,9 +1,19 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../shared/decorators/current-user.decorator';
 import { Public } from '../../../../shared/decorators/public.decorator';
 import { Roles } from '../../../../shared/decorators/roles.decorator';
-import { UserRole } from '../../../auth/domain/entities/user.entity';
+import { UserEntity, UserRole } from '../../../auth/domain/entities/user.entity';
 import { BookingService } from '../../application/services/booking.service';
 import {
   CreateBookingDto,
@@ -28,8 +38,14 @@ export class BookingController {
   async create(
     @Param('venueId') venueId: string,
     @Body() dto: CreateBookingDto,
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: UserEntity,
   ) {
+    if (!user.isVerified()) {
+      throw new ForbiddenException(
+        'Tenes que verificar tu email antes de enviar una solicitud de reserva',
+      );
+    }
+
     return this.bookingService.requestBooking(venueId, user.id, {
       eventType: dto.eventType,
       eventDate: dto.eventDate,

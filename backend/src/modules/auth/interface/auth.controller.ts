@@ -9,8 +9,10 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../shared/decorators/public.decorator';
@@ -19,16 +21,18 @@ import { RegisterUseCase } from '../application/use-cases/register.use-case';
 import { LoginUseCase } from '../application/use-cases/login.use-case';
 import { RefreshTokenUseCase } from '../application/use-cases/refresh-token.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
-import { AuthService } from '../application/services/auth.service';
+import { AuthService, GoogleProfile } from '../application/services/auth.service';
 import { RegisterDto } from '../application/dto/register.dto';
 import { LoginDto } from '../application/dto/login.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
 import { ForgotPasswordDto } from '../application/dto/forgot-password.dto';
 import { ResetPasswordDto } from '../application/dto/reset-password.dto';
+import { VerifyEmailDto } from '../application/dto/verify-email.dto';
 import { AuthResponseDto, PublicAuthResponseDto } from '../application/dto/auth-response.dto';
 import { LogoutDto } from '../application/dto/logout.dto';
-import { UserEntity } from '../domain/entities/user.entity';
+import { UserEntity, UserRole } from '../domain/entities/user.entity';
 import { TokenService } from '../application/services/token.service';
+import { GoogleAuthGuard } from '../infrastructure/guards/google-auth.guard';
 import { REFRESH_TOKEN_COOKIE, clearAuthCookies, setAuthCookies } from './auth-cookies.util';
 
 const toProfileDto = (user: UserEntity) => ({
@@ -42,7 +46,20 @@ const toProfileDto = (user: UserEntity) => ({
   city: user.city,
   district: user.district,
   whatsappPhone: user.whatsappPhone,
+  emailVerified: user.isVerified(),
 });
+
+// Same default-landing-page-per-role table the frontend's own post-login redirect uses (see
+// login-form.tsx) — kept in sync manually since this is the one redirect that has to happen
+// server-side (the OAuth callback can't hand control back to a client-side router first).
+const defaultRedirectForRole = (role: string): string => {
+  if (role === UserRole.OWNER) return '/dashboard';
+  if (role === UserRole.ADMIN) return '/admin';
+  return '/bookings';
+};
+
+const isSafeNextPath = (next: string | undefined): next is string =>
+  !!next && next.startsWith('/') && !next.startsWith('//');
 
 // Strips accessToken/refreshToken before they'd ever reach a JSON response body — they only
 // travel via the httpOnly Set-Cookie headers written by setAuthCookies.
@@ -172,5 +189,51 @@ export class AuthController {
   async updateMe(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
     const user = await this.authService.updateProfile(userId, dto);
     return toProfileDto(user);
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verificar el email con el codigo de 6 digitos enviado' })
+  @ApiResponse({ status: 200, description: 'Email verificado' })
+  @ApiResponse({ status: 400, description: 'Codigo invalido, expirado o intentos agotados' })
+  async verifyEmail(@CurrentUser('id') userId: string, @Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(userId, dto.code);
+  }
+
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('resend-verification-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reenviar el codigo de verificacion de email' })
+  @ApiResponse({ status: 200, description: 'Codigo reenviado (o ya estaba verificado)' })
+  @ApiResponse({ status: 400, description: 'Hay que esperar el cooldown antes de reenviar' })
+  async resendVerificationCode(@CurrentUser('id') userId: string) {
+    return this.authService.resendVerificationCode(userId);
+  }
+
+  @Public()
+  @Get('google')
+  @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Inicia el flujo de OAuth con Google (redirige a Google)' })
+  googleAuth() {
+    // Body intentionally empty — GoogleAuthGuard's getAuthenticateOptions builds the signed
+    // state and passport.authenticate() performs the redirect before this handler ever runs.
+  }
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Callback de Google OAuth — redirige de vuelta al frontend' })
+  async googleCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
+    const profile = req.user as GoogleProfile;
+    const rawState = typeof req.query.state === 'string' ? req.query.state : '';
+    const { next, intent } = this.tokenService.verifyOAuthState(rawState);
+
+    const auth = await this.authService.loginOrRegisterWithGoogle(profile, intent);
+    setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
+
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const redirectPath = isSafeNextPath(next) ? next : defaultRedirectForRole(auth.user.role);
+    res.redirect(`${frontendUrl}${redirectPath}`);
   }
 }

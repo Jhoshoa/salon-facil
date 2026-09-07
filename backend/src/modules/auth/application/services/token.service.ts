@@ -97,6 +97,48 @@ export class TokenService {
     return randomBytes(32).toString('hex');
   }
 
+  /** Opaque, single-use code for the email-verification flow — same shape as
+   * generatePasswordResetToken, just shorter (this one gets typed by hand into a modal, not
+   * clicked from a link) and numeric-only so it's easy to read off an email on a phone. */
+  generateEmailVerificationCode(): string {
+    // randomInt-style rejection isn't needed at this range: bias from randomBytes(3) mod 1e6 is
+    // undetectably small (< 1 part in 16 million) for a 6-digit human-facing code.
+    const value = randomBytes(3).readUIntBE(0, 3) % 1_000_000;
+    return value.toString().padStart(6, '0');
+  }
+
+  /** Signs the OAuth `state` param carrying where to return to (`next`) and, for a fresh
+   * signup, which role the entry point intended (`intent`) — through the redirect to Google and
+   * back. Signed (not just base64'd) so the callback can trust it without a DB round-trip and so
+   * it can't be tampered with to redirect somewhere unintended (open-redirect / role escalation).
+   * Short-lived: nobody should be sitting on Google's login screen for more than a few minutes.
+   * See docs/auth-improvement/oauth-redirects-verification.md §2. */
+  signOAuthState(payload: { next?: string; intent?: 'CLIENT' | 'OWNER' }): string {
+    return this.jwtService.sign(
+      { ...payload, type: 'oauth_state' as const },
+      { secret: this.accessSecret, expiresIn: '10m' },
+    );
+  }
+
+  verifyOAuthState(state: string): { next?: string; intent?: 'CLIENT' | 'OWNER' } {
+    try {
+      const payload = this.jwtService.verify<{
+        next?: string;
+        intent?: 'CLIENT' | 'OWNER';
+        type: string;
+      }>(state, { secret: this.accessSecret });
+      if (payload.type !== 'oauth_state') {
+        throw new UnauthorizedException('State invalido');
+      }
+      return { next: payload.next, intent: payload.intent };
+    } catch {
+      // An expired/tampered state degrades to "no state" rather than a hard failure — the user
+      // still gets logged in, just without the return-to/role hints. Losing those is much less
+      // bad than blocking the whole login over a stale redirect hint.
+      return {};
+    }
+  }
+
   getRefreshTokenExpiresAt(token: string): Date {
     const payload = this.verifyRefreshToken(token);
     if (payload.exp) {

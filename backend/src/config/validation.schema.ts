@@ -24,8 +24,20 @@ export const validationSchema = Joi.object({
   TWILIO_ACCOUNT_SID: Joi.string().optional(),
   TWILIO_AUTH_TOKEN: Joi.string().optional(),
   TWILIO_WHATSAPP_NUMBER: Joi.string().optional(),
-  RESEND_API_KEY: Joi.string().optional(),
-  RESEND_FROM_EMAIL: Joi.string().email().optional(),
+  // AWS SES — transactional email (verification codes, booking/payment notifications). Reads
+  // AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY itself via the SDK's standard env var convention, so
+  // only the region and sender identity need their own entries here.
+  AWS_REGION: Joi.string().optional(),
+  AWS_ACCESS_KEY_ID: Joi.string().optional(),
+  AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
+  SES_FROM_EMAIL: Joi.string().email().optional(),
   GOOGLE_MAPS_API_KEY: Joi.string().optional(),
+  // Google OAuth (sign in / sign up with Google) — see
+  // docs/auth-improvement/oauth-redirects-verification.md §1. Optional so the app still boots
+  // without them (the Google buttons just won't work); GoogleStrategy checks these are all
+  // present before registering itself.
+  GOOGLE_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
+  GOOGLE_CALLBACK_URL: Joi.string().uri().optional(),
   SENTRY_DSN: Joi.string().uri().optional(),
 });

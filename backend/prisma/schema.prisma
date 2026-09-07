@@ -105,6 +105,7 @@ enum NotificationType {
   WELCOME
   PASSWORD_RESET
   REVIEW_RESPONSE
+  EMAIL_VERIFICATION
 }
 
 enum NotificationChannel {
@@ -117,7 +118,9 @@ model User {
   id              String     @id @default(uuid())
   email           String     @unique
   phone           String     @unique
-  passwordHash    String     @map("password_hash")
+  // Nullable: accounts created via an OAuth identity (see UserIdentity) have no password of
+  // their own — password-based login must check this is non-null before comparing.
+  passwordHash    String?    @map("password_hash")
   fullName        String     @map("full_name")
   role            UserRole   @default(CLIENT)
   status          UserStatus @default(PENDING_VERIFICATION)
@@ -131,20 +134,58 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   lastLoginAt     DateTime?  @map("last_login_at")
 
-  venues              Venue[]              @relation("VenueOwner")
-  verifiedVenues      Venue[]              @relation("VenueVerifier")
-  bookings            Booking[]            @relation("ClientBookings")
-  reviews             Review[]             @relation("ClientReviews")
-  confirmedPayments   Payment[]            @relation("PaymentConfirmedBy")
-  notifications       Notification[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  venues                 Venue[]                 @relation("VenueOwner")
+  verifiedVenues         Venue[]                 @relation("VenueVerifier")
+  bookings               Booking[]               @relation("ClientBookings")
+  reviews                Review[]                @relation("ClientReviews")
+  confirmedPayments      Payment[]               @relation("PaymentConfirmedBy")
+  notifications          Notification[]
+  refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
+  identities             UserIdentity[]
+  emailVerificationCodes EmailVerificationCode[]
 
   @@index([email])
   @@index([phone])
   @@index([role])
   @@index([status])
   @@map("users")
+}
+
+// One row per external identity (Google today, extensible to Facebook/Apple/etc. later without
+// touching User) — see docs/auth-improvement/oauth-redirects-verification.md §1.
+model UserIdentity {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  provider   String
+  providerId String   @map("provider_id")
+  email      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("user_identities")
+}
+
+// Short numeric code (not a long token like PasswordResetToken) mailed to confirm the address
+// entered at registration. `attempts` guards against brute-forcing a mere 6-digit space — see
+// docs/auth-improvement/oauth-redirects-verification.md §4.
+model EmailVerificationCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  attempts  Int       @default(0)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_codes")
 }
 
 model RefreshToken {

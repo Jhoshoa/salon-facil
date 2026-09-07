@@ -58,3 +58,30 @@ export const resetPassword = async (payload: {
     body: JSON.stringify(payload),
   });
 };
+
+export const verifyEmail = async (code: string): Promise<{ message: string }> => {
+  return apiRequest<{ message: string }>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+};
+
+export const resendVerificationCode = async (): Promise<{ message: string }> => {
+  return apiRequest<{ message: string }>('/auth/resend-verification-code', {
+    method: 'POST',
+  });
+};
+
+const getApiBaseUrl = () => process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+// Not a fetch — this is a real cross-domain redirect to Google, so the caller navigates the
+// browser to this URL directly (window.location.href / an <a href>) instead of calling it as
+// an API function. `next`/`intent` become the signed OAuth `state` server-side (see
+// docs/auth-improvement/oauth-redirects-verification.md §2).
+export const getGoogleAuthUrl = (params: { next?: string; intent?: 'CLIENT' | 'OWNER' } = {}) => {
+  const searchParams = new URLSearchParams();
+  if (params.next) searchParams.set('next', params.next);
+  if (params.intent) searchParams.set('intent', params.intent);
+  const query = searchParams.toString();
+  return `${getApiBaseUrl()}/api/v1/auth/google${query ? `?${query}` : ''}`;
+};

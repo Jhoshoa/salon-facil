@@ -26,4 +26,13 @@ export class UpdateProfileDto {
     message: 'El teléfono debe ser válido de Bolivia (+591XXXXXXXX)',
   })
   whatsappPhone?: string;
+
+  // Only meaningful for Google-signup accounts still carrying the `pending:<id>` placeholder
+  // phone — lets the "completa tu perfil" step set a real one. See
+  // docs/auth-improvement/oauth-redirects-verification.md §1.
+  @IsOptional()
+  @Matches(/^\+591\d{8}$/, {
+    message: 'El teléfono debe ser válido de Bolivia (+591XXXXXXXX)',
+  })
+  phone?: string;
 }

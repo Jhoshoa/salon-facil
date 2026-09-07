@@ -66,11 +66,11 @@ describe('NotificationProcessor', () => {
   });
 
   it('marks the notification failed when the channel send fails', async () => {
-    emailService.send.mockResolvedValue({ success: false, error: 'Resend no configurado' });
+    emailService.send.mockResolvedValue({ success: false, error: 'AWS SES no configurado' });
 
     await processor.process(makeJob());
 
-    expect(repository.markAsFailed).toHaveBeenCalledWith('notif-1', 'Resend no configurado');
+    expect(repository.markAsFailed).toHaveBeenCalledWith('notif-1', 'AWS SES no configurado');
     expect(repository.markAsSent).not.toHaveBeenCalled();
   });
 

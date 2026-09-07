@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
+import { PrismaService } from '../../../src/prisma/prisma.service';
 
 // supertest's own `SuperAgentTest` type doesn't structurally match what `request.agent()`
 // actually returns in this version — this is the type that does.
@@ -53,12 +54,22 @@ export async function registerFixtureUsers(
     role: 'OWNER',
   });
 
-  await otherOwnerAgent.post('/api/v1/auth/register').send({
+  const otherOwnerRes = await otherOwnerAgent.post('/api/v1/auth/register').send({
     email: `owner2-fix-${uniqueId}@email.com`,
     password: 'Password123!',
     phone: phoneFor(uniqueId, 2),
     fullName: 'Other Owner Fixture E2E',
     role: 'OWNER',
+  });
+
+  // Fresh registrations are email-unverified by design (see AuthService.isVerified) — booking
+  // creation and venue publishing both gate on that now, so these fixtures mark themselves
+  // verified directly in the DB rather than exercising the code-entry flow, which is already
+  // covered by its own auth e2e tests. See docs/auth-improvement/oauth-redirects-verification.md.
+  const prisma = app.get(PrismaService);
+  await prisma.user.updateMany({
+    where: { id: { in: [clientRes.body.user.id, ownerRes.body.user.id, otherOwnerRes.body.user.id] } },
+    data: { emailVerifiedAt: new Date() },
   });
 
   return {

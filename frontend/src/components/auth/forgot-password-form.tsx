@@ -35,8 +35,8 @@ export const ForgotPasswordForm = () => {
     return (
       <div className="space-y-5">
         <p className="text-sm text-muted-foreground">
-          Si el email esta registrado, te enviamos un enlace para restablecer tu contrasena.
-          Revisa tu bandeja de entrada.
+          Si el email esta registrado, te enviamos un enlace para restablecer tu contrasena. Revisa
+          tu bandeja de entrada.
         </p>
         <Link href="/login" className="sf-link block text-center text-sm">
           Volver a iniciar sesion

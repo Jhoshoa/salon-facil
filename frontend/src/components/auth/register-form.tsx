@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { SubmitButton } from '@/components/shared/submit-button';
+import { GoogleAuthButton } from '@/components/auth/google-auth-button';
 
 interface RegisterFormProps {
   /** Fixed at the call site — the role picker was confusing for clients, so each entry
@@ -111,6 +112,14 @@ export const RegisterForm = ({ role, submitLabel = 'Crear cuenta' }: RegisterFor
       <SubmitButton className="w-full" disabled={!canSubmit} isLoading={mutation.isPending}>
         {submitLabel}
       </SubmitButton>
+
+      <div className="relative flex items-center py-1">
+        <span className="flex-grow border-t" />
+        <span className="mx-3 text-xs text-muted-foreground">o</span>
+        <span className="flex-grow border-t" />
+      </div>
+
+      <GoogleAuthButton intent={role} label="Continuar con Google" />
 
       <p className="text-center text-xs text-muted-foreground">
         Al crear una cuenta aceptas nuestros{' '}

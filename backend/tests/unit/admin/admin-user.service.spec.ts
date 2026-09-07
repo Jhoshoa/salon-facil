@@ -49,6 +49,14 @@ describe('AdminUserService', () => {
       markPasswordResetTokenUsed: jest.fn(),
       findMany: jest.fn(),
       updateStatus: jest.fn(),
+      findIdentity: jest.fn(),
+      createIdentity: jest.fn(),
+      markEmailVerified: jest.fn(),
+      createEmailVerificationCode: jest.fn(),
+      findLatestActiveEmailVerificationCode: jest.fn(),
+      incrementEmailVerificationAttempts: jest.fn(),
+      markEmailVerificationCodeUsed: jest.fn(),
+      invalidateActiveEmailVerificationCodes: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

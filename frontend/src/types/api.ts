@@ -24,6 +24,7 @@ export interface AuthUser {
   city: string | null;
   district: string | null;
   whatsappPhone: string | null;
+  emailVerified: boolean;
 }
 
 export interface UpdateProfilePayload {
@@ -32,6 +33,7 @@ export interface UpdateProfilePayload {
   district?: string;
   avatarUrl?: string;
   whatsappPhone?: string;
+  phone?: string;
 }
 
 export type UserRole = 'CLIENT' | 'OWNER' | 'ADMIN';

@@ -49,6 +49,14 @@ describe('AuthService', () => {
     createPasswordResetToken: jest.Mock;
     findActivePasswordResetToken: jest.Mock;
     markPasswordResetTokenUsed: jest.Mock;
+    findIdentity: jest.Mock;
+    createIdentity: jest.Mock;
+    markEmailVerified: jest.Mock;
+    createEmailVerificationCode: jest.Mock;
+    findLatestActiveEmailVerificationCode: jest.Mock;
+    incrementEmailVerificationAttempts: jest.Mock;
+    markEmailVerificationCodeUsed: jest.Mock;
+    invalidateActiveEmailVerificationCodes: jest.Mock;
   };
   let mockTokenService: {
     generateTokens: jest.Mock;
@@ -56,6 +64,9 @@ describe('AuthService', () => {
     hashToken: jest.Mock;
     getRefreshTokenExpiresAt: jest.Mock;
     generatePasswordResetToken: jest.Mock;
+    generateEmailVerificationCode: jest.Mock;
+    signOAuthState: jest.Mock;
+    verifyOAuthState: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -74,6 +85,14 @@ describe('AuthService', () => {
       createPasswordResetToken: jest.fn(),
       findActivePasswordResetToken: jest.fn(),
       markPasswordResetTokenUsed: jest.fn(),
+      findIdentity: jest.fn(),
+      createIdentity: jest.fn(),
+      markEmailVerified: jest.fn(),
+      createEmailVerificationCode: jest.fn(),
+      findLatestActiveEmailVerificationCode: jest.fn(),
+      incrementEmailVerificationAttempts: jest.fn(),
+      markEmailVerificationCodeUsed: jest.fn(),
+      invalidateActiveEmailVerificationCodes: jest.fn(),
     };
 
     mockTokenService = {
@@ -86,6 +105,9 @@ describe('AuthService', () => {
       hashToken: jest.fn().mockReturnValue('mock-refresh-token-hash'),
       getRefreshTokenExpiresAt: jest.fn().mockReturnValue(new Date('2030-01-01T00:00:00.000Z')),
       generatePasswordResetToken: jest.fn().mockReturnValue('mock-reset-token'),
+      generateEmailVerificationCode: jest.fn().mockReturnValue('123456'),
+      signOAuthState: jest.fn().mockReturnValue('mock-oauth-state'),
+      verifyOAuthState: jest.fn().mockReturnValue({}),
     };
 
     const mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
