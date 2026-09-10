@@ -84,6 +84,11 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
       SENTRY_DSN: ${SENTRY_DSN}
+      # Only read by prisma/seed-admin.ts, run manually once — see .env.production.example.
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_PHONE: ${ADMIN_PHONE}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
     depends_on:
       postgres:
         condition: service_healthy

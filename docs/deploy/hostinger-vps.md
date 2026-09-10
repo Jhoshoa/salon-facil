@@ -92,8 +92,16 @@ nunca borra nada y se puede correr mas de una vez sin problema:
 docker compose -f docker-compose.prod.yml exec backend npm run prisma:seed:catalog
 ```
 
-Si necesitas una cuenta admin inicial, creala directamente contra la base de datos (no hay un
-script para eso todavia).
+Para la cuenta admin inicial, completa `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `ADMIN_PHONE` en tu
+`.env` (la contrasena nunca vive en el repo — elegila vos mismo, minimo 12 caracteres con
+mayuscula, minuscula, numero y caracter especial) y corre:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend npm run prisma:seed:admin
+```
+
+Es seguro correrlo mas de una vez: si `ADMIN_EMAIL` ya existe, no toca nada (nunca resetea la
+contrasena de una cuenta ya creada).
 
 ## 8. Verificar
 
