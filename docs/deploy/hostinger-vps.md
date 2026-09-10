@@ -81,9 +81,19 @@ docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec backend npx prisma migrate deploy
 ```
 
-El seed (`prisma/seed.ts`) borra y recrea datos de ejemplo — **no lo corras en produccion**. Si
-necesitas una cuenta admin inicial, crea el usuario directamente contra la base de datos o agrega
-un script de seed separado pensado para produccion.
+El seed completo (`prisma/seed.ts`) borra y recrea datos de ejemplo — **no lo corras en
+produccion** (de hecho el script se niega a correr si `NODE_ENV=production`). Lo que si necesitas
+en una base de datos de produccion recien creada son los catalogos de referencia (tipos de
+espacio, tipos de uso, comodidades) que el formulario de crear local y los filtros de busqueda
+necesitan para tener opciones — eso lo cubre un script separado, seguro para produccion, que
+nunca borra nada y se puede correr mas de una vez sin problema:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend npm run prisma:seed:catalog
+```
+
+Si necesitas una cuenta admin inicial, creala directamente contra la base de datos (no hay un
+script para eso todavia).
 
 ## 8. Verificar
 

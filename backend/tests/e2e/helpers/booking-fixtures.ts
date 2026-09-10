@@ -68,7 +68,9 @@ export async function registerFixtureUsers(
   // covered by its own auth e2e tests. See docs/auth-improvement/oauth-redirects-verification.md.
   const prisma = app.get(PrismaService);
   await prisma.user.updateMany({
-    where: { id: { in: [clientRes.body.user.id, ownerRes.body.user.id, otherOwnerRes.body.user.id] } },
+    where: {
+      id: { in: [clientRes.body.user.id, ownerRes.body.user.id, otherOwnerRes.body.user.id] },
+    },
     data: { emailVerifiedAt: new Date() },
   });
 
