@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { useAuthHydrated, useAuthStore } from '@/stores/auth.store';
+import { useAuthReady, useAuthStore } from '@/stores/auth.store';
 
 // "Mis reservas" and its detail page are client-only account data — without this guard,
 // visiting them signed out just falls through to a generic error state (getMyBookings/getBooking
@@ -17,13 +17,13 @@ import { useAuthHydrated, useAuthStore } from '@/stores/auth.store';
 const BookingsLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
-  const hydrated = useAuthHydrated();
+  const ready = useAuthReady();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const role = useAuthStore((state) => state.role);
   const isAllowed = isAuthenticated && role === 'CLIENT';
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!ready) return;
     if (!isAuthenticated) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
@@ -31,9 +31,9 @@ const BookingsLayout = ({ children }: { children: React.ReactNode }) => {
     if (!isAllowed) {
       router.replace('/dashboard/bookings');
     }
-  }, [hydrated, isAuthenticated, isAllowed, pathname, router]);
+  }, [ready, isAuthenticated, isAllowed, pathname, router]);
 
-  if (!hydrated || !isAllowed) {
+  if (!ready || !isAllowed) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

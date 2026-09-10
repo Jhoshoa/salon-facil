@@ -133,7 +133,7 @@ export const SiteHeader = () => {
                 asChild
                 variant="outline"
                 size="sm"
-                className="hidden border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
+                className="hidden bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
               >
                 <Link href="/bookings">
                   <LayoutDashboard className="h-4 w-4" />

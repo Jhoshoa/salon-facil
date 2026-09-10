@@ -33,6 +33,12 @@ export const logout = async (allDevices?: boolean): Promise<{ message: string }>
   });
 };
 
+// Used to recover session state after a flow that sets the httpOnly cookies without any
+// client-side JS seeing a login response — see auth.store.ts's hydrateSession.
+export const getCurrentUser = async (): Promise<AuthUser> => {
+  return apiRequest<AuthUser>('/auth/me');
+};
+
 export const updateProfile = async (payload: UpdateProfilePayload): Promise<AuthUser> => {
   return apiRequest<AuthUser>('/auth/me', {
     method: 'PUT',
