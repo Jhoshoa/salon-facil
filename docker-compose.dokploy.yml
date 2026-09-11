@@ -1,0 +1,108 @@
+# Production stack for Dokploy — same services as docker-compose.prod.yml, minus nginx/certbot.
+#
+# Dokploy runs its own Traefik reverse proxy and handles Let's Encrypt certificates itself
+# (configured from its own UI, not from this file) — bundling our own nginx/certbot here would
+# fight Dokploy's Traefik for ports 80/443 and break the deploy. See
+# docs/deploy/hostinger-vps.md for the plain-VPS (no PaaS) version of this stack, which does
+# need nginx/certbot because nothing else is managing TLS there.
+#
+# After deploying this in Dokploy, go to the app's "Domains" tab and add two domains:
+#   - app.mievento.com.bo -> frontend service, container port 3000
+#   - api.mievento.com.bo -> backend service, container port 3001
+# Dokploy issues and renews the certificates for both automatically from there — nothing to
+# run manually (no init-letsencrypt.sh equivalent needed for this path).
+#
+# Reads its variables the same way as docker-compose.prod.yml: paste them into Dokploy's own
+# "Environment" tab for this project (not a .env file on disk — Dokploy manages that itself).
+
+name: salonfacil-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: salonfacil-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: salonfacil
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: salonfacil
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salonfacil -d salonfacil"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: salonfacil-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    container_name: salonfacil-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://salonfacil:${POSTGRES_PASSWORD}@postgres:5432/salonfacil
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      BCRYPT_ROUNDS: 12
+      CORS_ORIGINS: https://${APP_DOMAIN}
+      FRONTEND_URL: https://${APP_DOMAIN}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      SES_FROM_EMAIL: ${SES_FROM_EMAIL}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      SENTRY_DSN: ${SENTRY_DSN}
+      # Only read by prisma/seed-admin.ts, run manually once — see .env.production.example.
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_PHONE: ${ADMIN_PHONE}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN}
+    container_name: salonfacil-frontend
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: https://${API_DOMAIN}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
