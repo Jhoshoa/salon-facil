@@ -72,3 +72,29 @@ export function clearAuthCookies(res: Response): void {
     path: REFRESH_TOKEN_COOKIE_PATH,
   });
 }
+
+// Binds a Google OAuth attempt to the browser that started it — the actual CSRF defense for
+// that flow (see TokenService.signOAuthState). Scoped to /api/v1/auth/google so it's only ever
+// sent to /auth/google (where it's set) and /auth/google/callback (where it's checked), not to
+// every request the way access_token is.
+export const OAUTH_NONCE_COOKIE = 'oauth_nonce';
+const OAUTH_NONCE_COOKIE_PATH = '/api/v1/auth/google';
+
+export function setOAuthNonceCookie(res: Response, nonce: string): void {
+  res.cookie(OAUTH_NONCE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: 'lax',
+    path: OAUTH_NONCE_COOKIE_PATH,
+    maxAge: 10 * 60 * 1000, // matches signOAuthState's 10m expiry
+  });
+}
+
+export function clearOAuthNonceCookie(res: Response): void {
+  res.clearCookie(OAUTH_NONCE_COOKIE, {
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: 'lax',
+    path: OAUTH_NONCE_COOKIE_PATH,
+  });
+}

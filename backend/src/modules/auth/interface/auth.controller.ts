@@ -33,7 +33,13 @@ import { LogoutDto } from '../application/dto/logout.dto';
 import { UserEntity, UserRole } from '../domain/entities/user.entity';
 import { TokenService } from '../application/services/token.service';
 import { GoogleAuthGuard } from '../infrastructure/guards/google-auth.guard';
-import { REFRESH_TOKEN_COOKIE, clearAuthCookies, setAuthCookies } from './auth-cookies.util';
+import {
+  OAUTH_NONCE_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  clearAuthCookies,
+  clearOAuthNonceCookie,
+  setAuthCookies,
+} from './auth-cookies.util';
 
 const toProfileDto = (user: UserEntity) => ({
   id: user.id,
@@ -225,14 +231,37 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Callback de Google OAuth — redirige de vuelta al frontend' })
   async googleCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
-    const profile = req.user as GoogleProfile;
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     const rawState = typeof req.query.state === 'string' ? req.query.state : '';
-    const { next, intent } = this.tokenService.verifyOAuthState(rawState);
+    const nonceCookie = req.cookies?.[OAUTH_NONCE_COOKIE] as string | undefined;
 
+    // The state's signature alone only proves it came from this server at some point — it does
+    // NOT prove this is the same browser that started the flow. That's what the nonce cookie is
+    // for: an attacker can start their own /auth/google, capture the resulting code+state
+    // before their browser exchanges it, and hand that URL to a victim; the victim's browser
+    // never received the matching oauth_nonce cookie, so this check rejects it. Without this,
+    // the victim would get silently logged into the attacker's account (OAuth login CSRF). See
+    // TokenService.signOAuthState and GoogleAuthGuard.
+    let next: string | undefined;
+    let intent: 'CLIENT' | 'OWNER' | undefined;
+    try {
+      const decoded = this.tokenService.verifyOAuthState(rawState);
+      if (!nonceCookie || decoded.nonce !== nonceCookie) {
+        throw new UnauthorizedException('State invalido');
+      }
+      next = decoded.next;
+      intent = decoded.intent;
+    } catch {
+      clearOAuthNonceCookie(res);
+      res.redirect(`${frontendUrl}/login?error=oauth_state_invalid`);
+      return;
+    }
+    clearOAuthNonceCookie(res);
+
+    const profile = req.user as GoogleProfile;
     const auth = await this.authService.loginOrRegisterWithGoogle(profile, intent);
     setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     const redirectPath = isSafeNextPath(next) ? next : defaultRedirectForRole(auth.user.role);
     res.redirect(`${frontendUrl}${redirectPath}`);
   }

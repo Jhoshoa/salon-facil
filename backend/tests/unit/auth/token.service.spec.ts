@@ -146,4 +146,52 @@ describe('TokenService', () => {
       expect(() => service.verifyRefreshToken('access-as-refresh')).toThrow(UnauthorizedException);
     });
   });
+
+  // The nonce round-trip through sign/verify is the actual CSRF defense for the Google OAuth
+  // flow (see google-auth.guard.ts / auth.controller.ts) — verifyOAuthState must reject rather
+  // than silently drop it, or an attacker's captured code+state could be replayed against a
+  // victim's browser regardless of the missing/mismatched nonce cookie.
+  describe('signOAuthState / verifyOAuthState', () => {
+    it('signs the next/intent/nonce payload with the oauth_state type', () => {
+      (jwtService.sign as jest.Mock).mockReturnValue('signed-state');
+
+      const result = service.signOAuthState({ next: '/bookings', intent: 'CLIENT', nonce: 'n1' });
+
+      expect(result).toBe('signed-state');
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { next: '/bookings', intent: 'CLIENT', nonce: 'n1', type: 'oauth_state' },
+        expect.objectContaining({ secret: expect.any(String), expiresIn: '10m' }),
+      );
+    });
+
+    it('returns next/intent/nonce for a valid state', () => {
+      (jwtService.verify as jest.Mock).mockReturnValue({
+        next: '/dashboard',
+        intent: 'OWNER',
+        nonce: 'abc123',
+        type: 'oauth_state',
+      });
+
+      const result = service.verifyOAuthState('valid-state');
+
+      expect(result).toEqual({ next: '/dashboard', intent: 'OWNER', nonce: 'abc123' });
+    });
+
+    it('throws (does not degrade to {}) for an expired or tampered state', () => {
+      (jwtService.verify as jest.Mock).mockImplementation(() => {
+        throw new Error('jwt expired');
+      });
+
+      expect(() => service.verifyOAuthState('bad-state')).toThrow();
+    });
+
+    it('throws when the token type is not oauth_state (e.g. a replayed access token)', () => {
+      (jwtService.verify as jest.Mock).mockReturnValue({
+        sub: 'user-123',
+        type: 'access',
+      });
+
+      expect(() => service.verifyOAuthState('access-as-state')).toThrow(UnauthorizedException);
+    });
+  });
 });

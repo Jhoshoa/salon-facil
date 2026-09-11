@@ -107,36 +107,41 @@ export class TokenService {
     return value.toString().padStart(6, '0');
   }
 
-  /** Signs the OAuth `state` param carrying where to return to (`next`) and, for a fresh
-   * signup, which role the entry point intended (`intent`) — through the redirect to Google and
-   * back. Signed (not just base64'd) so the callback can trust it without a DB round-trip and so
-   * it can't be tampered with to redirect somewhere unintended (open-redirect / role escalation).
-   * Short-lived: nobody should be sitting on Google's login screen for more than a few minutes.
+  /** Signs the OAuth `state` param carrying where to return to (`next`), for a fresh signup
+   * which role the entry point intended (`intent`), and a `nonce` — through the redirect to
+   * Google and back. Signed (not just base64'd) so the callback can trust it without a DB round
+   * trip and so it can't be tampered with to redirect somewhere unintended (open-redirect /
+   * role escalation). Short-lived: nobody should be sitting on Google's login screen for more
+   * than a few minutes.
+   *
+   * The `nonce` is the actual CSRF defense, not the signature: a signed-but-unbound state only
+   * proves *some* /auth/google request produced it, not that it's the same browser now hitting
+   * the callback — without binding it to a value only that browser holds (see the
+   * oauth_nonce cookie set alongside this in GoogleAuthGuard), an attacker can start their own
+   * OAuth flow, capture the resulting code+state before their browser exchanges it, and hand
+   * that URL to a victim — logging the victim into the attacker's account (OAuth login CSRF).
    * See docs/auth-improvement/oauth-redirects-verification.md §2. */
-  signOAuthState(payload: { next?: string; intent?: 'CLIENT' | 'OWNER' }): string {
+  signOAuthState(payload: { next?: string; intent?: 'CLIENT' | 'OWNER'; nonce: string }): string {
     return this.jwtService.sign(
       { ...payload, type: 'oauth_state' as const },
       { secret: this.accessSecret, expiresIn: '10m' },
     );
   }
 
-  verifyOAuthState(state: string): { next?: string; intent?: 'CLIENT' | 'OWNER' } {
-    try {
-      const payload = this.jwtService.verify<{
-        next?: string;
-        intent?: 'CLIENT' | 'OWNER';
-        type: string;
-      }>(state, { secret: this.accessSecret });
-      if (payload.type !== 'oauth_state') {
-        throw new UnauthorizedException('State invalido');
-      }
-      return { next: payload.next, intent: payload.intent };
-    } catch {
-      // An expired/tampered state degrades to "no state" rather than a hard failure — the user
-      // still gets logged in, just without the return-to/role hints. Losing those is much less
-      // bad than blocking the whole login over a stale redirect hint.
-      return {};
+  /** Throws (does not degrade to "no state") on a missing/expired/tampered state — unlike a
+   * plain redirect hint, the nonce inside is a security boundary, so a state that can't be
+   * trusted must block the login rather than silently proceed without it. */
+  verifyOAuthState(state: string): { next?: string; intent?: 'CLIENT' | 'OWNER'; nonce: string } {
+    const payload = this.jwtService.verify<{
+      next?: string;
+      intent?: 'CLIENT' | 'OWNER';
+      nonce: string;
+      type: string;
+    }>(state, { secret: this.accessSecret });
+    if (payload.type !== 'oauth_state') {
+      throw new UnauthorizedException('State invalido');
     }
+    return { next: payload.next, intent: payload.intent, nonce: payload.nonce };
   }
 
   getRefreshTokenExpiresAt(token: string): Date {
