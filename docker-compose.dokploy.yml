@@ -28,9 +28,13 @@ services:
       POSTGRES_DB: salonfacil
     # Bound to the server's own loopback only — never reachable from the internet directly.
     # This is what makes the SSH-tunnel DBeaver connection possible (see docs/deploy/hostinger-vps.md):
-    # the tunnel lands on the server's own 127.0.0.1:5432, exactly like a session on the server itself.
+    # the tunnel lands on the server's own 127.0.0.1:5434, exactly like a session on the server itself.
+    # Host side is 5434 (not Postgres's default 5432) on purpose, same convention as local dev
+    # (docker-compose.yml) — keeps 5432 free on this server for another app's own Postgres later.
+    # Only the host-side mapping changes here; DATABASE_URL below still targets postgres:5432,
+    # Postgres's actual port *inside* the Docker network, completely unrelated to this mapping.
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
