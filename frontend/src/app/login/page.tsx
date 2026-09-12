@@ -9,8 +9,8 @@ export default function LoginPage() {
       <section className="sf-auth-card-sm">
         <div className="sf-auth-header">
           <Link href="/" className="mb-6 inline-flex items-center gap-2">
-            <span className="sf-logo">
-              <LogoMark className="h-6 w-6" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center">
+              <LogoMark variant="light" className="h-8 w-8" />
             </span>
             <span className="text-lg font-bold">Mi Evento</span>
           </Link>
