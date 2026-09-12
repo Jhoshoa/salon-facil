@@ -74,7 +74,7 @@ describe('Venues (e2e)', () => {
 
     adminAgent = request.agent(app.getHttpServer());
     await adminAgent.post('/api/v1/auth/login').send({
-      email: 'admin@salonfacil.bo',
+      email: 'admin@mievento.com.bo',
       password: 'Password123!',
     });
   }, 30000);

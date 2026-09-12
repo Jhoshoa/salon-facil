@@ -115,7 +115,7 @@ export async function createVerifiedVenue(
 export async function loginAdmin(app: INestApplication): Promise<TestAgent> {
   const adminAgent = request.agent(app.getHttpServer());
   await adminAgent.post('/api/v1/auth/login').send({
-    email: 'admin@salonfacil.bo',
+    email: 'admin@mievento.com.bo',
     password: 'Password123!',
   });
   return adminAgent;
