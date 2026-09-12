@@ -1,6 +1,6 @@
 # Flujos de la aplicacion — guia de pruebas manuales
 
-Este documento lista todos los flujos de usuario de SalonFacil para probarlos manualmente:
+Este documento lista todos los flujos de usuario de Mi Evento para probarlos manualmente:
 CLIENT, OWNER y ADMIN. Fue generado revisando el codigo real (rutas del frontend, endpoints
 del backend, seed de datos) el 2026-08-28.
 
@@ -18,7 +18,7 @@ Todos comparten la misma contraseña: **`Password123!`**
 
 | Email | Rol | Nombre | Notas |
 |---|---|---|---|
-| `admin@salonfacil.bo` | ADMIN | Administrador SalonFacil | Unico admin disponible; no hay forma de crear otro desde la UI |
+| `admin@mievento.com.bo` | ADMIN | Administrador Mi Evento | Unico admin disponible; no hay forma de crear otro desde la UI |
 | `mario.quispe@email.com` | OWNER | Mario Quispe Mamani | Dueño de "Salon Imperial" y "Estudio Creativo Calacoto" |
 | `rosa.choque@email.com` | OWNER | Rosa Choque Flores | Dueña de "Espacio Fiesta" |
 | `luis.condori@email.com` | OWNER | Luis Condori Apaza | Dueño de "Jardin Los Pinos" y "Terraza Mirador Andino" |
@@ -33,7 +33,7 @@ a mano. Nunca lo corras sin confirmar antes.**
 
 **Cloudinary ya esta configurado** (credenciales reales en `backend/.env.local` y en `.env`
 en la raiz para docker-compose) — subir fotos de un local y comprobantes de pago funciona de
-punta a punta. Resend (email) y Twilio (WhatsApp) siguen **sin configurar**:
+punta a punta. AWS SES (email) y Twilio (WhatsApp) siguen **sin configurar**:
 
 - **Recuperar contraseña**: el correo nunca llega a una bandeja real. El enlace de recuperacion
   queda igual disponible en la tabla `notifications` — ver flujo 1.3.
@@ -219,7 +219,7 @@ del cliente y que el cliente recibe una notificacion.
 
 ## 4. Flujos de ADMIN
 
-Inicia sesion con `admin@salonfacil.bo`. Todo vive bajo `/admin`.
+Inicia sesion con `admin@mievento.com.bo`. Todo vive bajo `/admin`.
 
 ### 4.1 Verificar locales
 `/admin/venues` — cola de locales publicados por sus dueños que esperan verificacion.
