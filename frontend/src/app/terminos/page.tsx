@@ -3,8 +3,8 @@ import { SiteHeader } from '@/components/shared/site-header';
 import { SiteFooter } from '@/components/shared/site-footer';
 
 export const metadata: Metadata = {
-  title: 'Terminos y condiciones | SalonFacil',
-  description: 'Terminos y condiciones de uso de la plataforma SalonFacil.',
+  title: 'Terminos y condiciones | Mi Evento',
+  description: 'Terminos y condiciones de uso de la plataforma Mi Evento.',
 };
 
 export default function TerminosPage() {
@@ -26,7 +26,7 @@ export default function TerminosPage() {
       <section className="sf-container py-10">
         <div className="mx-auto max-w-3xl space-y-10 text-sm leading-6 text-foreground">
           <p className="text-base leading-7 text-muted-foreground">
-            Estos terminos regulan el uso de SalonFacil, una plataforma en linea que conecta a
+            Estos terminos regulan el uso de Mi Evento, una plataforma en linea que conecta a
             personas que buscan un espacio para eventos (&quot;Clientes&quot;) con personas o
             negocios que ofrecen espacios en alquiler (&quot;Propietarios&quot;). Al crear una
             cuenta o usar el sitio aceptas estos terminos. Si no estas de acuerdo, no deberias usar
@@ -34,11 +34,11 @@ export default function TerminosPage() {
           </p>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold">1. Que es SalonFacil</h2>
+            <h2 className="text-xl font-semibold">1. Que es Mi Evento</h2>
             <p>
-              SalonFacil es un intermediario: publicamos espacios de terceros, facilitamos la
+              Mi Evento es un intermediario: publicamos espacios de terceros, facilitamos la
               busqueda, la solicitud de reserva y la coordinacion del pago entre Cliente y
-              Propietario. SalonFacil no es dueño de los locales publicados, no organiza los
+              Propietario. Mi Evento no es dueño de los locales publicados, no organiza los
               eventos y no es parte del contrato de alquiler entre Cliente y Propietario, aunque
               intervenimos para verificar locales, mediar pagos y resolver disputas cuando es
               posible.
@@ -83,7 +83,7 @@ export default function TerminosPage() {
               administrador verifica el comprobante y confirma la reserva.
             </p>
             <p>
-              SalonFacil no procesa ni retiene el dinero de la transaccion: los pagos se coordinan
+              Mi Evento no procesa ni retiene el dinero de la transaccion: los pagos se coordinan
               directamente entre Cliente y Propietario (transferencia, QR u otro medio que el local
               acepte) y nosotros solo verificamos que el comprobante subido corresponda a lo
               acordado. No somos responsables por errores en transferencias hechas fuera de la
@@ -127,16 +127,16 @@ export default function TerminosPage() {
             <h2 className="text-xl font-semibold">8. Propiedad intelectual</h2>
             <p>
               El contenido que subis (fotos de tu local, descripciones, reseñas) sigue siendo tuyo;
-              al subirlo nos das permiso para mostrarlo dentro de SalonFacil con el fin de operar la
+              al subirlo nos das permiso para mostrarlo dentro de Mi Evento con el fin de operar la
               plataforma (busquedas, fichas de local, promocion del sitio). El diseño, marca y
-              codigo de SalonFacil son propiedad de sus operadores.
+              codigo de Mi Evento son propiedad de sus operadores.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-xl font-semibold">9. Limitacion de responsabilidad</h2>
             <p>
-              SalonFacil facilita el contacto y la coordinacion entre Cliente y Propietario, pero no
+              Mi Evento facilita el contacto y la coordinacion entre Cliente y Propietario, pero no
               controla el estado fisico de los locales, la conducta de los usuarios durante un
               evento, ni el cumplimiento de acuerdos hechos fuera de la plataforma. En la medida
               permitida por ley, no somos responsables por daños, perdidas o conflictos derivados
@@ -149,7 +149,7 @@ export default function TerminosPage() {
             <p>
               Podemos actualizar estos terminos para reflejar cambios en la plataforma o en la
               normativa aplicable. Si el cambio es importante, lo avisaremos dentro del sitio. Seguir
-              usando SalonFacil despues de un cambio implica que lo aceptas.
+              usando Mi Evento despues de un cambio implica que lo aceptas.
             </p>
           </section>
 
@@ -166,8 +166,8 @@ export default function TerminosPage() {
             <h2 className="text-xl font-semibold">12. Contacto</h2>
             <p>
               Si tenes preguntas sobre estos terminos, escribinos a{' '}
-              <a className="sf-link" href="mailto:soporte@salonfacil.bo">
-                soporte@salonfacil.bo
+              <a className="sf-link" href="mailto:soporte@mievento.com.bo">
+                soporte@mievento.com.bo
               </a>
               .
             </p>

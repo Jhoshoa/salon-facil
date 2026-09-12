@@ -8,6 +8,7 @@ import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { VerifyEmailModal } from '@/components/auth/verify-email-modal';
+import { LogoMark } from '@/components/shared/logo-mark';
 
 const roleLabels: Record<string, string> = {
   CLIENT: 'Cliente',
@@ -49,15 +50,9 @@ export const SiteHeader = () => {
         <div className="sf-container flex h-full items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <span className="sf-logo-mark">
-              <svg viewBox="0 0 32 32" fill="none" className="h-full w-full">
-                <circle cx="16" cy="16" r="14.5" stroke="#FFFFFF" strokeWidth="1" opacity=".7" />
-                <path
-                  d="M16 6 L18.4 14 L26 16 L18.4 18 L16 26 L13.6 18 L6 16 L13.6 14 Z"
-                  fill="#C9A227"
-                />
-              </svg>
+              <LogoMark />
             </span>
-            <span className="sf-wordmark">SalonFacil</span>
+            <span className="sf-wordmark">Mi Evento</span>
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex">

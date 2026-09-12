@@ -3,8 +3,8 @@ import { SiteHeader } from '@/components/shared/site-header';
 import { SiteFooter } from '@/components/shared/site-footer';
 
 export const metadata: Metadata = {
-  title: 'Politica de privacidad | SalonFacil',
-  description: 'Como SalonFacil recolecta, usa y protege tus datos personales.',
+  title: 'Politica de privacidad | Mi Evento',
+  description: 'Como Mi Evento recolecta, usa y protege tus datos personales.',
 };
 
 export default function PrivacidadPage() {
@@ -26,7 +26,7 @@ export default function PrivacidadPage() {
       <section className="sf-container py-10">
         <div className="mx-auto max-w-3xl space-y-10 text-sm leading-6 text-foreground">
           <p className="text-base leading-7 text-muted-foreground">
-            Esta politica explica que datos personales recolecta SalonFacil, para que los usamos,
+            Esta politica explica que datos personales recolecta Mi Evento, para que los usamos,
             con quien los compartimos y que derechos tenes sobre ellos. Se aplica a Clientes,
             Propietarios y visitantes del sitio.
           </p>
@@ -148,8 +148,8 @@ export default function PrivacidadPage() {
               de proteccion de privacidad (habeas data) te permite conocer, actualizar o eliminar
               informacion tuya en manos de terceros. Para ejercer cualquiera de estos derechos,
               escribinos a{' '}
-              <a className="sf-link" href="mailto:soporte@salonfacil.bo">
-                soporte@salonfacil.bo
+              <a className="sf-link" href="mailto:soporte@mievento.com.bo">
+                soporte@mievento.com.bo
               </a>
               .
             </p>
@@ -158,7 +158,7 @@ export default function PrivacidadPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold">8. Menores de edad</h2>
             <p>
-              SalonFacil no esta dirigido a menores de 18 años y no creamos cuentas a sabiendas para
+              Mi Evento no esta dirigido a menores de 18 años y no creamos cuentas a sabiendas para
               menores de edad.
             </p>
           </section>
@@ -176,8 +176,8 @@ export default function PrivacidadPage() {
             <p>
               Para consultas sobre privacidad o para ejercer tus derechos sobre tus datos,
               escribinos a{' '}
-              <a className="sf-link" href="mailto:soporte@salonfacil.bo">
-                soporte@salonfacil.bo
+              <a className="sf-link" href="mailto:soporte@mievento.com.bo">
+                soporte@mievento.com.bo
               </a>
               .
             </p>

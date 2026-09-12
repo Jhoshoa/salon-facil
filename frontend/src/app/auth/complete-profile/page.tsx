@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { CalendarCheck } from 'lucide-react';
 import { CompleteProfileForm } from '@/components/auth/complete-profile-form';
+import { LogoMark } from '@/components/shared/logo-mark';
 
 export default function CompleteProfilePage() {
   return (
@@ -9,9 +9,9 @@ export default function CompleteProfilePage() {
         <div className="sf-auth-header">
           <Link href="/" className="mb-6 inline-flex items-center gap-2">
             <span className="sf-logo">
-              <CalendarCheck className="h-5 w-5" />
+              <LogoMark className="h-6 w-6" />
             </span>
-            <span className="text-lg font-bold">SalonFacil</span>
+            <span className="text-lg font-bold">Mi Evento</span>
           </Link>
           <h1 className="sf-auth-title">Completa tu perfil</h1>
           <p className="sf-auth-subtitle">

@@ -8,6 +8,7 @@ import { AccountMenu } from '@/components/shared/account-menu';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { NotificationBell } from '@/components/shared/notification-bell';
 import { Button } from '@/components/ui/button';
+import { LogoMark } from '@/components/shared/logo-mark';
 
 const navItems = [
   { href: '/dashboard', label: 'Resumen', icon: LayoutDashboard },
@@ -56,9 +57,9 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
         <div className="mb-6 flex items-center justify-between px-1">
           <Link href="/dashboard" className="flex items-center gap-2">
             <span className="sf-logo">
-              <CalendarCheck className="h-5 w-5" />
+              <LogoMark className="h-6 w-6" />
             </span>
-            <span className="text-base font-bold">SalonFacil</span>
+            <span className="text-base font-bold">Mi Evento</span>
           </Link>
           <NotificationBell align="left" />
         </div>
@@ -72,9 +73,9 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-background px-4 lg:hidden">
           <Link href="/dashboard" className="flex items-center gap-2">
             <span className="sf-logo">
-              <CalendarCheck className="h-5 w-5" />
+              <LogoMark className="h-6 w-6" />
             </span>
-            <span className="text-sm font-bold">SalonFacil</span>
+            <span className="text-sm font-bold">Mi Evento</span>
           </Link>
           <div className="flex items-center gap-1">
             <NotificationBell />

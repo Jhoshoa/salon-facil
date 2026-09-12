@@ -250,7 +250,7 @@ export const VenueDetail = ({
               <span className="sf-stamp shrink-0">
                 verificado
                 <br />
-                salonfacil
+                mi evento
               </span>
             ) : null}
           </div>

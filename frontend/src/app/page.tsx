@@ -318,7 +318,7 @@ export default function HomePage() {
           <span className="sf-stamp mx-auto mb-7 border-primary-foreground/40 text-primary-foreground/75">
             verificado
             <br />
-            salonfacil
+            mi evento
           </span>
           <h3 className="mx-auto max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
             Tu espacio tambien merece{' '}

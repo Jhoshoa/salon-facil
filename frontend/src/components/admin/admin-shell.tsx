@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
-  CalendarCheck,
   CalendarRange,
   LayoutGrid,
   Menu,
@@ -17,6 +16,7 @@ import {
 import { AccountMenu } from '@/components/shared/account-menu';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { Button } from '@/components/ui/button';
+import { LogoMark } from '@/components/shared/logo-mark';
 
 const navItems = [
   { href: '/admin/analytics', label: 'Analitica', icon: BarChart3 },
@@ -65,9 +65,9 @@ export const AdminShell = ({ children }: AdminShellProps) => {
       <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r bg-background p-4 lg:flex">
         <Link href="/admin" className="mb-6 flex items-center gap-2 px-1">
           <span className="sf-logo">
-            <CalendarCheck className="h-5 w-5" />
+            <LogoMark className="h-6 w-6" />
           </span>
-          <span className="text-base font-bold">SalonFacil admin</span>
+          <span className="text-base font-bold">Mi Evento admin</span>
         </Link>
         <div className="flex-1">
           <NavLinks pathname={pathname} />
@@ -79,9 +79,9 @@ export const AdminShell = ({ children }: AdminShellProps) => {
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-background px-4 lg:hidden">
           <Link href="/admin" className="flex items-center gap-2">
             <span className="sf-logo">
-              <CalendarCheck className="h-5 w-5" />
+              <LogoMark className="h-6 w-6" />
             </span>
-            <span className="text-sm font-bold">SalonFacil admin</span>
+            <span className="text-sm font-bold">Mi Evento admin</span>
           </Link>
           <Button variant="ghost" size="icon-sm" onClick={() => setDrawerOpen(true)}>
             <Menu className="h-5 w-5" />

@@ -20,7 +20,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: 'SalonFacil - Encuentra el local perfecto para tu evento',
+  title: 'Mi Evento - Encuentra el local perfecto para tu evento',
   description:
     'Alquiler de locales para bodas, quinceañeras, cumpleaños y eventos en El Alto, Bolivia.',
 };

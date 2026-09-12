@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ShieldCheck } from 'lucide-react';
+import { LogoMark } from '@/components/shared/logo-mark';
 
 const footerColumns = [
   {
@@ -40,22 +41,9 @@ export const SiteFooter = () => {
           <div>
             <Link href="/" className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center">
-                <svg viewBox="0 0 32 32" fill="none" className="h-full w-full">
-                  <circle
-                    cx="16"
-                    cy="16"
-                    r="14.5"
-                    stroke="hsl(var(--foreground))"
-                    strokeWidth="1"
-                    opacity=".5"
-                  />
-                  <path
-                    d="M16 6 L18.4 14 L26 16 L18.4 18 L16 26 L13.6 18 L6 16 L13.6 14 Z"
-                    fill="#C9A227"
-                  />
-                </svg>
+                <LogoMark variant="light" />
               </span>
-              <span className="font-serif text-lg italic text-foreground">SalonFacil</span>
+              <span className="font-serif text-lg italic text-foreground">Mi Evento</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-6 text-muted-foreground">
               Un catalogo curado de espacios para eventos en todo Bolivia, con datos claros de
@@ -87,7 +75,7 @@ export const SiteFooter = () => {
       </div>
 
       <div className="sf-container flex flex-col gap-2 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>SalonFacil 2026. Todos los derechos reservados.</span>
+        <span>Mi Evento 2026. Todos los derechos reservados.</span>
         <span>Hecho en Bolivia</span>
       </div>
     </footer>
