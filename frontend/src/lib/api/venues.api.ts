@@ -95,6 +95,14 @@ export const deleteVenue = async (id: string): Promise<void> => {
   return apiRequest<void>(`/venues/${id}`, { method: 'DELETE' });
 };
 
+export const deactivateVenue = async (id: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/${id}/deactivate`, { method: 'PUT' });
+};
+
+export const reactivateVenue = async (id: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/${id}/reactivate`, { method: 'PUT' });
+};
+
 export const getVenueCompletion = async (id: string): Promise<VenueCompletion> => {
   return apiRequest<VenueCompletion>(`/venues/${id}/completion`);
 };

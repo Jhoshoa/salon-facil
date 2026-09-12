@@ -98,7 +98,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findById(id: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
@@ -106,7 +106,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findBySlug(slug: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
-      where: { slug },
+      where: { slug, deletedAt: null },
       include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
@@ -114,7 +114,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findByOwner(ownerId: string): Promise<VenueEntity[]> {
     const venues = await this.prisma.venue.findMany({
-      where: { ownerId },
+      where: { ownerId, deletedAt: null },
       include: this.venueInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -129,6 +129,7 @@ export class VenueRepository implements IVenueRepository {
     const where: Prisma.VenueWhereInput = {
       status: VenueStatus.ACTIVE,
       isVerified: true,
+      deletedAt: null,
     };
     const andFilters: Prisma.VenueWhereInput[] = [];
 
@@ -483,7 +484,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findByStatus(status: string): Promise<VenueEntity[]> {
     const venues = await this.prisma.venue.findMany({
-      where: { status: status as VenueStatus },
+      where: { status: status as VenueStatus, deletedAt: null },
       include: this.venueInclude,
       orderBy: { createdAt: 'asc' },
     });
@@ -863,9 +864,13 @@ export class VenueRepository implements IVenueRepository {
   }
 
   async softDelete(id: string): Promise<void> {
+    // Sets deletedAt only — leaves `status` as whatever it already was, so the history of the
+    // venue's last real state survives for anyone reading the row directly. Every normal read
+    // path (findById, findBySlug, findByOwner, search, findByStatus) already filters
+    // `deletedAt: null`, so this alone is enough to make the venue disappear everywhere.
     await this.prisma.venue.update({
       where: { id },
-      data: { status: VenueStatus.INACTIVE },
+      data: { deletedAt: new Date() },
     });
   }
 
@@ -1026,6 +1031,7 @@ export class VenueRepository implements IVenueRepository {
       bookingCount: raw.bookingCount,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
+      deletedAt: raw.deletedAt ?? null,
       services: raw.services?.map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (s: any) =>

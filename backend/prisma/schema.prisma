@@ -259,6 +259,12 @@ model Venue {
   bookingCount       Int          @default(0) @map("booking_count")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
+  // Real soft delete, separate from `status`: null means not deleted. Deleting a venue is a
+  // final, irreversible action from the app's point of view (no restore endpoint) and hides it
+  // from every read path (search, direct slug lookup, the owner's own venue list) regardless of
+  // whatever `status` it was in — unlike VenueStatus.INACTIVE, which is a reversible pause the
+  // owner/admin can flip back to ACTIVE.
+  deletedAt          DateTime?    @map("deleted_at")
 
   owner          User               @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   verifiedBy     User?              @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
@@ -282,6 +288,7 @@ model Venue {
   @@index([isFeatured])
   @@index([spaceTypeId])
   @@index([capacityMax])
+  @@index([deletedAt])
   @@index([latitude, longitude])
   @@map("venues")
 }

@@ -56,7 +56,12 @@ export class VenueService {
 
   async getVenueBySlug(slug: string): Promise<VenueEntity> {
     const venue = await this.venueRepository.findBySlug(slug);
-    if (!venue) {
+    // Same 404 for "doesn't exist" and "exists but isn't public" (draft, pending, rejected,
+    // deactivated) — a random visitor with a saved/guessed link shouldn't be able to tell those
+    // apart. The owner/admin manage and preview a non-public venue through their own
+    // authenticated dashboard routes (getMyVenues + /dashboard/venues/:id/preview), which don't
+    // go through this public lookup at all, so no exception is needed here for them.
+    if (!venue || !venue.isPublic()) {
       throw new NotFoundException(`Local con slug '${slug}' no encontrado`);
     }
     this.venueRepository.incrementViewCount(venue.id).catch(() => {});
@@ -66,7 +71,7 @@ export class VenueService {
 
   async getSimilarVenues(slug: string, limit = 4): Promise<VenueEntity[]> {
     const venue = await this.venueRepository.findBySlug(slug);
-    if (!venue) {
+    if (!venue || !venue.isPublic()) {
       throw new NotFoundException(`Local con slug '${slug}' no encontrado`);
     }
     return this.venueRepository.findSimilar(venue, limit);
@@ -114,6 +119,38 @@ export class VenueService {
     }
 
     await this.venueRepository.softDelete(id);
+  }
+
+  /** Pauses a live listing — reversible via reactivateVenue, unlike deleteVenue. Hides it from
+   * public search/direct link immediately; the owner still sees and manages it from their
+   * dashboard (getMyVenues doesn't filter by status, only by deletedAt). */
+  async deactivateVenue(id: string, userId: string, userRole: UserRole): Promise<VenueEntity> {
+    const venue = await this.getVenueById(id);
+
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para desactivar este local');
+    }
+    if (venue.status !== VenueStatus.ACTIVE) {
+      throw new BadRequestException('Solo podes desactivar un local activo');
+    }
+
+    return this.venueRepository.updateStatus(id, VenueStatus.INACTIVE);
+  }
+
+  /** Brings a deactivated venue back to ACTIVE without going through admin re-verification —
+   * it was already verified before being paused, and updateStatus only touches isVerified/
+   * verifiedAt/verifiedBy when a verifiedById is passed, which reactivation deliberately omits. */
+  async reactivateVenue(id: string, userId: string, userRole: UserRole): Promise<VenueEntity> {
+    const venue = await this.getVenueById(id);
+
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para reactivar este local');
+    }
+    if (venue.status !== VenueStatus.INACTIVE) {
+      throw new BadRequestException('Solo podes reactivar un local desactivado');
+    }
+
+    return this.venueRepository.updateStatus(id, VenueStatus.ACTIVE);
   }
 
   async searchVenues(filters: VenueFilterDto): Promise<{

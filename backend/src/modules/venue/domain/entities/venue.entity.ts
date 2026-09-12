@@ -57,6 +57,7 @@ export class VenueEntity {
   bookingCount: number = 0;
   createdAt!: Date;
   updatedAt!: Date;
+  deletedAt: Date | null = null;
 
   services?: VenueServiceEntity[];
   prices?: VenuePriceEntity[];
@@ -77,8 +78,12 @@ export class VenueEntity {
     return this.status === VenueStatus.ACTIVE;
   }
 
+  isDeleted(): boolean {
+    return this.deletedAt !== null;
+  }
+
   isPublic(): boolean {
-    return this.status === VenueStatus.ACTIVE && this.isVerified;
+    return this.status === VenueStatus.ACTIVE && this.isVerified && !this.isDeleted();
   }
 
   canBeEditedBy(userId: string, userRole: string): boolean {

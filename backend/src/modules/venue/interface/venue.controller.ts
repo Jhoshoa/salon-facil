@@ -244,6 +244,34 @@ export class VenueController {
     return this.venueService.submitForReview(id, user.id, user.role);
   }
 
+  @Put(':id/deactivate')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Pausar un local activo — reversible (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Local desactivado (INACTIVE)' })
+  @ApiResponse({ status: 400, description: 'El local no esta activo' })
+  @ApiResponse({ status: 403, description: 'No es propietario del local' })
+  async deactivate(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.deactivateVenue(id, user.id, user.role);
+  }
+
+  @Put(':id/reactivate')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reactivar un local pausado (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Local reactivado (ACTIVE)' })
+  @ApiResponse({ status: 400, description: 'El local no esta desactivado' })
+  @ApiResponse({ status: 403, description: 'No es propietario del local' })
+  async reactivate(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.reactivateVenue(id, user.id, user.role);
+  }
+
   @Post(':id/media')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @UseInterceptors(
