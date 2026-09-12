@@ -472,6 +472,58 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  // ===== Authenticated by-id lookup (preview) and admin "all venues" listing =====
+  describe('GET /api/v1/venues/by-id/:id and /api/v1/venues/admin/all', () => {
+    let draftVenueId: string;
+
+    beforeAll(async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `By-id Draft Test ${uniqueId}`)
+        .field('description', 'Venue en borrador, solo visible por id para su dueno o un admin.')
+        .field('address', 'By-id Address 12345')
+        .field('district', 'By-id District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+      draftVenueId = res.body.id;
+    });
+
+    it('lets the owner preview their own draft venue by id', async () => {
+      const res = await ownerAgent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(200);
+      expect(res.body.id).toBe(draftVenueId);
+      expect(res.body.status).toBe('DRAFT');
+    });
+
+    it('lets an admin preview any venue by id, regardless of status', async () => {
+      const res = await adminAgent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(200);
+      expect(res.body.id).toBe(draftVenueId);
+    });
+
+    it('returns 403 for a different owner', () => {
+      return owner2Agent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(403);
+    });
+
+    it('returns 403 for a CLIENT', () => {
+      return clientAgent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(403);
+    });
+
+    it('returns 401 without a session', () => {
+      return request(app.getHttpServer()).get(`/api/v1/venues/by-id/${draftVenueId}`).expect(401);
+    });
+
+    it('lists every status for ADMIN, including the draft, excluding nothing by status', async () => {
+      const res = await adminAgent.get('/api/v1/venues/admin/all').expect(200);
+      const ids = res.body.map((v: { id: string }) => v.id);
+      expect(ids).toContain(draftVenueId);
+    });
+
+    it('returns 403 for OWNER and CLIENT on the admin listing', async () => {
+      await ownerAgent.get('/api/v1/venues/admin/all').expect(403);
+      await clientAgent.get('/api/v1/venues/admin/all').expect(403);
+    });
+  });
+
   // ===== My venues =====
   describe('GET /api/v1/venues/my/venues', () => {
     it('should return venues owned by the authenticated user', () => {

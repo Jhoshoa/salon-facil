@@ -54,6 +54,27 @@ export class VenueService {
     return venue;
   }
 
+  /** Backs the authenticated by-id preview route — unlike getVenueBySlug, this never gates on
+   * isPublic() (a draft/pending/deactivated venue is exactly what its owner or an admin needs
+   * to preview), it gates on ownership instead. */
+  async getVenueByIdForViewer(
+    id: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<VenueEntity> {
+    const venue = await this.getVenueById(id);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para ver este local');
+    }
+    return venue;
+  }
+
+  /** Every venue in every status, for the admin management view (distinct from
+   * getVenuesByStatus('PENDING'), which only backs the verification queue). */
+  async getAllVenuesForAdmin(): Promise<VenueEntity[]> {
+    return this.venueRepository.findAllForAdmin();
+  }
+
   async getVenueBySlug(slug: string): Promise<VenueEntity> {
     const venue = await this.venueRepository.findBySlug(slug);
     // Same 404 for "doesn't exist" and "exists but isn't public" (draft, pending, rejected,

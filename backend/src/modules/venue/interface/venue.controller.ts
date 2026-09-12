@@ -217,6 +217,22 @@ export class VenueController {
     await this.venueService.deleteVenue(id, user.id, user.role);
   }
 
+  @Get('by-id/:id')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Obtener local por ID para vista previa autenticada (OWNER/ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Local encontrado' })
+  @ApiResponse({ status: 403, description: 'No es propietario ni admin' })
+  @ApiResponse({ status: 404, description: 'Local no encontrado' })
+  async getByIdForPreview(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.getVenueByIdForViewer(id, user.id, user.role);
+  }
+
   @Get(':id/completion')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()
@@ -351,6 +367,15 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Locales con estado PENDING' })
   async getPendingVenues() {
     return this.venueService.getVenuesByStatus('PENDING');
+  }
+
+  @Get('admin/all')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar todos los locales, cualquier estado (ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Todos los locales no eliminados' })
+  async getAllVenues() {
+    return this.venueService.getAllVenuesForAdmin();
   }
 
   // --- Catalog management: space types ---

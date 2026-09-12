@@ -53,6 +53,12 @@ export const getSimilarVenues = async (slug: string, limit = 4): Promise<Venue[]
   return apiRequest<Venue[]>(`/venues/${slug}/similar?limit=${limit}`, { auth: false });
 };
 
+/** Authenticated by-id lookup (OWNER of the venue, or ADMIN) — unlike getVenueBySlug, works
+ * for a draft/pending/deactivated venue too, since it gates on ownership, not on being public. */
+export const getVenueById = async (id: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/by-id/${id}`);
+};
+
 export const getAmenitiesCatalog = async (): Promise<AmenityCatalog> => {
   return apiRequest<AmenityCatalog>('/venues/catalog/amenities', { auth: false });
 };
@@ -147,6 +153,10 @@ export const verifyVenue = async (id: string, approve: boolean): Promise<Venue> 
 
 export const getPendingVenues = async (): Promise<Venue[]> => {
   return apiRequest<Venue[]>('/venues/admin/pending');
+};
+
+export const getAllVenuesAdmin = async (): Promise<Venue[]> => {
+  return apiRequest<Venue[]>('/venues/admin/all');
 };
 
 export const getAdminSpaceTypes = async (): Promise<CatalogItem[]> => {

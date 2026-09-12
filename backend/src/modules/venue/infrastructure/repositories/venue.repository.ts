@@ -491,6 +491,17 @@ export class VenueRepository implements IVenueRepository {
     return venues.map((v) => this.toEntity(v));
   }
 
+  /** Every venue, any status, for the admin "all venues" management view — same include (owner
+   * name/phone) as findByStatus. Excludes soft-deleted venues, same as every other read path. */
+  async findAllForAdmin(): Promise<VenueEntity[]> {
+    const venues = await this.prisma.venue.findMany({
+      where: { deletedAt: null },
+      include: this.venueInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return venues.map((v) => this.toEntity(v));
+  }
+
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {
     const {
       services: rawServices,

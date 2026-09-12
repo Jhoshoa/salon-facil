@@ -48,6 +48,7 @@ describe('VenueService', () => {
       updateStatus: jest.fn(),
       incrementViewCount: jest.fn().mockResolvedValue(undefined),
       softDelete: jest.fn(),
+      findAllForAdmin: jest.fn(),
       existsBySlug: jest.fn(),
       addMedia: jest.fn(),
       deleteMedia: jest.fn(),
@@ -121,6 +122,45 @@ describe('VenueService', () => {
 
       await expect(service.getVenueBySlug('salon-perfecto')).rejects.toThrow(NotFoundException);
       expect(mockRepository.incrementViewCount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getVenueByIdForViewer', () => {
+    it('should return the venue when the caller can edit it (owner)', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+
+      const result = await service.getVenueByIdForViewer('venue-1', 'owner-1', UserRole.OWNER);
+
+      expect(result).toBe(mockVenue);
+    });
+
+    it('should throw ForbiddenException when the caller cannot edit it', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(false);
+
+      await expect(
+        service.getVenueByIdForViewer('venue-1', 'other-user', UserRole.CLIENT),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException when the venue does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.getVenueByIdForViewer('missing', 'owner-1', UserRole.OWNER),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getAllVenuesForAdmin', () => {
+    it('should return whatever the repository returns, unfiltered by status', async () => {
+      mockRepository.findAllForAdmin.mockResolvedValue([mockVenue]);
+
+      const result = await service.getAllVenuesForAdmin();
+
+      expect(result).toEqual([mockVenue]);
+      expect(mockRepository.findAllForAdmin).toHaveBeenCalled();
     });
   });
 
