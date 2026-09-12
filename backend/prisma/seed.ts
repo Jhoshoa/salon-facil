@@ -63,10 +63,10 @@ async function main(): Promise<void> {
 
   const admin = await prisma.user.create({
     data: {
-      email: 'admin@salonfacil.bo',
+      email: 'admin@mievento.com.bo',
       phone: '+59177777777',
       passwordHash,
-      fullName: 'Administrador SalonFacil',
+      fullName: 'Administrador Mi Evento',
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
       city: 'El Alto',

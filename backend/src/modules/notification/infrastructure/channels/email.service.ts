@@ -11,7 +11,7 @@ export interface SendResult {
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private client: SESv2Client | null = null;
-  private fromAddress = 'noreply@salonfacil.bo';
+  private fromAddress = 'noreply@mievento.com.bo';
 
   constructor(private readonly configService: ConfigService) {}
 

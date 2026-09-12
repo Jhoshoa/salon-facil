@@ -342,7 +342,7 @@ export class AuthService {
       .enqueue({
         userId: user.id,
         type: NotificationType.PASSWORD_RESET,
-        title: 'Restablece tu contrasena en SalonFacil',
+        title: 'Restablece tu contrasena en Mi Evento',
         content: `Recibimos una solicitud para restablecer tu contrasena. Este enlace vence en 1 hora: ${resetUrl}. Si no fuiste vos, ignora este mensaje.`,
         recipientEmail: user.email,
       })
@@ -422,7 +422,7 @@ export class AuthService {
       .enqueue({
         userId: user.id,
         type: NotificationType.WELCOME,
-        title: `Bienvenido a SalonFacil, ${user.fullName.split(' ')[0]}`,
+        title: `Bienvenido a Mi Evento, ${user.fullName.split(' ')[0]}`,
         content:
           user.role === UserRole.OWNER
             ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
@@ -449,7 +449,7 @@ export class AuthService {
       .enqueue({
         userId: user.id,
         type: NotificationType.EMAIL_VERIFICATION,
-        title: 'Verifica tu email en SalonFacil',
+        title: 'Verifica tu email en Mi Evento',
         content: `Tu codigo de verificacion es: ${code}. Vence en 15 minutos.`,
         recipientEmail: user.email,
       })

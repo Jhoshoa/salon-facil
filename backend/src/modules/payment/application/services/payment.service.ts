@@ -197,7 +197,7 @@ export class PaymentService {
         userId: payment.booking.client.id,
         type: NotificationType.PAYMENT_RECEIVED,
         title: `Tu pago en ${venueName} fue confirmado`,
-        content: `Confirmamos tu pago de Bs ${payment.amount}. Gracias por reservar con SalonFacil.`,
+        content: `Confirmamos tu pago de Bs ${payment.amount}. Gracias por reservar con Mi Evento.`,
         recipientEmail: payment.booking.client.email,
       });
     }

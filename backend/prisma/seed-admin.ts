@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   const email = process.env.ADMIN_EMAIL;
   const password = process.env.ADMIN_PASSWORD;
   const phone = process.env.ADMIN_PHONE;
-  const fullName = process.env.ADMIN_FULL_NAME || 'Administrador SalonFacil';
+  const fullName = process.env.ADMIN_FULL_NAME || 'Administrador Mi Evento';
 
   const providedCount = [email, password, phone].filter(Boolean).length;
 
