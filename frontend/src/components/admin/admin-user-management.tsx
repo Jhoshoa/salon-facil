@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { getAdminUsers, updateAdminUserStatus, type AdminUsersParams } from '@/lib/api/admin.api';
+import {
+  getAdminUsers,
+  updateAdminUserRole,
+  updateAdminUserStatus,
+  type AdminUsersParams,
+} from '@/lib/api/admin.api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +70,18 @@ export const AdminUserManagement = () => {
     },
     onError: (error: { message?: string }) => {
       toast.error('No se pudo actualizar el estado', { description: error.message });
+    },
+  });
+
+  const roleMutation = useMutation({
+    mutationFn: ({ userId, nextRole }: { userId: string; nextRole: 'CLIENT' | 'OWNER' }) =>
+      updateAdminUserRole(userId, nextRole),
+    onSuccess: () => {
+      toast.success('Rol actualizado');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo actualizar el rol', { description: error.message });
     },
   });
 
@@ -157,19 +174,38 @@ export const AdminUserManagement = () => {
                 </p>
               </div>
 
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm sm:w-56"
-                value={user.status}
-                disabled={statusMutation.isPending}
-                onChange={(event) =>
-                  statusMutation.mutate({ userId: user.id, nextStatus: event.target.value })
-                }
-              >
-                <option value="ACTIVE">Activo</option>
-                <option value="INACTIVE">Inactivo</option>
-                <option value="SUSPENDED">Suspendido</option>
-                <option value="PENDING_VERIFICATION">Pendiente de verificacion</option>
-              </select>
+              <div className="flex flex-col gap-2 sm:w-56">
+                {user.role === 'ADMIN' ? null : (
+                  <select
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    value={user.role}
+                    disabled={roleMutation.isPending}
+                    onChange={(event) =>
+                      roleMutation.mutate({
+                        userId: user.id,
+                        nextRole: event.target.value as 'CLIENT' | 'OWNER',
+                      })
+                    }
+                  >
+                    <option value="CLIENT">Cliente</option>
+                    <option value="OWNER">Propietario</option>
+                  </select>
+                )}
+
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={user.status}
+                  disabled={statusMutation.isPending}
+                  onChange={(event) =>
+                    statusMutation.mutate({ userId: user.id, nextStatus: event.target.value })
+                  }
+                >
+                  <option value="ACTIVE">Activo</option>
+                  <option value="INACTIVE">Inactivo</option>
+                  <option value="SUSPENDED">Suspendido</option>
+                  <option value="PENDING_VERIFICATION">Pendiente de verificacion</option>
+                </select>
+              </div>
             </article>
           ))}
         </div>

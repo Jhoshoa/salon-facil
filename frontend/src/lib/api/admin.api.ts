@@ -28,3 +28,13 @@ export const updateAdminUserStatus = async (
     body: JSON.stringify({ status }),
   });
 };
+
+export const updateAdminUserRole = async (
+  userId: string,
+  role: 'CLIENT' | 'OWNER',
+): Promise<AdminUser> => {
+  return apiRequest<AdminUser>(`/admin/users/${userId}/role`, {
+    method: 'PUT',
+    body: JSON.stringify({ role }),
+  });
+};

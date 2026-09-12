@@ -212,6 +212,11 @@ export class AuthRepository implements IAuthRepository {
     return this.toEntity(user);
   }
 
+  async updateRole(userId: string, role: UserRole): Promise<UserEntity> {
+    const user = await this.prisma.user.update({ where: { id: userId }, data: { role } });
+    return this.toEntity(user);
+  }
+
   async findIdentity(provider: string, providerId: string): Promise<UserIdentityRecord | null> {
     return this.prisma.userIdentity.findUnique({
       where: { provider_providerId: { provider, providerId } },

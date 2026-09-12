@@ -6,6 +6,7 @@ import {
 import { UserEntity } from '../../../auth/domain/entities/user.entity';
 import { ListUsersDto } from '../dto/list-users.dto';
 import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
+import { UpdateUserRoleDto } from '../dto/update-user-role.dto';
 
 @Injectable()
 export class AdminUserService {
@@ -50,5 +51,23 @@ export class AdminUserService {
 
     this.logger.log(`Admin ${adminId} set user ${userId} status to ${dto.status}`);
     return this.authRepository.updateStatus(userId, dto.status);
+  }
+
+  async updateUserRole(
+    userId: string,
+    adminId: string,
+    dto: UpdateUserRoleDto,
+  ): Promise<UserEntity> {
+    if (userId === adminId) {
+      throw new BadRequestException('No podes cambiar tu propio rol');
+    }
+
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`Usuario con ID '${userId}' no encontrado`);
+    }
+
+    this.logger.log(`Admin ${adminId} set user ${userId} role to ${dto.role}`);
+    return this.authRepository.updateRole(userId, dto.role);
   }
 }

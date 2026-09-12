@@ -49,6 +49,7 @@ describe('AdminUserService', () => {
       markPasswordResetTokenUsed: jest.fn(),
       findMany: jest.fn(),
       updateStatus: jest.fn(),
+      updateRole: jest.fn(),
       findIdentity: jest.fn(),
       createIdentity: jest.fn(),
       markEmailVerified: jest.fn(),
@@ -109,6 +110,32 @@ describe('AdminUserService', () => {
     it('rejects an admin trying to change their own status', async () => {
       await expect(
         service.updateUserStatus('admin-1', 'admin-1', { status: UserStatus.SUSPENDED }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateUserRole', () => {
+    it('updates the role of an existing user', async () => {
+      authRepository.findById.mockResolvedValue(makeUser());
+      authRepository.updateRole.mockResolvedValue(makeUser({ role: UserRole.OWNER }));
+
+      const result = await service.updateUserRole('user-1', 'admin-1', { role: UserRole.OWNER });
+
+      expect(result.role).toBe(UserRole.OWNER);
+      expect(authRepository.updateRole).toHaveBeenCalledWith('user-1', UserRole.OWNER);
+    });
+
+    it('throws NotFoundException for a missing user', async () => {
+      authRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.updateUserRole('missing', 'admin-1', { role: UserRole.OWNER }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an admin trying to change their own role', async () => {
+      await expect(
+        service.updateUserRole('admin-1', 'admin-1', { role: UserRole.OWNER }),
       ).rejects.toThrow(BadRequestException);
     });
   });
