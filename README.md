@@ -67,8 +67,13 @@ salon-facil/
 
 ## Deploy en produccion
 
-Ver [docs/deploy/hostinger-vps.md](docs/deploy/hostinger-vps.md) para la guia completa (Docker
-Compose de produccion, nginx con TLS de Let's Encrypt, migraciones, backups).
+El deploy real corre en un VPS de Hostinger administrado con Dokploy (auto-deploy en cada push a
+`main`). Ver [docs/deploy/dokploy-runbook.md](docs/deploy/dokploy-runbook.md) para conectarte al
+servidor, correr migraciones/seeds, y el troubleshooting ya conocido.
+
+`docs/deploy/hostinger-vps.md` documenta una alternativa con Docker Compose + nginx/certbot
+manual que no es la que terminamos usando, pero queda como referencia por si se migra fuera de
+Dokploy en el futuro.
 
 ## Desarrollo local
 
