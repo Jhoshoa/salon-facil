@@ -56,8 +56,8 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
       <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r bg-background p-4 lg:flex">
         <div className="mb-6 flex items-center justify-between px-1">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="sf-logo">
-              <LogoMark className="h-6 w-6" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center">
+              <LogoMark variant="light" className="h-8 w-8" />
             </span>
             <span className="text-base font-bold">Mi Evento</span>
           </Link>
@@ -72,8 +72,8 @@ export const DashboardShell = ({ children }: DashboardShellProps) => {
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-background px-4 lg:hidden">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="sf-logo">
-              <LogoMark className="h-6 w-6" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center">
+              <LogoMark variant="light" className="h-8 w-8" />
             </span>
             <span className="text-sm font-bold">Mi Evento</span>
           </Link>
