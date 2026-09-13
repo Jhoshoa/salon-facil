@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Eye,
   Mail,
   Phone,
   PartyPopper,
@@ -68,67 +69,80 @@ const OwnerBookingRow = ({
   onViewDetails: (booking: Booking) => void;
   approving: boolean;
   completing: boolean;
-}) => (
-  <div className="sf-card grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
-    <div className="min-w-0 space-y-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="font-medium">{booking.eventType}</p>
-        <BookingStatusBadge status={booking.status} />
-      </div>
-      <p className="text-sm text-muted-foreground">
-        {booking.eventDate === booking.endDate
-          ? formatDate(booking.eventDate)
-          : `${formatDate(booking.eventDate)} - ${formatDate(booking.endDate)}`}{' '}
-        · {formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)} ·{' '}
-        {booking.guestCount} invitados
-      </p>
-      <p className="text-sm text-muted-foreground">
-        {booking.client?.fullName ?? 'Cliente'} · {formatCurrency(booking.totalPrice)}
-        {booking.selectedExtras?.length ? (
-          <>
-            {' '}
-            · {booking.selectedExtras.length} extra{booking.selectedExtras.length === 1 ? '' : 's'}{' '}
-            ({formatCurrency(extrasTotalOf(booking))})
-          </>
-        ) : null}
-      </p>
-      <Button
-        type="button"
-        size="sm"
-        variant="link"
-        className="h-auto p-0"
-        onClick={() => onViewDetails(booking)}
-      >
-        Ver detalles
-      </Button>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      {booking.status === 'PENDING' ? (
-        <>
-          <Button size="sm" onClick={() => onApprove(booking)} disabled={approving}>
-            <Check className="h-4 w-4" />
-            Aprobar
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => onReject(booking)}>
-            <X className="h-4 w-4" />
-            Rechazar
-          </Button>
-        </>
-      ) : null}
-      {booking.status === 'DEPOSIT_PAID' || booking.status === 'FULLY_PAID' ? (
+}) => {
+  const hasActions =
+    booking.status === 'PENDING' ||
+    booking.status === 'DEPOSIT_PAID' ||
+    booking.status === 'FULLY_PAID';
+
+  return (
+    <div className="sf-card space-y-3 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">{booking.eventType}</p>
+            <BookingStatusBadge status={booking.status} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {booking.eventDate === booking.endDate
+              ? formatDate(booking.eventDate)
+              : `${formatDate(booking.eventDate)} - ${formatDate(booking.endDate)}`}{' '}
+            · {formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)} ·{' '}
+            {booking.guestCount} invitados
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {booking.client?.fullName ?? 'Cliente'} · {formatCurrency(booking.totalPrice)}
+            {booking.selectedExtras?.length ? (
+              <>
+                {' '}
+                · {booking.selectedExtras.length} extra
+                {booking.selectedExtras.length === 1 ? '' : 's'} (
+                {formatCurrency(extrasTotalOf(booking))})
+              </>
+            ) : null}
+          </p>
+        </div>
         <Button
+          type="button"
           size="sm"
           variant="outline"
-          onClick={() => onComplete(booking)}
-          disabled={completing}
+          className="shrink-0"
+          onClick={() => onViewDetails(booking)}
         >
-          <PartyPopper className="h-4 w-4" />
-          Marcar como completada
+          <Eye className="h-4 w-4" />
+          Ver detalles
         </Button>
+      </div>
+      {hasActions ? (
+        <div className="flex flex-wrap gap-2 border-t pt-3">
+          {booking.status === 'PENDING' ? (
+            <>
+              <Button size="sm" onClick={() => onApprove(booking)} disabled={approving}>
+                <Check className="h-4 w-4" />
+                Aprobar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onReject(booking)}>
+                <X className="h-4 w-4" />
+                Rechazar
+              </Button>
+            </>
+          ) : null}
+          {booking.status === 'DEPOSIT_PAID' || booking.status === 'FULLY_PAID' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onComplete(booking)}
+              disabled={completing}
+            >
+              <PartyPopper className="h-4 w-4" />
+              Marcar como completada
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </div>
-  </div>
-);
+  );
+};
 
 const BookingDetailModal = ({
   booking,
@@ -312,6 +326,7 @@ export const OwnerBookingManagement = () => {
   const [reason, setReason] = useState('');
   const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(null);
   const [bookingDetail, setBookingDetail] = useState<Booking | null>(null);
+  const [bookingToApprove, setBookingToApprove] = useState<Booking | null>(null);
   const [page, setPage] = useState(1);
 
   const venuesQuery = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
@@ -338,6 +353,7 @@ export const OwnerBookingManagement = () => {
     onSuccess: async () => {
       toast.success('Reserva aprobada');
       setBookingDetail(null);
+      setBookingToApprove(null);
       await queryClient.invalidateQueries({ queryKey: ['owner-bookings', venueId] });
     },
     onError: (error: { message?: string }) =>
@@ -446,7 +462,7 @@ export const OwnerBookingManagement = () => {
             booking={booking}
             approving={approveMutation.isPending}
             completing={completeMutation.isPending}
-            onApprove={(item) => approveMutation.mutate(item.id)}
+            onApprove={setBookingToApprove}
             onReject={(item) => setRejectState({ id: item.id, type: 'booking' })}
             onComplete={(item) => completeMutation.mutate(item.id)}
             onViewDetails={setBookingDetail}
@@ -505,7 +521,10 @@ export const OwnerBookingManagement = () => {
         onOpenChange={(open) => {
           if (!open) setBookingDetail(null);
         }}
-        onApprove={(item) => approveMutation.mutate(item.id)}
+        onApprove={(item) => {
+          setBookingDetail(null);
+          setBookingToApprove(item);
+        }}
         onReject={(item) => {
           setBookingDetail(null);
           setRejectState({ id: item.id, type: 'booking' });
@@ -513,6 +532,24 @@ export const OwnerBookingManagement = () => {
         onComplete={(item) => completeMutation.mutate(item.id)}
         approving={approveMutation.isPending}
         completing={completeMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={Boolean(bookingToApprove)}
+        title="Aprobar reserva"
+        description={
+          bookingToApprove
+            ? `Vas a aprobar la solicitud de "${bookingToApprove.eventType}" de ${bookingToApprove.client?.fullName ?? 'este cliente'}. El cliente podra continuar con el pago del anticipo.`
+            : ''
+        }
+        confirmLabel="Aprobar"
+        isLoading={approveMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setBookingToApprove(null);
+        }}
+        onConfirm={() => {
+          if (bookingToApprove) approveMutation.mutate(bookingToApprove.id);
+        }}
       />
 
       <AppDrawer
