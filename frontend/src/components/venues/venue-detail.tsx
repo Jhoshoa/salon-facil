@@ -5,9 +5,10 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Map, MapPin, Plus, SearchX, Star, X } from 'lucide-react';
+import { Check, Grid2x2, Map, MapPin, Plus, SearchX, Star, X } from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import { getSimilarVenues, getVenueById, getVenueBySlug } from '@/lib/api/venues.api';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
@@ -76,6 +77,43 @@ const amenityCategoryLabels: Record<AmenityCategory, string> = {
 };
 
 const dayLabels = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+
+// Grid template + per-cell col/row spans for the desktop photo mosaic, keyed by how many photos
+// are actually shown (1-5). Tailwind's JIT scanner only picks up classes that appear literally
+// in source, so this has to be a lookup of full class strings rather than something built with
+// `col-span-${n}` at runtime. Each layout is hand-picked to fill every cell in a 4x2 grid with no
+// gaps -- ordinary CSS grid auto-placement leaves blank cells for anything other than exactly 5
+// items when one of them spans 2x2.
+const MOSAIC_LAYOUTS: Record<number, { container: string; cells: string[] }> = {
+  1: { container: 'grid-cols-1 grid-rows-1', cells: ['col-span-1 row-span-1'] },
+  2: {
+    container: 'grid-cols-2 grid-rows-1',
+    cells: ['col-span-1 row-span-1', 'col-span-1 row-span-1'],
+  },
+  3: {
+    container: 'grid-cols-4 grid-rows-2',
+    cells: ['col-span-2 row-span-2', 'col-span-2 row-span-1', 'col-span-2 row-span-1'],
+  },
+  4: {
+    container: 'grid-cols-4 grid-rows-2',
+    cells: [
+      'col-span-2 row-span-2',
+      'col-span-2 row-span-1',
+      'col-span-1 row-span-1',
+      'col-span-1 row-span-1',
+    ],
+  },
+  5: {
+    container: 'grid-cols-4 grid-rows-2',
+    cells: [
+      'col-span-2 row-span-2',
+      'col-span-1 row-span-1',
+      'col-span-1 row-span-1',
+      'col-span-1 row-span-1',
+      'col-span-1 row-span-1',
+    ],
+  },
+};
 
 const getVenuePhotos = (venue: Venue) => {
   const mediaPhotos =
@@ -179,8 +217,16 @@ export const VenueDetail = ({
 
   const venue = query.data;
   const photos = getVenuePhotos(venue);
+  // Mobile: a swipeable strip of "prints" -- three is plenty to convey there's more without a
+  // grid that would be too cramped on a narrow screen. Desktop/tablet: a mosaic (one big photo +
+  // up to four smaller ones) that shows more of the gallery at a glance, closer to how a real
+  // photo grid works than a single scrolling row -- see "Ver todas las fotos" analysis this was
+  // rebuilt for. Both read from the same underlying `photos` array/order.
   const galleryPhotos = photos.slice(0, 3);
   const extraPhotoCount = photos.length - galleryPhotos.length;
+  const mosaicPhotos = photos.slice(0, 5);
+  const mosaicExtraCount = photos.length - mosaicPhotos.length;
+  const mosaicLayout = MOSAIC_LAYOUTS[mosaicPhotos.length] ?? MOSAIC_LAYOUTS[5];
   const includedAmenityGroups = Object.entries(
     groupAmenities(venue, (item) => item.isIncluded),
   ) as [AmenityCategory, NonNullable<Venue['amenities']>][];
@@ -199,49 +245,104 @@ export const VenueDetail = ({
     <div className={`space-y-2 ${!isDesktop ? 'pb-24' : ''}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
-          {/* Gallery — scroll horizontal de "prints" enmarcados */}
-          <section className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
-            {galleryPhotos.length ? (
-              galleryPhotos.map((photo, index) => {
-                const showMoreOverlay = index === galleryPhotos.length - 1 && extraPhotoCount > 0;
-                const rotate = index % 2 === 0 ? '-rotate-[1.2deg]' : 'rotate-[1deg]';
-                return (
-                  <button
-                    key={`${photo}-${index}`}
-                    type="button"
-                    onClick={() => setLightbox({ open: true, index })}
-                    aria-label={
-                      showMoreOverlay ? `Ver las ${photos.length} fotos` : 'Ver foto ampliada'
-                    }
-                    className={`relative w-[82%] shrink-0 cursor-zoom-in snap-center border border-border bg-card p-2 pb-8 text-left shadow-md sm:w-[46%] lg:w-[32%] ${rotate}`}
-                  >
-                    <div className="relative h-[190px] sm:h-[240px]">
+          {photos.length ? (
+            <>
+              {/* Mobile: scroll horizontal de "prints" enmarcados */}
+              <section className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 sm:hidden">
+                {galleryPhotos.map((photo, index) => {
+                  const showMoreOverlay = index === galleryPhotos.length - 1 && extraPhotoCount > 0;
+                  const rotate = index % 2 === 0 ? '-rotate-[1.2deg]' : 'rotate-[1deg]';
+                  return (
+                    <button
+                      key={`${photo}-${index}`}
+                      type="button"
+                      onClick={() => setLightbox({ open: true, index })}
+                      aria-label={
+                        showMoreOverlay ? `Ver las ${photos.length} fotos` : 'Ver foto ampliada'
+                      }
+                      className={`relative w-[82%] shrink-0 cursor-zoom-in snap-center border border-border bg-card p-2 pb-8 text-left shadow-md ${rotate}`}
+                    >
+                      <div className="relative h-[190px]">
+                        <Image
+                          src={photo}
+                          alt={`${venue.name} ${index + 1}`}
+                          fill
+                          className="object-cover"
+                          loader={cloudinaryImageLoader}
+                          sizes="82vw"
+                          priority={index === 0}
+                        />
+                        {showMoreOverlay ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-semibold text-white">
+                            +{extraPhotoCount}
+                          </div>
+                        ) : null}
+                      </div>
+                      <p className="absolute bottom-2 left-3 right-3 truncate font-serif text-sm italic text-foreground">
+                        {venue.name}
+                      </p>
+                    </button>
+                  );
+                })}
+              </section>
+
+              {/* Desktop/tablet: mosaico -- una foto grande + hasta cuatro chicas, con boton
+                  "Ver todas" siempre visible en vez de depender de que la ultima celda alcance a
+                  mostrar el overlay "+N" (que solo aparecia con 4+ fotos). */}
+              <section
+                className={`relative hidden gap-1.5 overflow-hidden rounded-[var(--radius)] sm:grid sm:h-[420px] ${mosaicLayout.container}`}
+              >
+                {mosaicPhotos.map((photo, index) => {
+                  const isBig = index === 0;
+                  const isLastVisible = index === mosaicPhotos.length - 1;
+                  const showMoreOverlay = isLastVisible && mosaicExtraCount > 0;
+                  return (
+                    <button
+                      key={`${photo}-${index}`}
+                      type="button"
+                      onClick={() => setLightbox({ open: true, index })}
+                      aria-label={
+                        showMoreOverlay ? `Ver las ${photos.length} fotos` : 'Ver foto ampliada'
+                      }
+                      className={`group relative cursor-zoom-in overflow-hidden ${mosaicLayout.cells[index]}`}
+                    >
                       <Image
                         src={photo}
                         alt={`${venue.name} ${index + 1}`}
                         fill
-                        className="object-cover"
-                        sizes="(min-width: 1024px) 32vw, (min-width: 640px) 46vw, 82vw"
-                        priority={index === 0}
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        loader={cloudinaryImageLoader}
+                        sizes={isBig ? '50vw' : '25vw'}
+                        priority={isBig}
                       />
                       {showMoreOverlay ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-semibold text-white">
-                          +{extraPhotoCount}
+                          +{mosaicExtraCount}
                         </div>
                       ) : null}
-                    </div>
-                    <p className="absolute bottom-2 left-3 right-3 truncate font-serif text-sm italic text-foreground">
-                      {venue.name}
-                    </p>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="sf-gradient-subtle flex h-[240px] w-full items-center justify-center text-sm text-muted-foreground">
-                Sin fotos
-              </div>
-            )}
-          </section>
+                    </button>
+                  );
+                })}
+
+                {photos.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLightbox({ open: true, index: 0 })}
+                    className="absolute bottom-3 right-3 bg-background/95 shadow-md"
+                  >
+                    <Grid2x2 className="h-4 w-4" />
+                    Ver las {photos.length} fotos
+                  </Button>
+                ) : null}
+              </section>
+            </>
+          ) : (
+            <div className="sf-gradient-subtle flex h-[240px] w-full items-center justify-center text-sm text-muted-foreground sm:h-[420px]">
+              Sin fotos
+            </div>
+          )}
 
           <PhotoLightbox
             photos={photos}

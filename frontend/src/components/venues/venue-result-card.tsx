@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArrowRight, Check, Clock, MapPin, Sparkles, Star, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import type { Venue } from '@/types/api';
 import { departamentoLabels } from './venue-filter-labels';
@@ -25,7 +26,6 @@ const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
   HOUR: 'hora',
   DAY: 'dia',
 };
-
 
 export const VenueResultCard = ({
   venue,
@@ -56,6 +56,7 @@ export const VenueResultCard = ({
             alt={venue.name}
             fill
             className="object-cover"
+            loader={cloudinaryImageLoader}
             sizes="(min-width: 1024px) 280px, 100vw"
           />
         ) : (
@@ -90,9 +91,7 @@ export const VenueResultCard = ({
               <p className="flex items-center gap-1 font-medium text-foreground">
                 <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                 {venue.averageRating.toFixed(1)}
-                <span className="font-normal text-muted-foreground">
-                  ({venue.reviewCount})
-                </span>
+                <span className="font-normal text-muted-foreground">({venue.reviewCount})</span>
               </p>
             ) : null}
           </div>

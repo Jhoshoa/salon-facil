@@ -6,9 +6,16 @@ import { ArrowLeft, ArrowRight, ImagePlus, Loader2, Star, Trash2 } from 'lucide-
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { addVenueMedia, deleteVenueMedia, reorderVenueMedia } from '@/lib/api/venues.api';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Venue } from '@/types/api';
+
+// Matches MAX_PHOTOS in backend/src/modules/venue/interface/venue.controller.ts -- keep both in
+// sync if this ever changes. The backend is the real source of truth (it rejects a request that
+// would push the venue's TOTAL photo count over this, not just a single oversized batch); this
+// copy only drives the owner-facing counter/label so they see the limit before hitting it.
+const MAX_VENUE_PHOTOS = 20;
 
 interface VenueMediaManagerProps {
   venue: Venue;
@@ -18,6 +25,8 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const media = [...(venue.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  const remainingSlots = MAX_VENUE_PHOTOS - media.length;
+  const atLimit = remainingSlots <= 0;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['owner-venues'] });
@@ -56,7 +65,17 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
 
   const handleFilesSelected = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    uploadMutation.mutate(Array.from(files));
+    const selected = Array.from(files);
+
+    if (selected.length > remainingSlots) {
+      toast.error('Demasiadas fotos', {
+        description: `Puedes subir ${remainingSlots} foto${remainingSlots === 1 ? '' : 's'} mas como maximo (elegiste ${selected.length}).`,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    uploadMutation.mutate(selected);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -76,13 +95,19 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle>Fotos</CardTitle>
+        <div>
+          <CardTitle>Fotos</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {media.length}/{MAX_VENUE_PHOTOS} fotos — maximo {MAX_VENUE_PHOTOS} por local
+          </p>
+        </div>
         <Button
           type="button"
           size="sm"
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploadMutation.isPending}
+          disabled={uploadMutation.isPending || atLimit}
+          title={atLimit ? `Ya llegaste al maximo de ${MAX_VENUE_PHOTOS} fotos` : undefined}
         >
           {uploadMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -110,7 +135,14 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
             {media.map((item, index) => (
               <div key={item.id} className="overflow-hidden rounded-[var(--radius)] border">
                 <div className="relative aspect-[4/3] bg-muted">
-                  <Image src={item.url} alt={item.alt ?? venue.name} fill className="object-cover" />
+                  <Image
+                    src={item.url}
+                    alt={item.alt ?? venue.name}
+                    fill
+                    className="object-cover"
+                    loader={cloudinaryImageLoader}
+                    sizes="(min-width: 1024px) 33vw, 50vw"
+                  />
                   {item.isCover ? (
                     <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                       <Star className="h-3 w-3 fill-current" />

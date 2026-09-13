@@ -16,7 +16,7 @@ import { UpdateVenueDto } from '../dto/update-venue.dto';
 import { VenueFilterDto } from '../dto/venue-filter.dto';
 import { AdminVenueQueryDto } from '../dto/admin-venue-query.dto';
 import { AdminVenueStatusCountsQueryDto } from '../dto/admin-venue-status-counts-query.dto';
-import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
+import { MAX_VENUE_PHOTOS, VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
 
@@ -327,6 +327,15 @@ export class VenueService {
     const venue = await this.getVenueById(id);
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    // The controller only caps a single request's batch size (MAX_VENUE_PHOTOS files per call)
+    // -- nothing stops repeated calls from pushing the venue's running total arbitrarily high.
+    // This is the actual cap on the total.
+    const existingCount = venue.media?.length ?? 0;
+    if (existingCount + uploads.length > MAX_VENUE_PHOTOS) {
+      throw new BadRequestException(
+        `Este local ya tiene ${existingCount} fotos. El maximo es ${MAX_VENUE_PHOTOS} -- podes agregar hasta ${Math.max(MAX_VENUE_PHOTOS - existingCount, 0)} mas.`,
+      );
     }
     return this.venueRepository.addMedia(id, uploads);
   }

@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Eye, ShieldCheck, X } from 'lucide-react';
@@ -66,7 +67,14 @@ export const PendingVenuesQueue = () => {
           <article key={venue.id} className="sf-card flex flex-col gap-4 p-4 sm:flex-row">
             <div className="relative h-32 w-full shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:w-48">
               {cover ? (
-                <Image src={cover} alt={venue.name} fill className="object-cover" />
+                <Image
+                  src={cover}
+                  alt={venue.name}
+                  fill
+                  className="object-cover"
+                  loader={cloudinaryImageLoader}
+                  sizes="(min-width: 640px) 192px, 100vw"
+                />
               ) : (
                 <div className="sf-gradient-subtle flex h-full items-center justify-center text-xs text-muted-foreground">
                   Sin foto

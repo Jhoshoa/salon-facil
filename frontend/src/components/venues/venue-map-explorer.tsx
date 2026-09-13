@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { MapPin, Star, Users, X } from 'lucide-react';
 import { buildQueryString } from '@/lib/api/client';
 import { searchVenues } from '@/lib/api/venues.api';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import { departamentoLabels } from './venue-filter-labels';
 import { Button } from '@/components/ui/button';
@@ -18,13 +19,10 @@ import { ErrorState } from '@/components/shared/error-state';
 import type { Venue, VenueSearchParams } from '@/types/api';
 import type { LocatedVenue } from './venue-price-map';
 
-const VenuePriceMap = dynamic(
-  () => import('./venue-price-map').then((mod) => mod.VenuePriceMap),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-full w-full rounded-none" />,
-  },
-);
+const VenuePriceMap = dynamic(() => import('./venue-price-map').then((mod) => mod.VenuePriceMap), {
+  ssr: false,
+  loading: () => <Skeleton className="h-full w-full rounded-none" />,
+});
 
 const getBasePrice = (venue: Venue) =>
   venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
@@ -54,9 +52,19 @@ const VenueMapDetailCard = ({ venue, detailHref, onClose }: VenueMapDetailCardPr
   return (
     <div className="sf-card-elevated w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden bg-background">
       <div className="flex gap-3 p-3">
-        <Link href={detailHref} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+        <Link
+          href={detailHref}
+          className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted"
+        >
           {photo ? (
-            <Image src={photo} alt={venue.name} fill className="object-cover" sizes="80px" />
+            <Image
+              src={photo}
+              alt={venue.name}
+              fill
+              className="object-cover"
+              loader={cloudinaryImageLoader}
+              sizes="80px"
+            />
           ) : (
             <div className="sf-gradient-subtle flex h-full items-center justify-center text-[10px] text-muted-foreground">
               Sin foto
@@ -205,9 +213,9 @@ export const VenueMapExplorer = ({ searchParams, highlightSlug }: VenueMapExplor
         <div className="absolute left-4 top-4 z-[1000]">
           <VenueMapDetailCard
             venue={activeVenue}
-            detailHref={`/venues/${activeVenue.slug}${
-              buildQueryString(toBackToListParams(searchParams))
-            }`}
+            detailHref={`/venues/${activeVenue.slug}${buildQueryString(
+              toBackToListParams(searchParams),
+            )}`}
             onClose={() => setPinnedId(null)}
           />
         </div>
