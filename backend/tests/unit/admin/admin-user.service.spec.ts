@@ -49,6 +49,9 @@ describe('AdminUserService', () => {
       markPasswordResetTokenUsed: jest.fn(),
       findMany: jest.fn(),
       updateStatus: jest.fn(),
+      updateRole: jest.fn(),
+      countByRole: jest.fn(),
+      countByStatus: jest.fn(),
       findIdentity: jest.fn(),
       createIdentity: jest.fn(),
       markEmailVerified: jest.fn(),
@@ -110,6 +113,62 @@ describe('AdminUserService', () => {
       await expect(
         service.updateUserStatus('admin-1', 'admin-1', { status: UserStatus.SUSPENDED }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateUserRole', () => {
+    it('updates the role of an existing user', async () => {
+      authRepository.findById.mockResolvedValue(makeUser());
+      authRepository.updateRole.mockResolvedValue(makeUser({ role: UserRole.OWNER }));
+
+      const result = await service.updateUserRole('user-1', 'admin-1', { role: UserRole.OWNER });
+
+      expect(result.role).toBe(UserRole.OWNER);
+      expect(authRepository.updateRole).toHaveBeenCalledWith('user-1', UserRole.OWNER);
+    });
+
+    it('throws NotFoundException for a missing user', async () => {
+      authRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.updateUserRole('missing', 'admin-1', { role: UserRole.OWNER }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an admin trying to change their own role', async () => {
+      await expect(
+        service.updateUserRole('admin-1', 'admin-1', { role: UserRole.OWNER }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getUserCounts', () => {
+    it('combines role and status counts, each excluding its own filter', async () => {
+      const roleCounts = { [UserRole.CLIENT]: 3, [UserRole.OWNER]: 2, [UserRole.ADMIN]: 1 };
+      const statusCounts = {
+        [UserStatus.ACTIVE]: 5,
+        [UserStatus.INACTIVE]: 0,
+        [UserStatus.SUSPENDED]: 1,
+        [UserStatus.PENDING_VERIFICATION]: 0,
+      };
+      authRepository.countByRole.mockResolvedValue(roleCounts);
+      authRepository.countByStatus.mockResolvedValue(statusCounts);
+
+      const result = await service.getUserCounts({
+        search: 'ana',
+        role: UserRole.CLIENT,
+        status: UserStatus.ACTIVE,
+      });
+
+      expect(result).toEqual({ role: roleCounts, status: statusCounts });
+      expect(authRepository.countByRole).toHaveBeenCalledWith({
+        search: 'ana',
+        status: UserStatus.ACTIVE,
+      });
+      expect(authRepository.countByStatus).toHaveBeenCalledWith({
+        search: 'ana',
+        role: UserRole.CLIENT,
+      });
     });
   });
 });
