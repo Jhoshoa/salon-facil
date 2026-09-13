@@ -39,10 +39,11 @@ import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slu
 import { GetSimilarVenuesUseCase } from '../application/use-cases/get-similar-venues.use-case';
 import { SearchVenuesUseCase } from '../application/use-cases/search-venues.use-case';
 import { CloudinaryService } from '../../upload/cloudinary.service';
+import { MAX_VENUE_PHOTOS } from '../domain/entities/venue.entity';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const MAX_PHOTOS = 20;
+const MAX_PHOTOS = MAX_VENUE_PHOTOS;
 
 function validateFiles(files: Express.Multer.File[] | undefined): void {
   if (!files || files.length === 0) return;

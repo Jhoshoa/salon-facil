@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { MapPin, Star, Users } from 'lucide-react';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import type { Venue } from '@/types/api';
 
@@ -18,7 +19,14 @@ export const VenueSimilarCard = ({ venue }: VenueSimilarCardProps) => {
       <div className="border border-border bg-card p-1.5 pb-0 shadow-md">
         <div className="sf-carousel-image">
           {photo ? (
-            <Image src={photo} alt={venue.name} fill className="object-cover" sizes="210px" />
+            <Image
+              src={photo}
+              alt={venue.name}
+              fill
+              className="object-cover"
+              loader={cloudinaryImageLoader}
+              sizes="210px"
+            />
           ) : (
             <div className="sf-gradient-subtle flex h-full w-full items-center justify-center text-xs text-muted-foreground">
               Foto pendiente

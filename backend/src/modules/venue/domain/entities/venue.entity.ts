@@ -2,6 +2,11 @@ import { VenueServiceEntity } from './venue-service.entity';
 import { VenuePriceEntity } from './venue-price.entity';
 import { AmenityCategory, Departamento, PriceUnit, VenueMediaType } from '@prisma/client';
 
+/** Business rule, not an infra/upload concern -- lives in domain so both the controller (single
+ * upload batch) and the service (running total across every addMedia call ever made) enforce the
+ * exact same number. Also drives the "X/20 fotos" label in the owner-facing media manager. */
+export const MAX_VENUE_PHOTOS = 20;
+
 /** Shared shape for the admin-managed catalogs (space types, use types). */
 export interface CatalogItemEntity {
   id: string;

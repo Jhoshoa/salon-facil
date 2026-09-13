@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { cloudinaryBlurThumbUrl, cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 
 interface PhotoLightboxProps {
   photos: string[];
@@ -25,6 +26,13 @@ export const PhotoLightbox = ({
   const total = photos.length;
   const goTo = (next: number) => onIndexChange(((next % total) + total) % total);
 
+  // Reset per-photo so navigating to the next photo shows its own blurred placeholder again
+  // instead of the previous photo's now-stale "loaded" state.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    setLoaded(false);
+  }, [index]);
+
   useEffect(() => {
     if (!open || total < 2) return;
     const handleKey = (event: KeyboardEvent) => {
@@ -41,7 +49,7 @@ export const PhotoLightbox = ({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/90 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/90 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
           onOpenAutoFocus={(event) => event.preventDefault()}
           onClick={() => onOpenChange(false)}
@@ -87,12 +95,24 @@ export const PhotoLightbox = ({
             onClick={(event) => event.stopPropagation()}
             className="relative h-full max-h-[85vh] w-full max-w-5xl"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- deliberately a plain img,
+                not next/image: it's a tiny (24px) pre-blurred Cloudinary variant meant to paint
+                instantly, not something that needs Next's own responsive-size optimization. */}
+            <img
+              src={cloudinaryBlurThumbUrl(photos[index])}
+              alt=""
+              aria-hidden
+              className={`absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 ${loaded ? '' : 'opacity-100'}`}
+            />
             <Image
+              key={photos[index]}
               src={photos[index]}
               alt={`${alt} ${index + 1}`}
               fill
               sizes="100vw"
-              className="object-contain"
+              loader={cloudinaryImageLoader}
+              className={`object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setLoaded(true)}
               priority
             />
           </div>

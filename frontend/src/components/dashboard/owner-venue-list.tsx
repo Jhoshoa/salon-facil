@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -125,7 +126,14 @@ export const OwnerVenueList = () => {
               <article key={venue.id} className="sf-card overflow-hidden">
                 <div className="relative aspect-[16/9] bg-muted">
                   {cover ? (
-                    <Image src={cover} alt={venue.name} fill className="object-cover" />
+                    <Image
+                      src={cover}
+                      alt={venue.name}
+                      fill
+                      className="object-cover"
+                      loader={cloudinaryImageLoader}
+                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    />
                   ) : (
                     <div className="sf-gradient-subtle flex h-full items-center justify-center text-sm text-muted-foreground">
                       Sin foto

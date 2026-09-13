@@ -37,12 +37,22 @@ que ese cambio llegue a produccion.
 
 ## Cortar un release
 
-Cuando `develop` (= staging) ya se probo y esta listo para produccion:
+Cuando `develop` (= staging) ya se probo y esta listo para produccion, se abre un PR de
+`develop` a `main` -- a diferencia de un feature branch, este PR no pide una revision nueva (el
+codigo ya se reviso al entrar a `develop`), es solo para dejar un registro/changelog visual de
+cada release en GitHub:
+
+```bash
+git push origin develop
+gh pr create --base main --head develop --title "Release vYYYY.MM.N" --body "..."
+```
+
+Al mergear ese PR (merge commit normal, no squash -- para conservar el historial completo de
+`develop`), se tagea el resultado y se pushea el tag:
 
 ```bash
 git checkout main
 git pull --ff-only origin main
-git merge --no-ff develop
 git tag v2026.09.1
 git push origin main --tags
 ```
