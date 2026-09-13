@@ -59,6 +59,7 @@ salon-facil/
 ├── nginx/                   # Reverse proxy (produccion)
 ├── deploy/                  # Scripts de deploy (produccion)
 ├── docs/deploy/             # Guia de deploy
+├── docs/git-workflow/       # Flujo de ramas y releases
 ├── docker-compose.yml       # Infraestructura local
 ├── docker-compose.prod.yml  # Infraestructura de produccion
 ├── Makefile                 # Comandos comunes
@@ -74,6 +75,11 @@ servidor, correr migraciones/seeds, y el troubleshooting ya conocido.
 `docs/deploy/hostinger-vps.md` documenta una alternativa con Docker Compose + nginx/certbot
 manual que no es la que terminamos usando, pero queda como referencia por si se migra fuera de
 Dokploy en el futuro.
+
+Todo el trabajo se integra primero en `develop` (con su propia app de staging en Dokploy) y solo
+llega a `main`/produccion cuando ya se probo ahi -- ver
+[docs/git-workflow/branching-strategy.md](docs/git-workflow/branching-strategy.md) para el flujo
+completo de ramas, releases y versionado.
 
 ## Desarrollo local
 
