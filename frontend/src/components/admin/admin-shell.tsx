@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  Building2,
   CalendarRange,
   LayoutGrid,
   Menu,
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/admin/analytics', label: 'Analitica', icon: BarChart3 },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/venues', label: 'Verificacion de locales', icon: ShieldCheck },
+  { href: '/admin/venues/all', label: 'Todos los locales', icon: Building2 },
   { href: '/admin/catalog/space-types', label: 'Tipos de espacio', icon: LayoutGrid },
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },
   { href: '/admin/catalog/amenities', label: 'Comodidades', icon: Tag },
@@ -32,29 +34,39 @@ interface AdminShellProps {
   children: ReactNode;
 }
 
-const NavLinks = ({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) => (
-  <nav className="space-y-1">
-    {navItems.map((item) => {
-      const isActive = pathname.startsWith(item.href);
-      const Icon = item.icon;
-      return (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 text-sm font-medium transition-colors ${
-            isActive
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
-        >
-          <Icon className="h-4 w-4" />
-          {item.label}
-        </Link>
-      );
-    })}
-  </nav>
-);
+const NavLinks = ({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) => {
+  // "Best match wins" instead of a naive startsWith per item — /admin/venues and
+  // /admin/venues/all share a prefix, so a plain startsWith would highlight both at once
+  // whenever the more specific route is active.
+  const activeHref = navItems
+    .map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+
+  return (
+    <nav className="space-y-1">
+      {navItems.map((item) => {
+        const isActive = item.href === activeHref;
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            className={`flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 text-sm font-medium transition-colors ${
+              isActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+};
 
 export const AdminShell = ({ children }: AdminShellProps) => {
   const pathname = usePathname();

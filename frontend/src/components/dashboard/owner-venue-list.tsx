@@ -2,14 +2,16 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Pencil, Plus, Store, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Play, Plus, Power, Store, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteVenue, getMyVenues } from '@/lib/api/venues.api';
+import { deactivateVenue, deleteVenue, getMyVenues, reactivateVenue } from '@/lib/api/venues.api';
 import { departamentoLabels } from '@/components/venues/venue-filter-labels';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import type { Venue } from '@/types/api';
@@ -33,15 +35,41 @@ const statusLabels: Record<Venue['status'], string> = {
 export const OwnerVenueList = () => {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
+  const [venueToDeactivate, setVenueToDeactivate] = useState<Venue | null>(null);
+  const [venueToDelete, setVenueToDelete] = useState<Venue | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteVenue(id),
     onSuccess: () => {
       toast.success('Local eliminado');
+      setVenueToDelete(null);
       queryClient.invalidateQueries({ queryKey: ['owner-venues'] });
     },
     onError: (error: { message?: string }) => {
       toast.error('No se pudo eliminar el local', { description: error.message });
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: (id: string) => deactivateVenue(id),
+    onSuccess: () => {
+      toast.success('Local desactivado — ya no aparece en las busquedas');
+      setVenueToDeactivate(null);
+      queryClient.invalidateQueries({ queryKey: ['owner-venues'] });
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo desactivar el local', { description: error.message });
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => reactivateVenue(id),
+    onSuccess: () => {
+      toast.success('Local reactivado');
+      queryClient.invalidateQueries({ queryKey: ['owner-venues'] });
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo reactivar el local', { description: error.message });
     },
   });
 
@@ -127,16 +155,35 @@ export const OwnerVenueList = () => {
                         Vista previa
                       </Link>
                     </Button>
+                    {venue.status === 'ACTIVE' ? (
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        title="Desactivar — deja de aparecer en las busquedas, podes reactivarlo despues"
+                        onClick={() => setVenueToDeactivate(venue)}
+                      >
+                        <Power className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                    {venue.status === 'INACTIVE' ? (
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        title="Reactivar"
+                        onClick={() => reactivateMutation.mutate(venue.id)}
+                        disabled={reactivateMutation.isPending}
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="icon-sm"
                       variant="ghost"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar "${venue.name}"? Esta accion no se puede deshacer.`)) {
-                          deleteMutation.mutate(venue.id);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
+                      title="Eliminar — accion permanente"
+                      onClick={() => setVenueToDelete(venue)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -147,6 +194,34 @@ export const OwnerVenueList = () => {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(venueToDeactivate)}
+        title="Desactivar local"
+        description={`"${venueToDeactivate?.name}" va a dejar de aparecer en las busquedas. Podes reactivarlo despues.`}
+        confirmLabel="Desactivar"
+        isLoading={deactivateMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setVenueToDeactivate(null);
+        }}
+        onConfirm={() => {
+          if (venueToDeactivate) deactivateMutation.mutate(venueToDeactivate.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(venueToDelete)}
+        title="Eliminar local"
+        description={`"${venueToDelete?.name}" se va a eliminar. Esta accion no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        isLoading={deleteMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setVenueToDelete(null);
+        }}
+        onConfirm={() => {
+          if (venueToDelete) deleteMutation.mutate(venueToDelete.id);
+        }}
+      />
     </div>
   );
 };

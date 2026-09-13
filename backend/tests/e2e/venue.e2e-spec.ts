@@ -115,6 +115,7 @@ describe('Venues (e2e)', () => {
   // ===== CA1 & CA8: Create venue as OWNER =====
   describe('POST /api/v1/venues', () => {
     const venueName = `Salon Test ${uniqueId}`;
+    let createdVenueId: string;
     let createdVenueSlug: string;
 
     it('should create a venue as OWNER (CA1)', () => {
@@ -135,6 +136,7 @@ describe('Venues (e2e)', () => {
           expect(res.body.name).toBe(venueName);
           expect(res.body.status).toBe('DRAFT');
           expect(res.body.ownerId).toBe(ownerUserId);
+          createdVenueId = res.body.id;
           createdVenueSlug = res.body.slug;
         });
     });
@@ -156,7 +158,14 @@ describe('Venues (e2e)', () => {
     });
 
     // ===== CA11: Services and prices persisted =====
-    it('should persist services and prices (CA11 & CA10)', () => {
+    it('should persist services and prices (CA11 & CA10)', async () => {
+      // The public slug lookup only returns ACTIVE + verified venues — this one is still DRAFT
+      // right after creation, so verify it first (same as CA5 below).
+      await adminAgent
+        .put(`/api/v1/venues/${createdVenueId}/verify`)
+        .send({ approve: true })
+        .expect(200);
+
       return request(app.getHttpServer())
         .get(`/api/v1/venues/${createdVenueSlug}`)
         .expect(200)
@@ -219,6 +228,26 @@ describe('Venues (e2e)', () => {
         .field('capacityMax', '150')
         .expect(201);
       testSlug = res.body.slug;
+
+      // Only ACTIVE + verified venues are visible via the public slug lookup.
+      await adminAgent
+        .put(`/api/v1/venues/${res.body.id}/verify`)
+        .send({ approve: true })
+        .expect(200);
+    });
+
+    it('should 404 a venue that is not ACTIVE/verified yet (draft, pending, rejected, deactivated)', async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Draft Slug Test ${uniqueId}`)
+        .field('description', 'Venue en borrador, no deberia ser visible publicamente.')
+        .field('address', 'Draft Slug Address')
+        .field('district', 'Test')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+
+      await request(app.getHttpServer()).get(`/api/v1/venues/${res.body.slug}`).expect(404);
     });
 
     it('should get venue by slug publicly (CA5)', () => {
@@ -300,11 +329,11 @@ describe('Venues (e2e)', () => {
     it('should soft delete venue (CA9)', async () => {
       await ownerAgent.delete(`/api/v1/venues/${deleteVenueId}`).expect(204);
 
-      // Venue should now be INACTIVE
+      // A real soft delete: the venue disappears from the owner's own list entirely (not just
+      // flipped to INACTIVE, which is the reversible deactivate/reactivate toggle instead).
       const getRes = await ownerAgent.get(`/api/v1/venues/my/venues`).expect(200);
-
       const deletedVenue = getRes.body.find((v: { id: string }) => v.id === deleteVenueId);
-      expect(deletedVenue.status).toBe('INACTIVE');
+      expect(deletedVenue).toBeUndefined();
     });
 
     it('should return 403 when different owner tries to delete', async () => {
@@ -361,6 +390,239 @@ describe('Venues (e2e)', () => {
         .put(`/api/v1/venues/${pendingVenueId}/verify`)
         .send({ approve: true })
         .expect(403);
+    });
+  });
+
+  // ===== Deactivate / reactivate (reversible pause, distinct from DELETE's soft delete) =====
+  describe('PUT /api/v1/venues/:id/deactivate and /reactivate', () => {
+    let activeVenueId: string;
+    let activeVenueSlug: string;
+
+    beforeAll(async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Deactivate Test Venue ${uniqueId}`)
+        .field('description', 'Venue activa para probar pausar/reactivar.')
+        .field('address', 'Deactivate Address 12345')
+        .field('district', 'Deactivate District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+      activeVenueId = res.body.id;
+      activeVenueSlug = res.body.slug;
+
+      await adminAgent
+        .put(`/api/v1/venues/${activeVenueId}/verify`)
+        .send({ approve: true })
+        .expect(200);
+    });
+
+    it('should reject deactivating a venue that is not ACTIVE', async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Draft Deactivate Test ${uniqueId}`)
+        .field('description', 'Venue en borrador, nunca deberia poder desactivarse.')
+        .field('address', 'Draft Address')
+        .field('district', 'Test')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+
+      await ownerAgent.put(`/api/v1/venues/${res.body.id}/deactivate`).expect(400);
+    });
+
+    it('should return 403 when a different owner tries to deactivate', () => {
+      return owner2Agent.put(`/api/v1/venues/${activeVenueId}/deactivate`).expect(403);
+    });
+
+    it('deactivates the venue, hiding it from public search/direct link but not from the owner', async () => {
+      const res = await ownerAgent.put(`/api/v1/venues/${activeVenueId}/deactivate`).expect(200);
+      expect(res.body.status).toBe('INACTIVE');
+
+      // Gone from the public direct-link lookup.
+      await request(app.getHttpServer()).get(`/api/v1/venues/${activeVenueSlug}`).expect(404);
+
+      // Still visible to its owner, still marked INACTIVE (not deleted).
+      const myVenues = await ownerAgent.get('/api/v1/venues/my/venues').expect(200);
+      const found = myVenues.body.find((v: { id: string }) => v.id === activeVenueId);
+      expect(found).toBeDefined();
+      expect(found.status).toBe('INACTIVE');
+    });
+
+    it('should reject reactivating a venue that is not INACTIVE', async () => {
+      // activeVenueId is already INACTIVE from the previous test in this block — reactivate it
+      // first so this check runs against a venue that's back to ACTIVE.
+      await ownerAgent.put(`/api/v1/venues/${activeVenueId}/reactivate`).expect(200);
+      await ownerAgent.put(`/api/v1/venues/${activeVenueId}/reactivate`).expect(400);
+    });
+
+    it('should return 403 when a different owner tries to reactivate', async () => {
+      await ownerAgent.put(`/api/v1/venues/${activeVenueId}/deactivate`).expect(200);
+      await owner2Agent.put(`/api/v1/venues/${activeVenueId}/reactivate`).expect(403);
+    });
+
+    it('reactivates the venue without requiring a new admin verification', async () => {
+      const res = await ownerAgent.put(`/api/v1/venues/${activeVenueId}/reactivate`).expect(200);
+      expect(res.body.status).toBe('ACTIVE');
+      expect(res.body.isVerified).toBe(true);
+
+      await request(app.getHttpServer()).get(`/api/v1/venues/${activeVenueSlug}`).expect(200);
+    });
+  });
+
+  // ===== Authenticated by-id lookup (preview) and admin "all venues" listing =====
+  describe('GET /api/v1/venues/by-id/:id and /api/v1/venues/admin/all', () => {
+    let draftVenueId: string;
+
+    beforeAll(async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `By-id Draft Test ${uniqueId}`)
+        .field('description', 'Venue en borrador, solo visible por id para su dueno o un admin.')
+        .field('address', 'By-id Address 12345')
+        .field('district', 'By-id District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+      draftVenueId = res.body.id;
+    });
+
+    it('lets the owner preview their own draft venue by id', async () => {
+      const res = await ownerAgent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(200);
+      expect(res.body.id).toBe(draftVenueId);
+      expect(res.body.status).toBe('DRAFT');
+    });
+
+    it('lets an admin preview any venue by id, regardless of status', async () => {
+      const res = await adminAgent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(200);
+      expect(res.body.id).toBe(draftVenueId);
+    });
+
+    it('returns 403 for a different owner', () => {
+      return owner2Agent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(403);
+    });
+
+    it('returns 403 for a CLIENT', () => {
+      return clientAgent.get(`/api/v1/venues/by-id/${draftVenueId}`).expect(403);
+    });
+
+    it('returns 401 without a session', () => {
+      return request(app.getHttpServer()).get(`/api/v1/venues/by-id/${draftVenueId}`).expect(401);
+    });
+
+    it('lists every status for ADMIN via search, excluding nothing by status', async () => {
+      const res = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${encodeURIComponent(`By-id Draft Test ${uniqueId}`)}`)
+        .expect(200);
+      expect(res.body).toHaveProperty('venues');
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('totalPages');
+      const ids = res.body.venues.map((v: { id: string }) => v.id);
+      expect(ids).toContain(draftVenueId);
+    });
+
+    it('filters the admin listing by departamento', async () => {
+      const nameQuery = encodeURIComponent(`By-id Draft Test ${uniqueId}`);
+      const matching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&departamento=LA_PAZ`)
+        .expect(200);
+      expect(matching.body.venues.map((v: { id: string }) => v.id)).toContain(draftVenueId);
+
+      const nonMatching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&departamento=SANTA_CRUZ`)
+        .expect(200);
+      expect(nonMatching.body.venues.map((v: { id: string }) => v.id)).not.toContain(draftVenueId);
+    });
+
+    it('filters the admin listing by status', async () => {
+      const nameQuery = encodeURIComponent(`By-id Draft Test ${uniqueId}`);
+      const matching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&status=DRAFT`)
+        .expect(200);
+      expect(matching.body.venues.map((v: { id: string }) => v.id)).toContain(draftVenueId);
+
+      const nonMatching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&status=ACTIVE`)
+        .expect(200);
+      expect(nonMatching.body.venues.map((v: { id: string }) => v.id)).not.toContain(draftVenueId);
+    });
+
+    it('paginates the admin listing', async () => {
+      const res = await adminAgent.get('/api/v1/venues/admin/all?page=1&limit=2').expect(200);
+      expect(res.body.venues.length).toBeLessThanOrEqual(2);
+      expect(res.body.page).toBe(1);
+      expect(res.body.limit).toBe(2);
+    });
+
+    it('returns 403 for OWNER and CLIENT on the admin listing', async () => {
+      await ownerAgent.get('/api/v1/venues/admin/all').expect(403);
+      await clientAgent.get('/api/v1/venues/admin/all').expect(403);
+    });
+  });
+
+  // ===== Status counts for the admin listing's status dropdown =====
+  describe('GET /api/v1/venues/admin/status-counts', () => {
+    const countsName = `Status Counts Test ${uniqueId}`;
+
+    beforeAll(async () => {
+      await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', countsName)
+        .field('description', 'Venue creada solo para probar el endpoint de conteos por estado.')
+        .field('address', 'Status Counts Address 12345')
+        .field('district', 'Status Counts District')
+        .field('departamento', 'SANTA_CRUZ')
+        .field('capacityMax', '50')
+        .expect(201);
+    });
+
+    it('counts the new DRAFT venue when scoped by query, without leaking into other statuses', async () => {
+      const res = await adminAgent
+        .get(`/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}`)
+        .expect(200);
+      expect(res.body).toEqual({ DRAFT: 1, PENDING: 0, ACTIVE: 0, INACTIVE: 0, REJECTED: 0 });
+    });
+
+    it('respects the departamento filter the same way the listing does', async () => {
+      const matching = await adminAgent
+        .get(
+          `/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}&departamento=SANTA_CRUZ`,
+        )
+        .expect(200);
+      expect(matching.body.DRAFT).toBe(1);
+
+      const nonMatching = await adminAgent
+        .get(
+          `/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}&departamento=PANDO`,
+        )
+        .expect(200);
+      expect(nonMatching.body.DRAFT).toBe(0);
+    });
+
+    it('always returns every status key, zero-filled, even with no matches at all', async () => {
+      const res = await adminAgent
+        .get(`/api/v1/venues/admin/status-counts?query=${encodeURIComponent('no-such-venue-xyz')}`)
+        .expect(200);
+      expect(res.body).toEqual({ DRAFT: 0, PENDING: 0, ACTIVE: 0, INACTIVE: 0, REJECTED: 0 });
+    });
+
+    it('rejects a status query param (400) instead of silently accepting it, since the whole point is to break down every status', async () => {
+      // The global ValidationPipe has forbidNonWhitelisted: true, and the dedicated DTO has no
+      // `status` field — so this fails loud rather than silently ignoring an unexpected param.
+      await adminAgent
+        .get(
+          `/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}&status=ACTIVE`,
+        )
+        .expect(400);
+    });
+
+    it('returns 403 for OWNER and CLIENT', async () => {
+      await ownerAgent.get('/api/v1/venues/admin/status-counts').expect(403);
+      await clientAgent.get('/api/v1/venues/admin/status-counts').expect(403);
+    });
+
+    it('returns 401 without a session', () => {
+      return request(app.getHttpServer()).get('/api/v1/venues/admin/status-counts').expect(401);
     });
   });
 

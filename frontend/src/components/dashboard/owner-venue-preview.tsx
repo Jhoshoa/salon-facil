@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
-import { getMyVenues } from '@/lib/api/venues.api';
+import { getVenueById } from '@/lib/api/venues.api';
 import { VenueDetail } from '@/components/venues/venue-detail';
 import { Breadcrumbs } from '@/components/shared/breadcrumbs';
 import { ErrorState } from '@/components/shared/error-state';
@@ -14,24 +14,23 @@ interface OwnerVenuePreviewProps {
 }
 
 export const OwnerVenuePreview = ({ venueId }: OwnerVenuePreviewProps) => {
-  const query = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
+  const query = useQuery({
+    queryKey: ['owner-venue-preview', venueId],
+    queryFn: () => getVenueById(venueId),
+  });
 
   if (query.isLoading) return <Skeleton className="h-96 w-full" />;
-  if (query.isError) {
-    return <ErrorState title="No se pudo cargar el local" onRetry={() => query.refetch()} />;
-  }
-
-  const venue = query.data?.find((item) => item.id === venueId);
-
-  if (!venue) {
+  if (query.isError || !query.data) {
     return (
       <ErrorState
-        title="Local no encontrado"
+        title="No se pudo cargar el local"
         description="Puede que no exista o que no seas su propietario."
         onRetry={() => query.refetch()}
       />
     );
   }
+
+  const venue = query.data;
 
   return (
     <div className="space-y-4">
@@ -55,7 +54,7 @@ export const OwnerVenuePreview = ({ venueId }: OwnerVenuePreviewProps) => {
           Volver a editar
         </Link>
       </div>
-      <VenueDetail slug={venue.slug} />
+      <VenueDetail venueId={venue.id} />
     </div>
   );
 };

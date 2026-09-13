@@ -29,6 +29,7 @@ describe('VenueService', () => {
     viewCount: 0,
     bookingCount: 0,
     canBeEditedBy: jest.fn(),
+    isPublic: jest.fn().mockReturnValue(true),
     services: [],
     prices: [],
   };
@@ -47,6 +48,8 @@ describe('VenueService', () => {
       updateStatus: jest.fn(),
       incrementViewCount: jest.fn().mockResolvedValue(undefined),
       softDelete: jest.fn(),
+      findAllForAdmin: jest.fn(),
+      countByStatus: jest.fn(),
       existsBySlug: jest.fn(),
       addMedia: jest.fn(),
       deleteMedia: jest.fn(),
@@ -110,6 +113,86 @@ describe('VenueService', () => {
       mockRepository.findBySlug.mockResolvedValue(null);
 
       await expect(service.getVenueBySlug('not-found')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if found but not public (e.g. deactivated)', async () => {
+      mockRepository.findBySlug.mockResolvedValue({
+        ...mockVenue,
+        isPublic: jest.fn().mockReturnValue(false),
+      });
+
+      await expect(service.getVenueBySlug('salon-perfecto')).rejects.toThrow(NotFoundException);
+      expect(mockRepository.incrementViewCount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getVenueByIdForViewer', () => {
+    it('should return the venue when the caller can edit it (owner)', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+
+      const result = await service.getVenueByIdForViewer('venue-1', 'owner-1', UserRole.OWNER);
+
+      expect(result).toBe(mockVenue);
+    });
+
+    it('should throw ForbiddenException when the caller cannot edit it', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(false);
+
+      await expect(
+        service.getVenueByIdForViewer('venue-1', 'other-user', UserRole.CLIENT),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException when the venue does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.getVenueByIdForViewer('missing', 'owner-1', UserRole.OWNER),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getAllVenuesForAdmin', () => {
+    it('should return paginated results, unfiltered by status', async () => {
+      mockRepository.findAllForAdmin.mockResolvedValue({ venues: [mockVenue], total: 45 });
+
+      const result = await service.getAllVenuesForAdmin({});
+
+      expect(result).toEqual({ venues: [mockVenue], total: 45, page: 1, limit: 20, totalPages: 3 });
+      expect(mockRepository.findAllForAdmin).toHaveBeenCalledWith({
+        query: undefined,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('should forward the search query and pagination params', async () => {
+      mockRepository.findAllForAdmin.mockResolvedValue({ venues: [], total: 0 });
+
+      await service.getAllVenuesForAdmin({ query: 'mario', page: 2, limit: 10 });
+
+      expect(mockRepository.findAllForAdmin).toHaveBeenCalledWith({
+        query: 'mario',
+        page: 2,
+        limit: 10,
+      });
+    });
+  });
+
+  describe('getVenueStatusCounts', () => {
+    it('should forward query/departamento but never status', async () => {
+      const counts = { DRAFT: 1, PENDING: 2, ACTIVE: 3, INACTIVE: 0, REJECTED: 0 };
+      mockRepository.countByStatus.mockResolvedValue(counts);
+
+      const result = await service.getVenueStatusCounts({ query: 'mario', departamento: 'LA_PAZ' });
+
+      expect(result).toEqual(counts);
+      expect(mockRepository.countByStatus).toHaveBeenCalledWith({
+        query: 'mario',
+        departamento: 'LA_PAZ',
+      });
     });
   });
 
@@ -200,6 +283,69 @@ describe('VenueService', () => {
       await expect(service.deleteVenue('venue-1', 'other-user', UserRole.CLIENT)).rejects.toThrow(
         ForbiddenException,
       );
+    });
+  });
+
+  describe('deactivateVenue', () => {
+    it('should pause an ACTIVE venue', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockVenue, status: VenueStatus.ACTIVE });
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      mockRepository.updateStatus.mockResolvedValue({ ...mockVenue, status: VenueStatus.INACTIVE });
+
+      await service.deactivateVenue('venue-1', 'owner-1', UserRole.OWNER);
+
+      expect(mockRepository.updateStatus).toHaveBeenCalledWith('venue-1', VenueStatus.INACTIVE);
+    });
+
+    it('should throw ForbiddenException if not owner', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockVenue, status: VenueStatus.ACTIVE });
+      mockVenue.canBeEditedBy.mockReturnValue(false);
+
+      await expect(
+        service.deactivateVenue('venue-1', 'other-user', UserRole.CLIENT),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException if the venue is not ACTIVE', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockVenue, status: VenueStatus.DRAFT });
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+
+      await expect(service.deactivateVenue('venue-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockRepository.updateStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reactivateVenue', () => {
+    it('should bring an INACTIVE venue back to ACTIVE', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockVenue, status: VenueStatus.INACTIVE });
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      mockRepository.updateStatus.mockResolvedValue({ ...mockVenue, status: VenueStatus.ACTIVE });
+
+      await service.reactivateVenue('venue-1', 'owner-1', UserRole.OWNER);
+
+      // No verifiedById passed — reactivation must not re-trigger admin verification.
+      expect(mockRepository.updateStatus).toHaveBeenCalledWith('venue-1', VenueStatus.ACTIVE);
+    });
+
+    it('should throw ForbiddenException if not owner', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockVenue, status: VenueStatus.INACTIVE });
+      mockVenue.canBeEditedBy.mockReturnValue(false);
+
+      await expect(
+        service.reactivateVenue('venue-1', 'other-user', UserRole.CLIENT),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException if the venue is not INACTIVE', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockVenue, status: VenueStatus.ACTIVE });
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+
+      await expect(service.reactivateVenue('venue-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockRepository.updateStatus).not.toHaveBeenCalled();
     });
   });
 

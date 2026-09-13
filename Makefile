@@ -48,7 +48,7 @@ migrate: ## Ejecutar migraciones de Prisma
 studio: ## Abrir Prisma Studio
 	docker compose exec backend npx prisma studio
 
-seed: ## Ejecutar seed de datos
+seed: ## Ejecutar seed de datos -- requiere CONFIRM_RESEED=yes, borra TODA la data (ver mensaje)
 	docker compose exec backend npx prisma db seed
 
 # --- Produccion (ver docs/deploy/hostinger-vps.md) ---

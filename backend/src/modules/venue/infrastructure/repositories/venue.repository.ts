@@ -98,7 +98,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findById(id: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
@@ -106,7 +106,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findBySlug(slug: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
-      where: { slug },
+      where: { slug, deletedAt: null },
       include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
@@ -114,7 +114,7 @@ export class VenueRepository implements IVenueRepository {
 
   async findByOwner(ownerId: string): Promise<VenueEntity[]> {
     const venues = await this.prisma.venue.findMany({
-      where: { ownerId },
+      where: { ownerId, deletedAt: null },
       include: this.venueInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -129,6 +129,7 @@ export class VenueRepository implements IVenueRepository {
     const where: Prisma.VenueWhereInput = {
       status: VenueStatus.ACTIVE,
       isVerified: true,
+      deletedAt: null,
     };
     const andFilters: Prisma.VenueWhereInput[] = [];
 
@@ -483,11 +484,95 @@ export class VenueRepository implements IVenueRepository {
 
   async findByStatus(status: string): Promise<VenueEntity[]> {
     const venues = await this.prisma.venue.findMany({
-      where: { status: status as VenueStatus },
+      where: { status: status as VenueStatus, deletedAt: null },
       include: this.venueInclude,
       orderBy: { createdAt: 'asc' },
     });
     return venues.map((v) => this.toEntity(v));
+  }
+
+  /** Every venue, any status, for the admin "all venues" management view — same include (owner
+   * name/phone) as findByStatus. Excludes soft-deleted venues, same as every other read path.
+   * `query` matches venue name, district, or owner name (an admin is just as likely to be
+   * looking for "all of this owner's venues" as for a specific venue by name). */
+  async findAllForAdmin(filters: {
+    query?: string;
+    departamento?: Departamento;
+    status?: VenueStatus;
+    page?: number;
+    limit?: number;
+  }): Promise<{ venues: VenueEntity[]; total: number }> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.VenueWhereInput = { deletedAt: null };
+    if (filters.query) {
+      where.OR = [
+        { name: { contains: filters.query, mode: 'insensitive' } },
+        { district: { contains: filters.query, mode: 'insensitive' } },
+        { owner: { fullName: { contains: filters.query, mode: 'insensitive' } } },
+      ];
+    }
+    if (filters.departamento) {
+      where.departamento = filters.departamento;
+    }
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    const [venues, total] = await Promise.all([
+      this.prisma.venue.findMany({
+        where,
+        include: this.venueInclude,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.venue.count({ where }),
+    ]);
+
+    return { venues: venues.map((v) => this.toEntity(v)), total };
+  }
+
+  /** Backs the status dropdown counts on the admin "all venues" view. Respects the same
+   * query/departamento the list itself is filtered by — but never `status`, since that's the
+   * breakdown being computed — and the same deletedAt: null every other admin read path uses.
+   * Always returns every status key (zero-filled), even ones with no matching rows, so the
+   * frontend never has to guess whether a missing key means zero or means "not fetched yet". */
+  async countByStatus(filters: {
+    query?: string;
+    departamento?: Departamento;
+  }): Promise<Record<VenueStatus, number>> {
+    const where: Prisma.VenueWhereInput = { deletedAt: null };
+    if (filters.query) {
+      where.OR = [
+        { name: { contains: filters.query, mode: 'insensitive' } },
+        { district: { contains: filters.query, mode: 'insensitive' } },
+        { owner: { fullName: { contains: filters.query, mode: 'insensitive' } } },
+      ];
+    }
+    if (filters.departamento) {
+      where.departamento = filters.departamento;
+    }
+
+    const grouped = await this.prisma.venue.groupBy({
+      by: ['status'],
+      where,
+      _count: { _all: true },
+    });
+
+    const counts: Record<VenueStatus, number> = {
+      [VenueStatus.DRAFT]: 0,
+      [VenueStatus.PENDING]: 0,
+      [VenueStatus.ACTIVE]: 0,
+      [VenueStatus.INACTIVE]: 0,
+      [VenueStatus.REJECTED]: 0,
+    };
+    for (const row of grouped) {
+      counts[row.status as VenueStatus] = row._count._all;
+    }
+    return counts;
   }
 
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {
@@ -863,9 +948,13 @@ export class VenueRepository implements IVenueRepository {
   }
 
   async softDelete(id: string): Promise<void> {
+    // Sets deletedAt only — leaves `status` as whatever it already was, so the history of the
+    // venue's last real state survives for anyone reading the row directly. Every normal read
+    // path (findById, findBySlug, findByOwner, search, findByStatus) already filters
+    // `deletedAt: null`, so this alone is enough to make the venue disappear everywhere.
     await this.prisma.venue.update({
       where: { id },
-      data: { status: VenueStatus.INACTIVE },
+      data: { deletedAt: new Date() },
     });
   }
 
@@ -1026,6 +1115,7 @@ export class VenueRepository implements IVenueRepository {
       bookingCount: raw.bookingCount,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
+      deletedAt: raw.deletedAt ?? null,
       services: raw.services?.map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (s: any) =>

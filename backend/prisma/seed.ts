@@ -55,6 +55,20 @@ async function main(): Promise<void> {
     throw new Error('Seed data must not run in production');
   }
 
+  // NODE_ENV=test is the e2e harness's own dedicated database (see scripts/setup-e2e-db.js),
+  // always safe to wipe on every run — no confirmation needed there. Everywhere else (plain
+  // local dev against salonfacil_dev) requires an explicit opt-in: this deletes EVERY row in
+  // every business table with no filter (see cleanDatabase above), including any account or
+  // venue you created by hand through the app, not just what this script itself seeded.
+  if (process.env.NODE_ENV !== 'test' && process.env.CONFIRM_RESEED !== 'yes') {
+    console.error(
+      'Esto va a borrar TODOS los usuarios, locales, reservas, pagos y resenas de esta base de ' +
+        'datos -- incluyendo cualquier cuenta o dato que hayas creado a mano, no solo lo que ' +
+        'puso el seed. Si estas seguro, corre de nuevo con CONFIRM_RESEED=yes.',
+    );
+    process.exit(1);
+  }
+
   console.log('Starting seed...');
   await cleanDatabase();
   console.log('Database cleaned');

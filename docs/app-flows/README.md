@@ -27,7 +27,9 @@ Todos comparten la misma contraseña: **`Password123!`**
 
 Para reponer estos datos si se ensucian: `make seed` desde la raiz del proyecto —
 **esto borra TODOS los usuarios y datos, incluyendo cualquier cuenta real que hayas creado
-a mano. Nunca lo corras sin confirmar antes.**
+a mano. Nunca lo corras sin confirmar antes.** Por eso `make seed` solo, sin mas, ahora se
+detiene con un mensaje de advertencia y no borra nada — si estas seguro, corre
+`docker exec -it salonfacil-backend sh -c "CONFIRM_RESEED=yes npx prisma db seed"` directamente.
 
 ### 0.2 Servicios opcionales sin configurar
 

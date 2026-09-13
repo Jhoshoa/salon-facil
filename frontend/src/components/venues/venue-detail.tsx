@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Map, MapPin, Plus, Star, X } from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
-import { getSimilarVenues, getVenueBySlug } from '@/lib/api/venues.api';
+import { getSimilarVenues, getVenueById, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,13 @@ import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
 
 interface VenueDetailProps {
-  slug: string;
+  /** Public lookup by slug — only resolves ACTIVE + verified venues (see getVenueBySlug). */
+  slug?: string;
+  /** Authenticated preview by ID (the venue's OWNER, or an ADMIN) — resolves a venue in any
+   * status, since previewing a draft/pending/deactivated listing is exactly the point. Takes
+   * precedence over `slug` when both are somehow passed. The "similar venues" section is
+   * skipped in this mode (it's a public-only feature, not worth wiring up for a preview). */
+  venueId?: string;
   initialStartDate?: string;
   initialEndDate?: string;
   /** Link back to the full-page map view, pre-loaded with the same search criteria the user
@@ -91,18 +97,20 @@ const groupAmenities = (
 
 export const VenueDetail = ({
   slug,
+  venueId,
   initialStartDate,
   initialEndDate,
   mapHref,
 }: VenueDetailProps) => {
   const query = useQuery({
-    queryKey: ['venue', slug],
-    queryFn: () => getVenueBySlug(slug),
+    queryKey: ['venue', venueId ?? slug],
+    queryFn: () => (venueId ? getVenueById(venueId) : getVenueBySlug(slug!)),
   });
 
   const similarQuery = useQuery({
     queryKey: ['venue', slug, 'similar'],
-    queryFn: () => getSimilarVenues(slug),
+    queryFn: () => getSimilarVenues(slug!),
+    enabled: !venueId && Boolean(slug),
   });
 
   const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | undefined>(

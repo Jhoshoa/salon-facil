@@ -5,6 +5,7 @@ import type {
   CatalogAmenityInput,
   CatalogItem,
   CatalogItemInput,
+  Departamento,
   PaginatedResponse,
   SeasonalEvent,
   SeasonalEventInput,
@@ -53,6 +54,12 @@ export const getSimilarVenues = async (slug: string, limit = 4): Promise<Venue[]
   return apiRequest<Venue[]>(`/venues/${slug}/similar?limit=${limit}`, { auth: false });
 };
 
+/** Authenticated by-id lookup (OWNER of the venue, or ADMIN) — unlike getVenueBySlug, works
+ * for a draft/pending/deactivated venue too, since it gates on ownership, not on being public. */
+export const getVenueById = async (id: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/by-id/${id}`);
+};
+
 export const getAmenitiesCatalog = async (): Promise<AmenityCatalog> => {
   return apiRequest<AmenityCatalog>('/venues/catalog/amenities', { auth: false });
 };
@@ -93,6 +100,14 @@ export const updateVenue = async (
 
 export const deleteVenue = async (id: string): Promise<void> => {
   return apiRequest<void>(`/venues/${id}`, { method: 'DELETE' });
+};
+
+export const deactivateVenue = async (id: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/${id}/deactivate`, { method: 'PUT' });
+};
+
+export const reactivateVenue = async (id: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/${id}/reactivate`, { method: 'PUT' });
 };
 
 export const getVenueCompletion = async (id: string): Promise<VenueCompletion> => {
@@ -139,6 +154,26 @@ export const verifyVenue = async (id: string, approve: boolean): Promise<Venue> 
 
 export const getPendingVenues = async (): Promise<Venue[]> => {
   return apiRequest<Venue[]>('/venues/admin/pending');
+};
+
+export const getAllVenuesAdmin = async (
+  params: {
+    query?: string;
+    departamento?: Departamento;
+    status?: Venue['status'];
+    page?: number;
+    limit?: number;
+  } = {},
+): Promise<PaginatedResponse<Venue>> => {
+  return apiRequest<PaginatedResponse<Venue>>(`/venues/admin/all${buildQueryString(params)}`);
+};
+
+export const getVenueStatusCounts = async (
+  params: { query?: string; departamento?: Departamento } = {},
+): Promise<Record<Venue['status'], number>> => {
+  return apiRequest<Record<Venue['status'], number>>(
+    `/venues/admin/status-counts${buildQueryString(params)}`,
+  );
 };
 
 export const getAdminSpaceTypes = async (): Promise<CatalogItem[]> => {

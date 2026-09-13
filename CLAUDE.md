@@ -17,7 +17,9 @@ make db-shell        # PostgreSQL shell
 make redis-cli       # Redis CLI
 make migrate         # Run Prisma migrations
 make studio          # Open Prisma Studio
-make seed            # Seed database
+make seed            # Seed database -- DESTRUCTIVE, wipes every user/venue/booking with no
+                     # filter, real accounts included. Requires CONFIRM_RESEED=yes to actually
+                     # run; never invoke without the user's explicit go-ahead for this run.
 ```
 
 ### Backend (cd backend)
