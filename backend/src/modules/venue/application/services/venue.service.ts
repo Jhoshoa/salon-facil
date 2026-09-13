@@ -84,6 +84,8 @@ export class VenueService {
     const limit = filters.limit ?? 20;
     const { venues, total } = await this.venueRepository.findAllForAdmin({
       query: filters.query,
+      departamento: filters.departamento,
+      status: filters.status as VenueStatus | undefined,
       page,
       limit,
     });

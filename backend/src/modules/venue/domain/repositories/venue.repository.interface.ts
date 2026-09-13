@@ -1,6 +1,6 @@
-import { VenueEntity, VenueMediaEntity } from '../entities/venue.entity';
+import { VenueEntity, VenueMediaEntity, VenueStatus } from '../entities/venue.entity';
 import { VenueFilterDto } from '../../application/dto/venue-filter.dto';
-import { AmenityCategory } from '@prisma/client';
+import { AmenityCategory, Departamento } from '@prisma/client';
 
 export const VENUE_REPOSITORY = Symbol('VENUE_REPOSITORY');
 
@@ -55,6 +55,8 @@ export interface IVenueRepository {
   findByStatus(status: string): Promise<VenueEntity[]>;
   findAllForAdmin(filters: {
     query?: string;
+    departamento?: Departamento;
+    status?: VenueStatus;
     page?: number;
     limit?: number;
   }): Promise<{ venues: VenueEntity[]; total: number }>;

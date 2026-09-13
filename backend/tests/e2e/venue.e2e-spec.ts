@@ -523,6 +523,32 @@ describe('Venues (e2e)', () => {
       expect(ids).toContain(draftVenueId);
     });
 
+    it('filters the admin listing by departamento', async () => {
+      const nameQuery = encodeURIComponent(`By-id Draft Test ${uniqueId}`);
+      const matching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&departamento=LA_PAZ`)
+        .expect(200);
+      expect(matching.body.venues.map((v: { id: string }) => v.id)).toContain(draftVenueId);
+
+      const nonMatching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&departamento=SANTA_CRUZ`)
+        .expect(200);
+      expect(nonMatching.body.venues.map((v: { id: string }) => v.id)).not.toContain(draftVenueId);
+    });
+
+    it('filters the admin listing by status', async () => {
+      const nameQuery = encodeURIComponent(`By-id Draft Test ${uniqueId}`);
+      const matching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&status=DRAFT`)
+        .expect(200);
+      expect(matching.body.venues.map((v: { id: string }) => v.id)).toContain(draftVenueId);
+
+      const nonMatching = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${nameQuery}&status=ACTIVE`)
+        .expect(200);
+      expect(nonMatching.body.venues.map((v: { id: string }) => v.id)).not.toContain(draftVenueId);
+    });
+
     it('paginates the admin listing', async () => {
       const res = await adminAgent.get('/api/v1/venues/admin/all?page=1&limit=2').expect(200);
       expect(res.body.venues.length).toBeLessThanOrEqual(2);

@@ -497,6 +497,8 @@ export class VenueRepository implements IVenueRepository {
    * looking for "all of this owner's venues" as for a specific venue by name). */
   async findAllForAdmin(filters: {
     query?: string;
+    departamento?: Departamento;
+    status?: VenueStatus;
     page?: number;
     limit?: number;
   }): Promise<{ venues: VenueEntity[]; total: number }> {
@@ -511,6 +513,12 @@ export class VenueRepository implements IVenueRepository {
         { district: { contains: filters.query, mode: 'insensitive' } },
         { owner: { fullName: { contains: filters.query, mode: 'insensitive' } } },
       ];
+    }
+    if (filters.departamento) {
+      where.departamento = filters.departamento;
+    }
+    if (filters.status) {
+      where.status = filters.status;
     }
 
     const [venues, total] = await Promise.all([

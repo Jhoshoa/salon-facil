@@ -16,11 +16,14 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
-import type { Venue } from '@/types/api';
+import type { Departamento, Venue } from '@/types/api';
+
+const departamentoEntries = Object.entries(departamentoLabels) as [Departamento, string][];
 
 const statusVariant: Record<Venue['status'], BadgeProps['variant']> = {
   DRAFT: 'outline',
@@ -45,6 +48,8 @@ const MIN_SEARCH_LENGTH = 3;
 export const AllVenuesList = () => {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState('');
+  const [departamentoFilter, setDepartamentoFilter] = useState<Departamento | ''>('');
+  const [statusFilter, setStatusFilter] = useState<Venue['status'] | ''>('');
   const [page, setPage] = useState(1);
   const [venueToDeactivate, setVenueToDeactivate] = useState<Venue | null>(null);
   const [venueToDelete, setVenueToDelete] = useState<Venue | null>(null);
@@ -53,8 +58,15 @@ export const AllVenuesList = () => {
   const activeQuery = debouncedSearch.length >= MIN_SEARCH_LENGTH ? debouncedSearch : '';
 
   const query = useQuery({
-    queryKey: ['admin', 'all-venues', activeQuery, page],
-    queryFn: () => getAllVenuesAdmin({ query: activeQuery, page, limit: 20 }),
+    queryKey: ['admin', 'all-venues', activeQuery, departamentoFilter, statusFilter, page],
+    queryFn: () =>
+      getAllVenuesAdmin({
+        query: activeQuery,
+        departamento: departamentoFilter || undefined,
+        status: statusFilter || undefined,
+        page,
+        limit: 20,
+      }),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'all-venues'] });
@@ -98,25 +110,62 @@ export const AllVenuesList = () => {
   const total = query.data?.total ?? 0;
   const currentPage = query.data?.page ?? page;
   const totalPages = query.data?.totalPages ?? 1;
+  const hasActiveFilters = Boolean(activeQuery || departamentoFilter || statusFilter);
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={searchInput}
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Buscar por nombre de local, distrito o propietario..."
+            className="pl-9"
+          />
+          {searchInput.trim().length > 0 && searchInput.trim().length < MIN_SEARCH_LENGTH ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Escribi al menos {MIN_SEARCH_LENGTH} caracteres para buscar.
+            </p>
+          ) : null}
+        </div>
+
+        <Select
+          value={departamentoFilter}
           onChange={(event) => {
-            setSearchInput(event.target.value);
+            setDepartamentoFilter(event.target.value as Departamento | '');
             setPage(1);
           }}
-          placeholder="Buscar por nombre de local, distrito o propietario..."
-          className="pl-9"
-        />
-        {searchInput.trim().length > 0 && searchInput.trim().length < MIN_SEARCH_LENGTH ? (
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Escribi al menos {MIN_SEARCH_LENGTH} caracteres para buscar.
-          </p>
-        ) : null}
+          className="sm:w-48"
+          aria-label="Filtrar por departamento"
+        >
+          <option value="">Todos los departamentos</option>
+          {departamentoEntries.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as Venue['status'] | '');
+            setPage(1);
+          }}
+          className="sm:w-40"
+          aria-label="Filtrar por estado"
+        >
+          <option value="">Todos los estados</option>
+          {(Object.keys(statusLabels) as Venue['status'][]).map((value) => (
+            <option key={value} value={value}>
+              {statusLabels[value]}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {query.isLoading ? (
@@ -130,10 +179,10 @@ export const AllVenuesList = () => {
       ) : !venues.length ? (
         <EmptyState
           icon={LayoutGrid}
-          title={activeQuery ? 'Sin resultados' : 'Todavia no hay locales'}
+          title={hasActiveFilters ? 'Sin resultados' : 'Todavia no hay locales'}
           description={
-            activeQuery
-              ? `Ningun local coincide con "${activeQuery}".`
+            hasActiveFilters
+              ? 'Ningun local coincide con la busqueda y los filtros aplicados.'
               : 'Los locales que publiquen los propietarios van a aparecer aca.'
           }
         />

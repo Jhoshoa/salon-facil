@@ -5,6 +5,7 @@ import type {
   CatalogAmenityInput,
   CatalogItem,
   CatalogItemInput,
+  Departamento,
   PaginatedResponse,
   SeasonalEvent,
   SeasonalEventInput,
@@ -156,7 +157,13 @@ export const getPendingVenues = async (): Promise<Venue[]> => {
 };
 
 export const getAllVenuesAdmin = async (
-  params: { query?: string; page?: number; limit?: number } = {},
+  params: {
+    query?: string;
+    departamento?: Departamento;
+    status?: Venue['status'];
+    page?: number;
+    limit?: number;
+  } = {},
 ): Promise<PaginatedResponse<Venue>> => {
   return apiRequest<PaginatedResponse<Venue>>(`/venues/admin/all${buildQueryString(params)}`);
 };
