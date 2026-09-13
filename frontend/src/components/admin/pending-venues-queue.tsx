@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ShieldCheck, X } from 'lucide-react';
+import { Check, Eye, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPendingVenues, verifyVenue } from '@/lib/api/venues.api';
 import { departamentoLabels } from '@/components/venues/venue-filter-labels';
@@ -39,7 +39,12 @@ export const PendingVenuesQueue = () => {
   }
 
   if (query.isError) {
-    return <ErrorState title="No se pudo cargar la cola de verificacion" onRetry={() => query.refetch()} />;
+    return (
+      <ErrorState
+        title="No se pudo cargar la cola de verificacion"
+        onRetry={() => query.refetch()}
+      />
+    );
   }
 
   if (!query.data?.length) {
@@ -86,8 +91,9 @@ export const PendingVenuesQueue = () => {
 
               <div className="flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="outline">
-                  <Link href={`/venues/${venue.slug}`} target="_blank">
-                    Ver publicacion
+                  <Link href={`/admin/venues/all/${venue.id}/preview`} target="_blank">
+                    <Eye className="h-4 w-4" />
+                    Ver detalle
                   </Link>
                 </Button>
                 <Button

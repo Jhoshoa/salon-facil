@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Map, MapPin, Plus, Star, X } from 'lucide-react';
+import { Check, Map, MapPin, Plus, SearchX, Star, X } from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import { getSimilarVenues, getVenueById, getVenueBySlug } from '@/lib/api/venues.api';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
@@ -15,6 +15,7 @@ import { departamentoLabels } from './venue-filter-labels';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
+import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import {
   FacebookIcon,
@@ -24,7 +25,7 @@ import {
 } from '@/components/shared/brand-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AmenityCategory, Venue } from '@/types/api';
+import type { AmenityCategory, ApiError, Venue } from '@/types/api';
 import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
@@ -102,7 +103,7 @@ export const VenueDetail = ({
   initialEndDate,
   mapHref,
 }: VenueDetailProps) => {
-  const query = useQuery({
+  const query = useQuery<Venue, ApiError>({
     queryKey: ['venue', venueId ?? slug],
     queryFn: () => (venueId ? getVenueById(venueId) : getVenueBySlug(slug!)),
   });
@@ -114,7 +115,9 @@ export const VenueDetail = ({
   });
 
   const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | undefined>(
-    initialStartDate ? { start: initialStartDate, end: initialEndDate ?? initialStartDate } : undefined,
+    initialStartDate
+      ? { start: initialStartDate, end: initialEndDate ?? initialStartDate }
+      : undefined,
   );
   const [staleRangeNotice, setStaleRangeNotice] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({
@@ -151,16 +154,36 @@ export const VenueDetail = ({
   };
 
   if (query.isLoading) return <VenueDetailSkeleton />;
-  if (query.isError || !query.data) return <ErrorState onRetry={() => query.refetch()} />;
+  if (query.isError) {
+    // A 404 here means "doesn't exist or isn't public" (the backend deliberately conflates the
+    // two, see getVenueBySlug) -- a permanent state, not a transient failure, so retrying can
+    // never help. Point the visitor back to the search instead of a "Reintentar" that only
+    // implies a connection problem that isn't actually happening.
+    if (query.error?.statusCode === 404) {
+      return (
+        <EmptyState
+          icon={SearchX}
+          title="Este local no esta disponible"
+          description="Puede que ya no exista o que el propietario todavia no lo haya publicado."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/venues">Buscar otros espacios</Link>
+            </Button>
+          }
+        />
+      );
+    }
+    return <ErrorState onRetry={() => query.refetch()} />;
+  }
+  if (!query.data) return <ErrorState onRetry={() => query.refetch()} />;
 
   const venue = query.data;
   const photos = getVenuePhotos(venue);
   const galleryPhotos = photos.slice(0, 3);
   const extraPhotoCount = photos.length - galleryPhotos.length;
-  const includedAmenityGroups = Object.entries(groupAmenities(venue, (item) => item.isIncluded)) as [
-    AmenityCategory,
-    NonNullable<Venue['amenities']>,
-  ][];
+  const includedAmenityGroups = Object.entries(
+    groupAmenities(venue, (item) => item.isIncluded),
+  ) as [AmenityCategory, NonNullable<Venue['amenities']>][];
   const extraAmenityGroups = Object.entries(groupAmenities(venue, (item) => !item.isIncluded)) as [
     AmenityCategory,
     NonNullable<Venue['amenities']>,
@@ -175,396 +198,398 @@ export const VenueDetail = ({
   return (
     <div className={`space-y-2 ${!isDesktop ? 'pb-24' : ''}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <div className="min-w-0 flex-1">
-        {/* Gallery — scroll horizontal de "prints" enmarcados */}
-        <section className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
-          {galleryPhotos.length ? (
-            galleryPhotos.map((photo, index) => {
-              const showMoreOverlay = index === galleryPhotos.length - 1 && extraPhotoCount > 0;
-              const rotate = index % 2 === 0 ? '-rotate-[1.2deg]' : 'rotate-[1deg]';
-              return (
-                <button
-                  key={`${photo}-${index}`}
-                  type="button"
-                  onClick={() => setLightbox({ open: true, index })}
-                  aria-label={showMoreOverlay ? `Ver las ${photos.length} fotos` : 'Ver foto ampliada'}
-                  className={`relative w-[82%] shrink-0 snap-center cursor-zoom-in border border-border bg-card p-2 pb-8 text-left shadow-md sm:w-[46%] lg:w-[32%] ${rotate}`}
-                >
-                  <div className="relative h-[190px] sm:h-[240px]">
-                    <Image
-                      src={photo}
-                      alt={`${venue.name} ${index + 1}`}
-                      fill
-                      className="object-cover"
-                      sizes="(min-width: 1024px) 32vw, (min-width: 640px) 46vw, 82vw"
-                      priority={index === 0}
-                    />
-                    {showMoreOverlay ? (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-semibold text-white">
-                        +{extraPhotoCount}
-                      </div>
-                    ) : null}
-                  </div>
-                  <p className="absolute bottom-2 left-3 right-3 truncate font-serif text-sm italic text-foreground">
-                    {venue.name}
-                  </p>
-                </button>
-              );
-            })
-          ) : (
-            <div className="sf-gradient-subtle flex h-[240px] w-full items-center justify-center text-sm text-muted-foreground">
-              Sin fotos
-            </div>
-          )}
-        </section>
-
-        <PhotoLightbox
-          photos={photos}
-          alt={venue.name}
-          index={lightbox.index}
-          open={lightbox.open}
-          onOpenChange={(open) => setLightbox((prev) => ({ ...prev, open }))}
-          onIndexChange={(index) => setLightbox((prev) => ({ ...prev, index }))}
-        />
-
-        {/* Title */}
-        <section className="sf-detail-section">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              {venue.spaceType ? (
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  {venue.spaceType.name}
-                  {venue.instantBooking ? ' · Reserva inmediata' : ''}
-                </p>
-              ) : null}
-              <h1 className="mb-2">{venue.name}</h1>
-              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span>
-                  <span className="text-accent-foreground">— </span>
-                  {venue.district}, {departamentoLabels[venue.departamento]}
-                </span>
-                {venue.averageRating ? (
-                  <span className="flex items-center gap-1 font-medium text-foreground">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    {venue.averageRating.toFixed(1)}
-                    <span className="font-normal text-muted-foreground">
-                      ({venue.reviewCount} {venue.reviewCount === 1 ? 'reseña' : 'reseñas'})
-                    </span>
-                  </span>
-                ) : null}
-              </p>
-            </div>
-            {venue.isVerified ? (
-              <span className="sf-stamp shrink-0">
-                verificado
-                <br />
-                mi evento
-              </span>
-            ) : null}
-          </div>
-          {venue.description ? (
-            <p className="font-serif text-base italic leading-7 text-foreground/80">
-              {venue.description}
-            </p>
-          ) : null}
-          {venue.contactPhone || venue.facebookUrl || venue.instagramUrl || venue.tiktokUrl ? (
-            <div className="flex flex-wrap gap-1">
-              {venue.contactPhone ? (
-                <a
-                  href={`https://wa.me/${venue.contactPhone.replace(/[^0-9]/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="WhatsApp"
-                  title="WhatsApp"
-                  className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
-                  style={{ color: '#25D366' }}
-                >
-                  <WhatsAppIcon className="h-6 w-6" />
-                </a>
-              ) : null}
-              {venue.facebookUrl ? (
-                <a
-                  href={venue.facebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Facebook"
-                  title="Facebook"
-                  className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
-                  style={{ color: '#1877F2' }}
-                >
-                  <FacebookIcon className="h-6 w-6" />
-                </a>
-              ) : null}
-              {venue.instagramUrl ? (
-                <a
-                  href={venue.instagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  title="Instagram"
-                  className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
-                  style={{ color: '#E4405F' }}
-                >
-                  <InstagramIcon className="h-6 w-6" />
-                </a>
-              ) : null}
-              {venue.tiktokUrl ? (
-                <a
-                  href={venue.tiktokUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="TikTok"
-                  title="TikTok"
-                  className="inline-flex h-9 w-9 items-center justify-center text-black transition-opacity hover:opacity-80"
-                >
-                  <TikTokIcon className="h-6 w-6" />
-                </a>
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-
-        {/* Summary — field-note stats */}
-        <section className="sf-detail-section">
-          <h2 className="sf-detail-title">Resumen del espacio</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                {venue.capacityMin}-{venue.capacityMax}
-              </p>
-              <p className="mt-1.5 text-xs text-muted-foreground">personas</p>
-            </div>
-            <div>
-              <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                {venue.minimumHours}h
-              </p>
-              <p className="mt-1.5 text-xs text-muted-foreground">minimo por reserva</p>
-            </div>
-            <div>
-              <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                {venue.allowsMultipleDays ? 'Multi' : '1'}
-              </p>
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {venue.allowsMultipleDays ? 'varios dias' : 'dia por reserva'}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Use Types — tag list */}
-        {allUses.length ? (
-          <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Ideal para</h2>
-            <div className="flex flex-wrap text-sm">
-              {allUses.map((item, index) => (
-                <span
-                  key={item.id}
-                  className={cn(
-                    'mb-1.5 mr-2.5 pr-2.5',
-                    index < allUses.length - 1 && 'border-r border-border',
-                    item.isPrimary
-                      ? 'relative font-bold text-foreground after:absolute after:inset-x-0 after:-bottom-1 after:h-[1.5px] after:bg-secondary'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {item.useType.name}
-                </span>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* Amenities included in the base price */}
-        {includedAmenityGroups.length ? (
-          <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Comodidades y servicios incluidos</h2>
-            <div>
-              {includedAmenityGroups.map(([category, amenities]) => (
-                <div key={category}>
-                  <p className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground first:mt-0">
-                    {amenityCategoryLabels[category]}
-                  </p>
-                  {amenities.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-2.5 border-t border-border py-2.5 text-sm first:border-t-0"
-                    >
-                      <Check className="h-3.5 w-3.5 shrink-0 text-city-green" />
-                      <span>{item.amenity.name}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* Amenities available at an extra cost */}
-        {extraAmenityGroups.length ? (
-          <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Comodidades y servicios con costo extra</h2>
-            <div>
-              {extraAmenityGroups.map(([category, amenities]) => (
-                <div key={category}>
-                  <p className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground first:mt-0">
-                    {amenityCategoryLabels[category]}
-                  </p>
-                  {amenities.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <Plus className="h-3.5 w-3.5 shrink-0 text-accent-foreground" />
-                        {item.amenity.name}
-                      </span>
-                      {item.extraCost ? (
-                        <span className="font-serif italic text-accent-foreground">
-                          {formatCurrency(item.extraCost)}
-                        </span>
+        <div className="min-w-0 flex-1">
+          {/* Gallery — scroll horizontal de "prints" enmarcados */}
+          <section className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
+            {galleryPhotos.length ? (
+              galleryPhotos.map((photo, index) => {
+                const showMoreOverlay = index === galleryPhotos.length - 1 && extraPhotoCount > 0;
+                const rotate = index % 2 === 0 ? '-rotate-[1.2deg]' : 'rotate-[1deg]';
+                return (
+                  <button
+                    key={`${photo}-${index}`}
+                    type="button"
+                    onClick={() => setLightbox({ open: true, index })}
+                    aria-label={
+                      showMoreOverlay ? `Ver las ${photos.length} fotos` : 'Ver foto ampliada'
+                    }
+                    className={`relative w-[82%] shrink-0 cursor-zoom-in snap-center border border-border bg-card p-2 pb-8 text-left shadow-md sm:w-[46%] lg:w-[32%] ${rotate}`}
+                  >
+                    <div className="relative h-[190px] sm:h-[240px]">
+                      <Image
+                        src={photo}
+                        alt={`${venue.name} ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="(min-width: 1024px) 32vw, (min-width: 640px) 46vw, 82vw"
+                        priority={index === 0}
+                      />
+                      {showMoreOverlay ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-semibold text-white">
+                          +{extraPhotoCount}
+                        </div>
                       ) : null}
                     </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* Opening Hours */}
-        {venue.openingHours?.length ? (
-          <section className="sf-detail-section">
-            <h2 className="sf-detail-title">Horarios</h2>
-            <div>
-              {venue.openingHours.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
-                >
-                  <span className="font-semibold">{dayLabels[item.dayOfWeek]}</span>
-                  <span
-                    className={`whitespace-nowrap ${item.isClosed ? 'text-destructive' : 'text-muted-foreground'}`}
-                  >
-                    {item.isClosed
-                      ? 'Cerrado'
-                      : `${formatTime12h(item.opensAt)} - ${formatTime12h(item.closesAt)}`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* Rules & Cancellation */}
-        {venue.rules || venue.cancellationPolicy ? (
-          <section className="sf-detail-section grid gap-6 md:grid-cols-2">
-            {venue.rules ? (
-              <div>
-                <div className="sf-kicker">
-                  <span>Reglas del espacio</span>
-                </div>
-                <p className="font-serif text-sm italic leading-6 text-muted-foreground">
-                  {venue.rules}
-                </p>
+                    <p className="absolute bottom-2 left-3 right-3 truncate font-serif text-sm italic text-foreground">
+                      {venue.name}
+                    </p>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="sf-gradient-subtle flex h-[240px] w-full items-center justify-center text-sm text-muted-foreground">
+                Sin fotos
               </div>
-            ) : null}
-            {venue.cancellationPolicy ? (
-              <div>
-                <div className="sf-kicker">
-                  <span>Politica de cancelacion</span>
-                </div>
-                <p className="font-serif text-sm italic leading-6 text-muted-foreground">
-                  {venue.cancellationPolicy}
-                </p>
-              </div>
-            ) : null}
+            )}
           </section>
-        ) : null}
 
-        {/* Location */}
-        <section className="sf-detail-section">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="sf-detail-title">Ubicacion</h2>
-            {mapHref ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={mapHref}>
-                  <Map className="h-4 w-4" />
-                  Ver en el mapa
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0" />
-            {venue.address ? `${venue.address}, ` : ''}
-            {venue.district}, {departamentoLabels[venue.departamento]}
-          </p>
-          {venue.latitude && venue.longitude ? (
-            <div className="isolate h-64 w-full border border-border bg-card p-2 shadow-md">
-              <VenueLocationMap
-                latitude={venue.latitude}
-                longitude={venue.longitude}
-                name={venue.name}
-              />
-            </div>
-          ) : (
-            <div className="sf-gradient-subtle flex min-h-52 items-center justify-center text-center text-sm">
-              <div>
-                <Map className="mx-auto mb-2 h-8 w-8 text-primary" />
-                <p className="font-semibold">Mapa no disponible</p>
-                <p className="mt-1 text-muted-foreground">
-                  Coordenadas exactas no disponibles todavia.
-                </p>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="sf-detail-section">
-          <AvailabilityCalendar
-            venueId={venue.id}
-            allowsMultipleDays={venue.allowsMultipleDays}
-            openingHours={venue.openingHours}
-            onRangeSelect={handleRangeChange}
-            externalRange={selectedRange}
+          <PhotoLightbox
+            photos={photos}
+            alt={venue.name}
+            index={lightbox.index}
+            open={lightbox.open}
+            onOpenChange={(open) => setLightbox((prev) => ({ ...prev, open }))}
+            onIndexChange={(index) => setLightbox((prev) => ({ ...prev, index }))}
           />
-        </section>
 
-        {venue.reviewCount ? (
+          {/* Title */}
           <section className="sf-detail-section">
-            <VenueReviews
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                {venue.spaceType ? (
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    {venue.spaceType.name}
+                    {venue.instantBooking ? ' · Reserva inmediata' : ''}
+                  </p>
+                ) : null}
+                <h1 className="mb-2">{venue.name}</h1>
+                <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span>
+                    <span className="text-accent-foreground">— </span>
+                    {venue.district}, {departamentoLabels[venue.departamento]}
+                  </span>
+                  {venue.averageRating ? (
+                    <span className="flex items-center gap-1 font-medium text-foreground">
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      {venue.averageRating.toFixed(1)}
+                      <span className="font-normal text-muted-foreground">
+                        ({venue.reviewCount} {venue.reviewCount === 1 ? 'reseña' : 'reseñas'})
+                      </span>
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+              {venue.isVerified ? (
+                <span className="sf-stamp shrink-0">
+                  verificado
+                  <br />
+                  mi evento
+                </span>
+              ) : null}
+            </div>
+            {venue.description ? (
+              <p className="font-serif text-base italic leading-7 text-foreground/80">
+                {venue.description}
+              </p>
+            ) : null}
+            {venue.contactPhone || venue.facebookUrl || venue.instagramUrl || venue.tiktokUrl ? (
+              <div className="flex flex-wrap gap-1">
+                {venue.contactPhone ? (
+                  <a
+                    href={`https://wa.me/${venue.contactPhone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="WhatsApp"
+                    title="WhatsApp"
+                    className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ color: '#25D366' }}
+                  >
+                    <WhatsAppIcon className="h-6 w-6" />
+                  </a>
+                ) : null}
+                {venue.facebookUrl ? (
+                  <a
+                    href={venue.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Facebook"
+                    title="Facebook"
+                    className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ color: '#1877F2' }}
+                  >
+                    <FacebookIcon className="h-6 w-6" />
+                  </a>
+                ) : null}
+                {venue.instagramUrl ? (
+                  <a
+                    href={venue.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Instagram"
+                    title="Instagram"
+                    className="inline-flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ color: '#E4405F' }}
+                  >
+                    <InstagramIcon className="h-6 w-6" />
+                  </a>
+                ) : null}
+                {venue.tiktokUrl ? (
+                  <a
+                    href={venue.tiktokUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="TikTok"
+                    title="TikTok"
+                    className="inline-flex h-9 w-9 items-center justify-center text-black transition-opacity hover:opacity-80"
+                  >
+                    <TikTokIcon className="h-6 w-6" />
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {/* Summary — field-note stats */}
+          <section className="sf-detail-section">
+            <h2 className="sf-detail-title">Resumen del espacio</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="font-serif text-2xl font-semibold leading-none text-primary">
+                  {venue.capacityMin}-{venue.capacityMax}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">personas</p>
+              </div>
+              <div>
+                <p className="font-serif text-2xl font-semibold leading-none text-primary">
+                  {venue.minimumHours}h
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">minimo por reserva</p>
+              </div>
+              <div>
+                <p className="font-serif text-2xl font-semibold leading-none text-primary">
+                  {venue.allowsMultipleDays ? 'Multi' : '1'}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {venue.allowsMultipleDays ? 'varios dias' : 'dia por reserva'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Use Types — tag list */}
+          {allUses.length ? (
+            <section className="sf-detail-section">
+              <h2 className="sf-detail-title">Ideal para</h2>
+              <div className="flex flex-wrap text-sm">
+                {allUses.map((item, index) => (
+                  <span
+                    key={item.id}
+                    className={cn(
+                      'mb-1.5 mr-2.5 pr-2.5',
+                      index < allUses.length - 1 && 'border-r border-border',
+                      item.isPrimary
+                        ? 'relative font-bold text-foreground after:absolute after:inset-x-0 after:-bottom-1 after:h-[1.5px] after:bg-secondary'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {item.useType.name}
+                  </span>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Amenities included in the base price */}
+          {includedAmenityGroups.length ? (
+            <section className="sf-detail-section">
+              <h2 className="sf-detail-title">Comodidades y servicios incluidos</h2>
+              <div>
+                {includedAmenityGroups.map(([category, amenities]) => (
+                  <div key={category}>
+                    <p className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground first:mt-0">
+                      {amenityCategoryLabels[category]}
+                    </p>
+                    {amenities.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2.5 border-t border-border py-2.5 text-sm first:border-t-0"
+                      >
+                        <Check className="h-3.5 w-3.5 shrink-0 text-city-green" />
+                        <span>{item.amenity.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Amenities available at an extra cost */}
+          {extraAmenityGroups.length ? (
+            <section className="sf-detail-section">
+              <h2 className="sf-detail-title">Comodidades y servicios con costo extra</h2>
+              <div>
+                {extraAmenityGroups.map(([category, amenities]) => (
+                  <div key={category}>
+                    <p className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground first:mt-0">
+                      {amenityCategoryLabels[category]}
+                    </p>
+                    {amenities.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Plus className="h-3.5 w-3.5 shrink-0 text-accent-foreground" />
+                          {item.amenity.name}
+                        </span>
+                        {item.extraCost ? (
+                          <span className="font-serif italic text-accent-foreground">
+                            {formatCurrency(item.extraCost)}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Opening Hours */}
+          {venue.openingHours?.length ? (
+            <section className="sf-detail-section">
+              <h2 className="sf-detail-title">Horarios</h2>
+              <div>
+                {venue.openingHours.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
+                  >
+                    <span className="font-semibold">{dayLabels[item.dayOfWeek]}</span>
+                    <span
+                      className={`whitespace-nowrap ${item.isClosed ? 'text-destructive' : 'text-muted-foreground'}`}
+                    >
+                      {item.isClosed
+                        ? 'Cerrado'
+                        : `${formatTime12h(item.opensAt)} - ${formatTime12h(item.closesAt)}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Rules & Cancellation */}
+          {venue.rules || venue.cancellationPolicy ? (
+            <section className="sf-detail-section grid gap-6 md:grid-cols-2">
+              {venue.rules ? (
+                <div>
+                  <div className="sf-kicker">
+                    <span>Reglas del espacio</span>
+                  </div>
+                  <p className="font-serif text-sm italic leading-6 text-muted-foreground">
+                    {venue.rules}
+                  </p>
+                </div>
+              ) : null}
+              {venue.cancellationPolicy ? (
+                <div>
+                  <div className="sf-kicker">
+                    <span>Politica de cancelacion</span>
+                  </div>
+                  <p className="font-serif text-sm italic leading-6 text-muted-foreground">
+                    {venue.cancellationPolicy}
+                  </p>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {/* Location */}
+          <section className="sf-detail-section">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="sf-detail-title">Ubicacion</h2>
+              {mapHref ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={mapHref}>
+                    <Map className="h-4 w-4" />
+                    Ver en el mapa
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4 shrink-0" />
+              {venue.address ? `${venue.address}, ` : ''}
+              {venue.district}, {departamentoLabels[venue.departamento]}
+            </p>
+            {venue.latitude && venue.longitude ? (
+              <div className="isolate h-64 w-full border border-border bg-card p-2 shadow-md">
+                <VenueLocationMap
+                  latitude={venue.latitude}
+                  longitude={venue.longitude}
+                  name={venue.name}
+                />
+              </div>
+            ) : (
+              <div className="sf-gradient-subtle flex min-h-52 items-center justify-center text-center text-sm">
+                <div>
+                  <Map className="mx-auto mb-2 h-8 w-8 text-primary" />
+                  <p className="font-semibold">Mapa no disponible</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Coordenadas exactas no disponibles todavia.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="sf-detail-section">
+            <AvailabilityCalendar
               venueId={venue.id}
-              ownerId={venue.ownerId}
-              averageRating={venue.averageRating}
-              reviewCount={venue.reviewCount}
+              allowsMultipleDays={venue.allowsMultipleDays}
+              openingHours={venue.openingHours}
+              onRangeSelect={handleRangeChange}
+              externalRange={selectedRange}
             />
           </section>
-        ) : null}
-      </div>
 
-      {isDesktop ? (
-        <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
-          {staleRangeNotice ? (
-            <div className="flex items-start justify-between gap-2 border-l-2 border-warning bg-warning/10 p-3 text-sm text-foreground">
-              <p>{staleRangeNotice}</p>
-              <button
-                type="button"
-                onClick={() => setStaleRangeNotice(null)}
-                aria-label="Cerrar aviso"
-                className="shrink-0"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+          {venue.reviewCount ? (
+            <section className="sf-detail-section">
+              <VenueReviews
+                venueId={venue.id}
+                ownerId={venue.ownerId}
+                averageRating={venue.averageRating}
+                reviewCount={venue.reviewCount}
+              />
+            </section>
           ) : null}
-          <BookingForm
-            venue={venue}
-            selectedRange={selectedRange}
-            onDatesChange={handleRangeChange}
-            onPriceChange={setLiveTotal}
-          />
-        </aside>
-      ) : null}
+        </div>
+
+        {isDesktop ? (
+          <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
+            {staleRangeNotice ? (
+              <div className="border-warning bg-warning/10 flex items-start justify-between gap-2 border-l-2 p-3 text-sm text-foreground">
+                <p>{staleRangeNotice}</p>
+                <button
+                  type="button"
+                  onClick={() => setStaleRangeNotice(null)}
+                  aria-label="Cerrar aviso"
+                  className="shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
+            <BookingForm
+              venue={venue}
+              selectedRange={selectedRange}
+              onDatesChange={handleRangeChange}
+              onPriceChange={setLiveTotal}
+            />
+          </aside>
+        ) : null}
       </div>
 
       {!isDesktop ? (
