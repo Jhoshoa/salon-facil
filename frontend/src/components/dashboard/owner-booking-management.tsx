@@ -23,7 +23,7 @@ import {
 import { getMyVenues } from '@/lib/api/venues.api';
 import { getPendingOwnerPayments, confirmPayment, rejectPayment } from '@/lib/api/payments.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
-import type { Booking, Payment } from '@/types/api';
+import type { Booking, BookingStatus, Payment } from '@/types/api';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
 import { AppDrawer } from '@/components/shared/app-drawer';
@@ -45,6 +45,29 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const BOOKINGS_PER_PAGE = 5;
+
+// Grouped, not the raw 8 enum values -- an owner thinks in terms of "needs a decision or is
+// coming up" vs "already happened", not in terms of individual backend statuses. PENDING stays
+// bundled with the already-confirmed ones (not split into its own tab) because each card already
+// makes the distinction obvious on its own: only a PENDING booking shows Aprobar/Rechazar, so a
+// separate tab would just be re-solving something the card already shows at a glance.
+type StatusFilter = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'ALL';
+
+const STATUS_FILTER_GROUPS: Record<Exclude<StatusFilter, 'ALL'>, BookingStatus[]> = {
+  ACTIVE: ['PENDING', 'APPROVED', 'DEPOSIT_PAID', 'FULLY_PAID'],
+  COMPLETED: ['COMPLETED'],
+  CANCELLED: ['CANCELLED_BY_CLIENT', 'CANCELLED_BY_OWNER', 'NO_SHOW'],
+};
+
+const STATUS_FILTER_TABS: { value: StatusFilter; label: string }[] = [
+  { value: 'ACTIVE', label: 'Activas' },
+  { value: 'COMPLETED', label: 'Completadas' },
+  { value: 'CANCELLED', label: 'Canceladas' },
+  { value: 'ALL', label: 'Todas' },
+];
+
+const matchesStatusFilter = (booking: Booking, filter: StatusFilter) =>
+  filter === 'ALL' || STATUS_FILTER_GROUPS[filter].includes(booking.status);
 
 interface RejectState {
   id: string;
@@ -342,6 +365,7 @@ export const OwnerBookingManagement = () => {
   const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(null);
   const [bookingDetail, setBookingDetail] = useState<Booking | null>(null);
   const [bookingToApprove, setBookingToApprove] = useState<Booking | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE');
   const [page, setPage] = useState(1);
 
   const venuesQuery = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
@@ -361,7 +385,7 @@ export const OwnerBookingManagement = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [venueId]);
+  }, [venueId, statusFilter]);
 
   const approveMutation = useMutation({
     mutationFn: approveBooking,
@@ -441,9 +465,12 @@ export const OwnerBookingManagement = () => {
     return <EmptyState icon={CreditCard} title="No tienes salones para gestionar" />;
 
   const allBookings = bookingsQuery.data ?? [];
-  const totalPages = Math.max(1, Math.ceil(allBookings.length / BOOKINGS_PER_PAGE));
+  const filteredBookings = allBookings.filter((booking) =>
+    matchesStatusFilter(booking, statusFilter),
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
-  const pageBookings = allBookings.slice(
+  const pageBookings = filteredBookings.slice(
     (currentPage - 1) * BOOKINGS_PER_PAGE,
     currentPage * BOOKINGS_PER_PAGE,
   );
@@ -453,14 +480,35 @@ export const OwnerBookingManagement = () => {
       <OwnerVenueSelect venues={venuesQuery.data} value={venueId} onChange={setVenueId} />
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Solicitudes de reserva</h2>
-          {allBookings.length ? (
+          {filteredBookings.length ? (
             <p className="text-sm text-muted-foreground">
-              {allBookings.length} reserva{allBookings.length === 1 ? '' : 's'} en total
+              {filteredBookings.length} reserva{filteredBookings.length === 1 ? '' : 's'}
             </p>
           ) : null}
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTER_TABS.map((tab) => {
+            const count =
+              tab.value === 'ALL'
+                ? allBookings.length
+                : allBookings.filter((booking) => matchesStatusFilter(booking, tab.value)).length;
+            return (
+              <Button
+                key={tab.value}
+                type="button"
+                size="sm"
+                variant={statusFilter === tab.value ? 'default' : 'outline'}
+                onClick={() => setStatusFilter(tab.value)}
+              >
+                {tab.label} ({count})
+              </Button>
+            );
+          })}
+        </div>
+
         {bookingsQuery.isLoading ? <Skeleton className="h-40 w-full" /> : null}
         {bookingsQuery.isError ? (
           <ErrorState
@@ -468,8 +516,13 @@ export const OwnerBookingManagement = () => {
             onRetry={() => bookingsQuery.refetch()}
           />
         ) : null}
-        {!bookingsQuery.isLoading && !allBookings.length ? (
-          <EmptyState icon={CreditCard} title="Sin reservas para este salon" />
+        {!bookingsQuery.isLoading && !filteredBookings.length ? (
+          <EmptyState
+            icon={CreditCard}
+            title={
+              allBookings.length ? 'Sin reservas en esta categoria' : 'Sin reservas para este salon'
+            }
+          />
         ) : null}
         {pageBookings.map((booking) => (
           <OwnerBookingRow
