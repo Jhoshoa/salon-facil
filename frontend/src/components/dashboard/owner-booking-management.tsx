@@ -27,6 +27,7 @@ import type { Booking, Payment } from '@/types/api';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
 import { AppDrawer } from '@/components/shared/app-drawer';
+import { WhatsAppIcon } from '@/components/shared/brand-icons';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
@@ -193,13 +194,27 @@ const BookingDetailModal = ({
               <p className="mt-1">{booking.client?.fullName ?? 'Cliente'}</p>
               <div className="mt-1 flex flex-col gap-1 text-muted-foreground">
                 {booking.client?.phone ? (
-                  <a
-                    href={`tel:${booking.client.phone}`}
-                    className="flex items-center gap-1.5 hover:text-foreground"
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {booking.client.phone}
-                  </a>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`tel:${booking.client.phone}`}
+                      className="flex items-center gap-1.5 hover:text-foreground"
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      {booking.client.phone}
+                    </a>
+                    <a
+                      href={`https://wa.me/${booking.client.phone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Coordinar por WhatsApp"
+                      title="Coordinar por WhatsApp"
+                      className="flex items-center gap-1.5 transition-opacity hover:opacity-80"
+                      style={{ color: '#25D366' }}
+                    >
+                      <WhatsAppIcon className="h-4 w-4" />
+                      WhatsApp
+                    </a>
+                  </div>
                 ) : null}
                 {booking.client?.email ? (
                   <a
