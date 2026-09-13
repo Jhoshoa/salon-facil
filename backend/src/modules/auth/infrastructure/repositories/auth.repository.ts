@@ -221,7 +221,10 @@ export class AuthRepository implements IAuthRepository {
    * but never `role` itself, since that's the breakdown being computed. Always returns every
    * role key (zero-filled), even ones with no matching rows, so the frontend never has to guess
    * whether a missing key means zero or means "not fetched yet". */
-  async countByRole(filters: { search?: string; status?: UserStatus }): Promise<Record<UserRole, number>> {
+  async countByRole(filters: {
+    search?: string;
+    status?: UserStatus;
+  }): Promise<Record<UserRole, number>> {
     const where: Prisma.UserWhereInput = {
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.search
@@ -254,7 +257,10 @@ export class AuthRepository implements IAuthRepository {
 
   /** Same idea as countByRole, mirrored for the status dropdown: respects `search` and `role`,
    * never `status` itself. */
-  async countByStatus(filters: { search?: string; role?: UserRole }): Promise<Record<UserStatus, number>> {
+  async countByStatus(filters: {
+    search?: string;
+    role?: UserRole;
+  }): Promise<Record<UserStatus, number>> {
     const where: Prisma.UserWhereInput = {
       ...(filters.role ? { role: filters.role } : {}),
       ...(filters.search
