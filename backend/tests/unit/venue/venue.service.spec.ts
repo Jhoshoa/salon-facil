@@ -49,6 +49,7 @@ describe('VenueService', () => {
       incrementViewCount: jest.fn().mockResolvedValue(undefined),
       softDelete: jest.fn(),
       findAllForAdmin: jest.fn(),
+      countByStatus: jest.fn(),
       existsBySlug: jest.fn(),
       addMedia: jest.fn(),
       deleteMedia: jest.fn(),
@@ -176,6 +177,21 @@ describe('VenueService', () => {
         query: 'mario',
         page: 2,
         limit: 10,
+      });
+    });
+  });
+
+  describe('getVenueStatusCounts', () => {
+    it('should forward query/departamento but never status', async () => {
+      const counts = { DRAFT: 1, PENDING: 2, ACTIVE: 3, INACTIVE: 0, REJECTED: 0 };
+      mockRepository.countByStatus.mockResolvedValue(counts);
+
+      const result = await service.getVenueStatusCounts({ query: 'mario', departamento: 'LA_PAZ' });
+
+      expect(result).toEqual(counts);
+      expect(mockRepository.countByStatus).toHaveBeenCalledWith({
+        query: 'mario',
+        departamento: 'LA_PAZ',
       });
     });
   });

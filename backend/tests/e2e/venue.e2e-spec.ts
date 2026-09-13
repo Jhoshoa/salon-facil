@@ -562,6 +562,72 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  // ===== Status counts for the admin listing's status dropdown =====
+  describe('GET /api/v1/venues/admin/status-counts', () => {
+    const countsName = `Status Counts Test ${uniqueId}`;
+
+    beforeAll(async () => {
+      await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', countsName)
+        .field('description', 'Venue creada solo para probar el endpoint de conteos por estado.')
+        .field('address', 'Status Counts Address 12345')
+        .field('district', 'Status Counts District')
+        .field('departamento', 'SANTA_CRUZ')
+        .field('capacityMax', '50')
+        .expect(201);
+    });
+
+    it('counts the new DRAFT venue when scoped by query, without leaking into other statuses', async () => {
+      const res = await adminAgent
+        .get(`/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}`)
+        .expect(200);
+      expect(res.body).toEqual({ DRAFT: 1, PENDING: 0, ACTIVE: 0, INACTIVE: 0, REJECTED: 0 });
+    });
+
+    it('respects the departamento filter the same way the listing does', async () => {
+      const matching = await adminAgent
+        .get(
+          `/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}&departamento=SANTA_CRUZ`,
+        )
+        .expect(200);
+      expect(matching.body.DRAFT).toBe(1);
+
+      const nonMatching = await adminAgent
+        .get(
+          `/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}&departamento=PANDO`,
+        )
+        .expect(200);
+      expect(nonMatching.body.DRAFT).toBe(0);
+    });
+
+    it('always returns every status key, zero-filled, even with no matches at all', async () => {
+      const res = await adminAgent
+        .get(`/api/v1/venues/admin/status-counts?query=${encodeURIComponent('no-such-venue-xyz')}`)
+        .expect(200);
+      expect(res.body).toEqual({ DRAFT: 0, PENDING: 0, ACTIVE: 0, INACTIVE: 0, REJECTED: 0 });
+    });
+
+    it('rejects a status query param (400) instead of silently accepting it, since the whole point is to break down every status', async () => {
+      // The global ValidationPipe has forbidNonWhitelisted: true, and the dedicated DTO has no
+      // `status` field — so this fails loud rather than silently ignoring an unexpected param.
+      await adminAgent
+        .get(
+          `/api/v1/venues/admin/status-counts?query=${encodeURIComponent(countsName)}&status=ACTIVE`,
+        )
+        .expect(400);
+    });
+
+    it('returns 403 for OWNER and CLIENT', async () => {
+      await ownerAgent.get('/api/v1/venues/admin/status-counts').expect(403);
+      await clientAgent.get('/api/v1/venues/admin/status-counts').expect(403);
+    });
+
+    it('returns 401 without a session', () => {
+      return request(app.getHttpServer()).get('/api/v1/venues/admin/status-counts').expect(401);
+    });
+  });
+
   // ===== My venues =====
   describe('GET /api/v1/venues/my/venues', () => {
     it('should return venues owned by the authenticated user', () => {

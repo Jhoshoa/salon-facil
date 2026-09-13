@@ -9,6 +9,7 @@ import {
   deactivateVenue,
   deleteVenue,
   getAllVenuesAdmin,
+  getVenueStatusCounts,
   reactivateVenue,
 } from '@/lib/api/venues.api';
 import { departamentoLabels } from '@/components/venues/venue-filter-labels';
@@ -66,6 +67,17 @@ export const AllVenuesList = () => {
         status: statusFilter || undefined,
         page,
         limit: 20,
+      }),
+  });
+
+  // Independent of statusFilter — the counts describe every status option, including the ones
+  // not currently selected, so selecting a status can't affect its own count.
+  const statusCountsQuery = useQuery({
+    queryKey: ['admin', 'all-venues', 'status-counts', activeQuery, departamentoFilter],
+    queryFn: () =>
+      getVenueStatusCounts({
+        query: activeQuery,
+        departamento: departamentoFilter || undefined,
       }),
   });
 
@@ -163,6 +175,7 @@ export const AllVenuesList = () => {
           {(Object.keys(statusLabels) as Venue['status'][]).map((value) => (
             <option key={value} value={value}>
               {statusLabels[value]}
+              {statusCountsQuery.data ? ` (${statusCountsQuery.data[value]})` : ''}
             </option>
           ))}
         </Select>

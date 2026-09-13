@@ -15,6 +15,7 @@ import { CreateVenueDto } from '../dto/create-venue.dto';
 import { UpdateVenueDto } from '../dto/update-venue.dto';
 import { VenueFilterDto } from '../dto/venue-filter.dto';
 import { AdminVenueQueryDto } from '../dto/admin-venue-query.dto';
+import { AdminVenueStatusCountsQueryDto } from '../dto/admin-venue-status-counts-query.dto';
 import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
@@ -90,6 +91,17 @@ export class VenueService {
       limit,
     });
     return { venues, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  /** Counts per status for the admin listing's status dropdown, respecting the same
+   * query/departamento currently applied (never status itself — that's what's being counted). */
+  async getVenueStatusCounts(
+    filters: AdminVenueStatusCountsQueryDto,
+  ): Promise<Record<VenueStatus, number>> {
+    return this.venueRepository.countByStatus({
+      query: filters.query,
+      departamento: filters.departamento,
+    });
   }
 
   async getVenueBySlug(slug: string): Promise<VenueEntity> {

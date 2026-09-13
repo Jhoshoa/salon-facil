@@ -535,6 +535,46 @@ export class VenueRepository implements IVenueRepository {
     return { venues: venues.map((v) => this.toEntity(v)), total };
   }
 
+  /** Backs the status dropdown counts on the admin "all venues" view. Respects the same
+   * query/departamento the list itself is filtered by — but never `status`, since that's the
+   * breakdown being computed — and the same deletedAt: null every other admin read path uses.
+   * Always returns every status key (zero-filled), even ones with no matching rows, so the
+   * frontend never has to guess whether a missing key means zero or means "not fetched yet". */
+  async countByStatus(filters: {
+    query?: string;
+    departamento?: Departamento;
+  }): Promise<Record<VenueStatus, number>> {
+    const where: Prisma.VenueWhereInput = { deletedAt: null };
+    if (filters.query) {
+      where.OR = [
+        { name: { contains: filters.query, mode: 'insensitive' } },
+        { district: { contains: filters.query, mode: 'insensitive' } },
+        { owner: { fullName: { contains: filters.query, mode: 'insensitive' } } },
+      ];
+    }
+    if (filters.departamento) {
+      where.departamento = filters.departamento;
+    }
+
+    const grouped = await this.prisma.venue.groupBy({
+      by: ['status'],
+      where,
+      _count: { _all: true },
+    });
+
+    const counts: Record<VenueStatus, number> = {
+      [VenueStatus.DRAFT]: 0,
+      [VenueStatus.PENDING]: 0,
+      [VenueStatus.ACTIVE]: 0,
+      [VenueStatus.INACTIVE]: 0,
+      [VenueStatus.REJECTED]: 0,
+    };
+    for (const row of grouped) {
+      counts[row.status as VenueStatus] = row._count._all;
+    }
+    return counts;
+  }
+
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {
     const {
       services: rawServices,

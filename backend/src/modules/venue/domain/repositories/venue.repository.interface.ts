@@ -60,6 +60,10 @@ export interface IVenueRepository {
     page?: number;
     limit?: number;
   }): Promise<{ venues: VenueEntity[]; total: number }>;
+  countByStatus(filters: {
+    query?: string;
+    departamento?: Departamento;
+  }): Promise<Record<VenueStatus, number>>;
   search(filters: VenueFilterDto): Promise<{ venues: VenueEntity[]; total: number }>;
   findSimilar(venue: VenueEntity, limit: number): Promise<VenueEntity[]>;
   findAmenities(includeInactive?: boolean): Promise<AmenityCatalogItem[]>;

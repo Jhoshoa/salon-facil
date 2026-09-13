@@ -24,6 +24,7 @@ import { CreateVenueDto } from '../application/dto/create-venue.dto';
 import { UpdateVenueDto } from '../application/dto/update-venue.dto';
 import { VenueFilterDto } from '../application/dto/venue-filter.dto';
 import { AdminVenueQueryDto } from '../application/dto/admin-venue-query.dto';
+import { AdminVenueStatusCountsQueryDto } from '../application/dto/admin-venue-status-counts-query.dto';
 import {
   CreateAmenityDto,
   CreateCatalogItemDto,
@@ -268,10 +269,7 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Local desactivado (INACTIVE)' })
   @ApiResponse({ status: 400, description: 'El local no esta activo' })
   @ApiResponse({ status: 403, description: 'No es propietario del local' })
-  async deactivate(
-    @Param('id') id: string,
-    @CurrentUser() user: { id: string; role: UserRole },
-  ) {
+  async deactivate(@Param('id') id: string, @CurrentUser() user: { id: string; role: UserRole }) {
     return this.venueService.deactivateVenue(id, user.id, user.role);
   }
 
@@ -282,10 +280,7 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Local reactivado (ACTIVE)' })
   @ApiResponse({ status: 400, description: 'El local no esta desactivado' })
   @ApiResponse({ status: 403, description: 'No es propietario del local' })
-  async reactivate(
-    @Param('id') id: string,
-    @CurrentUser() user: { id: string; role: UserRole },
-  ) {
+  async reactivate(@Param('id') id: string, @CurrentUser() user: { id: string; role: UserRole }) {
     return this.venueService.reactivateVenue(id, user.id, user.role);
   }
 
@@ -382,6 +377,17 @@ export class VenueController {
   }
 
   // --- Catalog management: space types ---
+
+  @Get('admin/status-counts')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cantidad de locales por estado, respetando query/departamento (ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Conteo por cada VenueStatus' })
+  async getStatusCounts(@Query() filters: AdminVenueStatusCountsQueryDto) {
+    return this.venueService.getVenueStatusCounts(filters);
+  }
 
   @Get('admin/catalog/space-types')
   @Roles(UserRole.ADMIN)

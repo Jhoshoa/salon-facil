@@ -168,6 +168,14 @@ export const getAllVenuesAdmin = async (
   return apiRequest<PaginatedResponse<Venue>>(`/venues/admin/all${buildQueryString(params)}`);
 };
 
+export const getVenueStatusCounts = async (
+  params: { query?: string; departamento?: Departamento } = {},
+): Promise<Record<Venue['status'], number>> => {
+  return apiRequest<Record<Venue['status'], number>>(
+    `/venues/admin/status-counts${buildQueryString(params)}`,
+  );
+};
+
 export const getAdminSpaceTypes = async (): Promise<CatalogItem[]> => {
   return apiRequest<CatalogItem[]>('/venues/admin/catalog/space-types');
 };
