@@ -72,6 +72,8 @@ export interface IAuthRepository {
   }): Promise<{ items: UserEntity[]; total: number }>;
   updateStatus(userId: string, status: UserStatus): Promise<UserEntity>;
   updateRole(userId: string, role: UserRole): Promise<UserEntity>;
+  countByRole(filters: { search?: string; status?: UserStatus }): Promise<Record<UserRole, number>>;
+  countByStatus(filters: { search?: string; role?: UserRole }): Promise<Record<UserStatus, number>>;
 
   // --- OAuth identities (Google today, extensible to other providers) ---
   findIdentity(provider: string, providerId: string): Promise<UserIdentityRecord | null>;

@@ -7,6 +7,7 @@ import { AdminUserService } from '../application/services/admin-user.service';
 import { ListUsersDto } from '../application/dto/list-users.dto';
 import { UpdateUserStatusDto } from '../application/dto/update-user-status.dto';
 import { UpdateUserRoleDto } from '../application/dto/update-user-role.dto';
+import { UserCountsQueryDto } from '../application/dto/user-counts-query.dto';
 
 const toAdminUserDto = (user: UserEntity) => ({
   id: user.id,
@@ -34,6 +35,16 @@ export class AdminUserController {
   async list(@Query() dto: ListUsersDto) {
     const result = await this.adminUserService.listUsers(dto);
     return { ...result, data: result.data.map(toAdminUserDto) };
+  }
+
+  @Get('counts')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Cantidad de usuarios por rol y por estado, respetando busqueda y filtros (ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Conteo por UserRole y por UserStatus' })
+  async getCounts(@Query() dto: UserCountsQueryDto) {
+    return this.adminUserService.getUserCounts(dto);
   }
 
   @Put(':userId/status')

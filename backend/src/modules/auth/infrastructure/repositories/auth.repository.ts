@@ -217,6 +217,75 @@ export class AuthRepository implements IAuthRepository {
     return this.toEntity(user);
   }
 
+  /** Backs the role dropdown counts on the admin users view. Respects `search` and `status` —
+   * but never `role` itself, since that's the breakdown being computed. Always returns every
+   * role key (zero-filled), even ones with no matching rows, so the frontend never has to guess
+   * whether a missing key means zero or means "not fetched yet". */
+  async countByRole(filters: { search?: string; status?: UserStatus }): Promise<Record<UserRole, number>> {
+    const where: Prisma.UserWhereInput = {
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.search
+        ? {
+            OR: [
+              { fullName: { contains: filters.search, mode: 'insensitive' } },
+              { email: { contains: filters.search, mode: 'insensitive' } },
+              { phone: { contains: filters.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const grouped = await this.prisma.user.groupBy({
+      by: ['role'],
+      where,
+      _count: { _all: true },
+    });
+
+    const counts: Record<UserRole, number> = {
+      [UserRole.CLIENT]: 0,
+      [UserRole.OWNER]: 0,
+      [UserRole.ADMIN]: 0,
+    };
+    for (const row of grouped) {
+      counts[row.role as UserRole] = row._count._all;
+    }
+    return counts;
+  }
+
+  /** Same idea as countByRole, mirrored for the status dropdown: respects `search` and `role`,
+   * never `status` itself. */
+  async countByStatus(filters: { search?: string; role?: UserRole }): Promise<Record<UserStatus, number>> {
+    const where: Prisma.UserWhereInput = {
+      ...(filters.role ? { role: filters.role } : {}),
+      ...(filters.search
+        ? {
+            OR: [
+              { fullName: { contains: filters.search, mode: 'insensitive' } },
+              { email: { contains: filters.search, mode: 'insensitive' } },
+              { phone: { contains: filters.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const grouped = await this.prisma.user.groupBy({
+      by: ['status'],
+      where,
+      _count: { _all: true },
+    });
+
+    const counts: Record<UserStatus, number> = {
+      [UserStatus.ACTIVE]: 0,
+      [UserStatus.INACTIVE]: 0,
+      [UserStatus.SUSPENDED]: 0,
+      [UserStatus.PENDING_VERIFICATION]: 0,
+    };
+    for (const row of grouped) {
+      counts[row.status as UserStatus] = row._count._all;
+    }
+    return counts;
+  }
+
   async findIdentity(provider: string, providerId: string): Promise<UserIdentityRecord | null> {
     return this.prisma.userIdentity.findUnique({
       where: { provider_providerId: { provider, providerId } },

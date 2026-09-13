@@ -534,6 +534,11 @@ export interface AdminUser {
   lastLoginAt: string | null;
 }
 
+export interface AdminUserCounts {
+  role: Record<AdminUser['role'], number>;
+  status: Record<AdminUser['status'], number>;
+}
+
 export interface AdminAnalyticsDashboard {
   summary: {
     revenueThisMonth: number;

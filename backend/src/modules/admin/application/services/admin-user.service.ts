@@ -3,10 +3,11 @@ import {
   AUTH_REPOSITORY,
   IAuthRepository,
 } from '../../../auth/domain/repositories/auth.repository.interface';
-import { UserEntity } from '../../../auth/domain/entities/user.entity';
+import { UserEntity, UserRole, UserStatus } from '../../../auth/domain/entities/user.entity';
 import { ListUsersDto } from '../dto/list-users.dto';
 import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
 import { UpdateUserRoleDto } from '../dto/update-user-role.dto';
+import { UserCountsQueryDto } from '../dto/user-counts-query.dto';
 
 @Injectable()
 export class AdminUserService {
@@ -69,5 +70,15 @@ export class AdminUserService {
 
     this.logger.log(`Admin ${adminId} set user ${userId} role to ${dto.role}`);
     return this.authRepository.updateRole(userId, dto.role);
+  }
+
+  async getUserCounts(
+    dto: UserCountsQueryDto,
+  ): Promise<{ role: Record<UserRole, number>; status: Record<UserStatus, number> }> {
+    const [role, status] = await Promise.all([
+      this.authRepository.countByRole({ search: dto.search, status: dto.status }),
+      this.authRepository.countByStatus({ search: dto.search, role: dto.role }),
+    ]);
+    return { role, status };
   }
 }
