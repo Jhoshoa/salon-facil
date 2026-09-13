@@ -14,6 +14,7 @@ import { SlugService } from './slug.service';
 import { CreateVenueDto } from '../dto/create-venue.dto';
 import { UpdateVenueDto } from '../dto/update-venue.dto';
 import { VenueFilterDto } from '../dto/venue-filter.dto';
+import { AdminVenueQueryDto } from '../dto/admin-venue-query.dto';
 import { VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
@@ -70,9 +71,23 @@ export class VenueService {
   }
 
   /** Every venue in every status, for the admin management view (distinct from
-   * getVenuesByStatus('PENDING'), which only backs the verification queue). */
-  async getAllVenuesForAdmin(): Promise<VenueEntity[]> {
-    return this.venueRepository.findAllForAdmin();
+   * getVenuesByStatus('PENDING'), which only backs the verification queue). Paginated —
+   * expected to grow into the hundreds, unlike the PENDING queue. */
+  async getAllVenuesForAdmin(filters: AdminVenueQueryDto): Promise<{
+    venues: VenueEntity[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const { venues, total } = await this.venueRepository.findAllForAdmin({
+      query: filters.query,
+      page,
+      limit,
+    });
+    return { venues, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async getVenueBySlug(slug: string): Promise<VenueEntity> {

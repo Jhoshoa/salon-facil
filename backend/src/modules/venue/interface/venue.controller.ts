@@ -23,6 +23,7 @@ import { UserEntity, UserRole } from '../../auth/domain/entities/user.entity';
 import { CreateVenueDto } from '../application/dto/create-venue.dto';
 import { UpdateVenueDto } from '../application/dto/update-venue.dto';
 import { VenueFilterDto } from '../application/dto/venue-filter.dto';
+import { AdminVenueQueryDto } from '../application/dto/admin-venue-query.dto';
 import {
   CreateAmenityDto,
   CreateCatalogItemDto,
@@ -372,10 +373,12 @@ export class VenueController {
   @Get('admin/all')
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Listar todos los locales, cualquier estado (ADMIN)' })
-  @ApiResponse({ status: 200, description: 'Todos los locales no eliminados' })
-  async getAllVenues() {
-    return this.venueService.getAllVenuesForAdmin();
+  @ApiOperation({
+    summary: 'Listar todos los locales, cualquier estado, con busqueda y paginacion (ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Locales no eliminados, paginados' })
+  async getAllVenues(@Query() filters: AdminVenueQueryDto) {
+    return this.venueService.getAllVenuesForAdmin(filters);
   }
 
   // --- Catalog management: space types ---

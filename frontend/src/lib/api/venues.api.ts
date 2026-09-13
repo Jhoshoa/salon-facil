@@ -155,8 +155,10 @@ export const getPendingVenues = async (): Promise<Venue[]> => {
   return apiRequest<Venue[]>('/venues/admin/pending');
 };
 
-export const getAllVenuesAdmin = async (): Promise<Venue[]> => {
-  return apiRequest<Venue[]>('/venues/admin/all');
+export const getAllVenuesAdmin = async (
+  params: { query?: string; page?: number; limit?: number } = {},
+): Promise<PaginatedResponse<Venue>> => {
+  return apiRequest<PaginatedResponse<Venue>>(`/venues/admin/all${buildQueryString(params)}`);
 };
 
 export const getAdminSpaceTypes = async (): Promise<CatalogItem[]> => {

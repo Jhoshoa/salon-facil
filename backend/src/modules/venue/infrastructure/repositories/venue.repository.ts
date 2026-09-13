@@ -492,14 +492,39 @@ export class VenueRepository implements IVenueRepository {
   }
 
   /** Every venue, any status, for the admin "all venues" management view — same include (owner
-   * name/phone) as findByStatus. Excludes soft-deleted venues, same as every other read path. */
-  async findAllForAdmin(): Promise<VenueEntity[]> {
-    const venues = await this.prisma.venue.findMany({
-      where: { deletedAt: null },
-      include: this.venueInclude,
-      orderBy: { createdAt: 'desc' },
-    });
-    return venues.map((v) => this.toEntity(v));
+   * name/phone) as findByStatus. Excludes soft-deleted venues, same as every other read path.
+   * `query` matches venue name, district, or owner name (an admin is just as likely to be
+   * looking for "all of this owner's venues" as for a specific venue by name). */
+  async findAllForAdmin(filters: {
+    query?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ venues: VenueEntity[]; total: number }> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.VenueWhereInput = { deletedAt: null };
+    if (filters.query) {
+      where.OR = [
+        { name: { contains: filters.query, mode: 'insensitive' } },
+        { district: { contains: filters.query, mode: 'insensitive' } },
+        { owner: { fullName: { contains: filters.query, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [venues, total] = await Promise.all([
+      this.prisma.venue.findMany({
+        where,
+        include: this.venueInclude,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.venue.count({ where }),
+    ]);
+
+    return { venues: venues.map((v) => this.toEntity(v)), total };
   }
 
   async create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity> {

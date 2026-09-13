@@ -512,10 +512,22 @@ describe('Venues (e2e)', () => {
       return request(app.getHttpServer()).get(`/api/v1/venues/by-id/${draftVenueId}`).expect(401);
     });
 
-    it('lists every status for ADMIN, including the draft, excluding nothing by status', async () => {
-      const res = await adminAgent.get('/api/v1/venues/admin/all').expect(200);
-      const ids = res.body.map((v: { id: string }) => v.id);
+    it('lists every status for ADMIN via search, excluding nothing by status', async () => {
+      const res = await adminAgent
+        .get(`/api/v1/venues/admin/all?query=${encodeURIComponent(`By-id Draft Test ${uniqueId}`)}`)
+        .expect(200);
+      expect(res.body).toHaveProperty('venues');
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('totalPages');
+      const ids = res.body.venues.map((v: { id: string }) => v.id);
       expect(ids).toContain(draftVenueId);
+    });
+
+    it('paginates the admin listing', async () => {
+      const res = await adminAgent.get('/api/v1/venues/admin/all?page=1&limit=2').expect(200);
+      expect(res.body.venues.length).toBeLessThanOrEqual(2);
+      expect(res.body.page).toBe(1);
+      expect(res.body.limit).toBe(2);
     });
 
     it('returns 403 for OWNER and CLIENT on the admin listing', async () => {

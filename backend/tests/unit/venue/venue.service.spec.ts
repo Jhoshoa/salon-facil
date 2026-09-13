@@ -154,13 +154,29 @@ describe('VenueService', () => {
   });
 
   describe('getAllVenuesForAdmin', () => {
-    it('should return whatever the repository returns, unfiltered by status', async () => {
-      mockRepository.findAllForAdmin.mockResolvedValue([mockVenue]);
+    it('should return paginated results, unfiltered by status', async () => {
+      mockRepository.findAllForAdmin.mockResolvedValue({ venues: [mockVenue], total: 45 });
 
-      const result = await service.getAllVenuesForAdmin();
+      const result = await service.getAllVenuesForAdmin({});
 
-      expect(result).toEqual([mockVenue]);
-      expect(mockRepository.findAllForAdmin).toHaveBeenCalled();
+      expect(result).toEqual({ venues: [mockVenue], total: 45, page: 1, limit: 20, totalPages: 3 });
+      expect(mockRepository.findAllForAdmin).toHaveBeenCalledWith({
+        query: undefined,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('should forward the search query and pagination params', async () => {
+      mockRepository.findAllForAdmin.mockResolvedValue({ venues: [], total: 0 });
+
+      await service.getAllVenuesForAdmin({ query: 'mario', page: 2, limit: 10 });
+
+      expect(mockRepository.findAllForAdmin).toHaveBeenCalledWith({
+        query: 'mario',
+        page: 2,
+        limit: 10,
+      });
     });
   });
 
