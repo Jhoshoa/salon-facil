@@ -1,0 +1,12 @@
+{
+  "name": "salon-facil",
+  "private": true,
+  "description": "Repo raiz -- solo para tooling compartido (husky + lint-staged). El codigo real vive en backend/ y frontend/, cada uno con su propio package.json.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10"
+  }
+}
