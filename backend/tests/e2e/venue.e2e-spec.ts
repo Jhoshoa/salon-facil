@@ -440,9 +440,7 @@ describe('Venues (e2e)', () => {
       expect(res.body.status).toBe('INACTIVE');
 
       // Gone from the public direct-link lookup.
-      await request(app.getHttpServer())
-        .get(`/api/v1/venues/${activeVenueSlug}`)
-        .expect(404);
+      await request(app.getHttpServer()).get(`/api/v1/venues/${activeVenueSlug}`).expect(404);
 
       // Still visible to its owner, still marked INACTIVE (not deleted).
       const myVenues = await ownerAgent.get('/api/v1/venues/my/venues').expect(200);
