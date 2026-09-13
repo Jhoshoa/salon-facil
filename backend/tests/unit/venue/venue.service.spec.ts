@@ -361,6 +361,37 @@ describe('VenueService', () => {
       expect(mockRepository.addMedia).toHaveBeenCalledWith('venue-1', uploads);
     });
 
+    it('should throw BadRequestException when the total would exceed MAX_VENUE_PHOTOS', async () => {
+      mockRepository.findById.mockResolvedValue({
+        ...mockVenue,
+        media: Array.from({ length: 19 }, (_, i) => ({ id: `existing-${i}` })),
+      });
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      const uploads = [
+        { url: 'https://cdn/a.jpg', publicId: 'a' },
+        { url: 'https://cdn/b.jpg', publicId: 'b' },
+      ];
+
+      await expect(
+        service.addVenueMedia('venue-1', 'owner-1', UserRole.OWNER, uploads),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRepository.addMedia).not.toHaveBeenCalled();
+    });
+
+    it('should allow adding photos that land exactly on MAX_VENUE_PHOTOS', async () => {
+      mockRepository.findById.mockResolvedValue({
+        ...mockVenue,
+        media: Array.from({ length: 19 }, (_, i) => ({ id: `existing-${i}` })),
+      });
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      const uploads = [{ url: 'https://cdn/a.jpg', publicId: 'a' }];
+      mockRepository.addMedia.mockResolvedValue(uploads);
+
+      await service.addVenueMedia('venue-1', 'owner-1', UserRole.OWNER, uploads);
+
+      expect(mockRepository.addMedia).toHaveBeenCalledWith('venue-1', uploads);
+    });
+
     it('should throw ForbiddenException when a non-owner adds media', async () => {
       mockRepository.findById.mockResolvedValue(mockVenue);
       mockVenue.canBeEditedBy.mockReturnValue(false);
