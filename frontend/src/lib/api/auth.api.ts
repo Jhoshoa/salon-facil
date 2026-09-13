@@ -25,9 +25,19 @@ export const register = async (payload: RegisterPayload): Promise<PublicAuthResp
 
 // No refreshToken param — the backend reads it from the httpOnly cookie itself. `allDevices`
 // revokes every session for this user instead of just the one in this browser.
+//
+// `auth` defaults to true (unlike login/register/forgot-password above) on purpose: /auth/logout
+// requires a valid access token server-side (it reads the user id off it to revoke the right
+// refresh token), so if the 15-minute access token has already expired by the time someone
+// clicks "Cerrar sesion", this call 401s. With auth:true, apiRequest transparently refreshes
+// and retries once, so the still-valid refresh token cookie is enough to actually clear the
+// session server-side. With auth:false this 401 was silently swallowed by useLogout's
+// onSettled (which always shows "Sesion cerrada" and wipes local state either way) -- the user
+// saw a success toast while the server-side session and cookies were untouched, and stayed
+// logged in until a second attempt happened to run after some other call had refreshed the
+// token in the meantime.
 export const logout = async (allDevices?: boolean): Promise<{ message: string }> => {
   return apiRequest<{ message: string }>('/auth/logout', {
-    auth: false,
     method: 'POST',
     body: JSON.stringify({ allDevices }),
   });
