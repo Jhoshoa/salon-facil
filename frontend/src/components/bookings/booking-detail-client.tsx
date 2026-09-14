@@ -96,9 +96,11 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
   }
 
   const booking = bookingQuery.data;
+  const isFullUpfront = booking.venue?.paymentPolicy === 'FULL_UPFRONT';
   const showPaymentAction = canUploadDeposit(booking.status, booking.depositPaid);
   const showCancelAction = ['PENDING', 'APPROVED'].includes(booking.status);
-  const showReviewAction = booking.status === 'COMPLETED' && !reviewQuery.isLoading && !reviewQuery.data;
+  const showReviewAction =
+    booking.status === 'COMPLETED' && !reviewQuery.isLoading && !reviewQuery.data;
 
   return (
     <div className="space-y-6">
@@ -121,7 +123,7 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             {showPaymentAction ? (
               <Button onClick={() => setPaymentOpen(true)}>
                 <CreditCard className="h-4 w-4" />
-                Pagar anticipo
+                {isFullUpfront ? 'Pagar el total' : 'Pagar anticipo'}
               </Button>
             ) : null}
             {showCancelAction ? (
@@ -144,7 +146,9 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             <p className="font-semibold">{formatCurrency(booking.totalPrice)}</p>
           </div>
           <div className="rounded-md bg-muted p-3">
-            <p className="text-xs text-muted-foreground">Anticipo</p>
+            <p className="text-xs text-muted-foreground">
+              {isFullUpfront ? 'A pagar' : 'Anticipo'}
+            </p>
             <p className="font-semibold">{formatCurrency(booking.depositAmount)}</p>
           </div>
           <div className="rounded-md bg-muted p-3">

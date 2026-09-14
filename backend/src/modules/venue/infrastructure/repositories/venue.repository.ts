@@ -15,6 +15,7 @@ import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dt
 import {
   AmenityCategory,
   Departamento,
+  PaymentPolicy,
   Prisma,
   PriceType,
   PriceUnit,
@@ -612,6 +613,11 @@ export class VenueRepository implements IVenueRepository {
       minimumHours: venueData.minimumHours as number | undefined,
       instantBooking: venueData.instantBooking as boolean | undefined,
       allowsMultipleDays: venueData.allowsMultipleDays as boolean | undefined,
+      paymentPolicy: venueData.paymentPolicy as PaymentPolicy | undefined,
+      depositPercentage:
+        venueData.depositPercentage != null
+          ? new Prisma.Decimal(venueData.depositPercentage as number)
+          : undefined,
       rules: venueData.rules as string | undefined,
       cancellationPolicy: venueData.cancellationPolicy as string | undefined,
       owner: { connect: { id: ownerId } },
@@ -742,6 +748,10 @@ export class VenueRepository implements IVenueRepository {
       updateInput.instantBooking = venueData.instantBooking as boolean;
     if (venueData.allowsMultipleDays != null)
       updateInput.allowsMultipleDays = venueData.allowsMultipleDays as boolean;
+    if (venueData.paymentPolicy != null)
+      updateInput.paymentPolicy = venueData.paymentPolicy as PaymentPolicy;
+    if (venueData.depositPercentage != null)
+      updateInput.depositPercentage = new Prisma.Decimal(venueData.depositPercentage as number);
     if (venueData.rules != null) updateInput.rules = venueData.rules;
     if (venueData.cancellationPolicy != null)
       updateInput.cancellationPolicy = venueData.cancellationPolicy;
@@ -1090,6 +1100,8 @@ export class VenueRepository implements IVenueRepository {
       priceUnit: raw.priceUnit,
       instantBooking: raw.instantBooking,
       allowsMultipleDays: raw.allowsMultipleDays,
+      paymentPolicy: raw.paymentPolicy,
+      depositPercentage: Number(raw.depositPercentage),
       squareMeters: raw.squareMeters,
       photos: Array.isArray(photos)
         ? (photos as string[])

@@ -18,7 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { Departamento, PriceUnit } from '@prisma/client';
+import { Departamento, PaymentPolicy, PriceUnit } from '@prisma/client';
 
 type Constructor<T extends object> = new () => T;
 
@@ -265,6 +265,18 @@ export class CreateVenueDto {
   @Transform(parseBoolean)
   @IsBoolean()
   allowsMultipleDays?: boolean;
+
+  @IsOptional()
+  @IsEnum(PaymentPolicy, { message: 'Politica de pago no valida' })
+  paymentPolicy?: PaymentPolicy;
+
+  // Se ignora cuando paymentPolicy es FULL_UPFRONT, pero igual se valida cuando llega para que
+  // nunca quede un valor sin sentido guardado (ej. si el propietario cambia de politica despues).
+  @IsOptional()
+  @IsNumber()
+  @Min(10, { message: 'El anticipo debe ser al menos 10%' })
+  @Max(90, { message: 'El anticipo no puede superar el 90%' })
+  depositPercentage?: number;
 
   @IsOptional()
   @IsArray()

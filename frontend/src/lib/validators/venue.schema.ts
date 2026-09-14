@@ -67,6 +67,11 @@ export const venueFormSchema = z.object({
   minimumHours: z.coerce.number().min(1).max(24),
   instantBooking: z.boolean(),
   allowsMultipleDays: z.boolean(),
+  paymentPolicy: z.enum(['FULL_UPFRONT', 'DEPOSIT_THEN_REMAINING']),
+  depositPercentage: z.coerce
+    .number()
+    .min(10, 'El anticipo debe ser al menos 10%')
+    .max(90, 'El anticipo no puede superar el 90%'),
   rules: z
     .string()
     .max(5000, 'Las reglas no pueden exceder 5000 caracteres')
@@ -113,6 +118,8 @@ export const venueFormDefaults: VenueFormValues = {
   minimumHours: 4,
   instantBooking: false,
   allowsMultipleDays: false,
+  paymentPolicy: 'DEPOSIT_THEN_REMAINING',
+  depositPercentage: 30,
   rules: '',
   cancellationPolicy: '',
   basePrice: 0,

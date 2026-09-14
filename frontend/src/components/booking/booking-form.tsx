@@ -117,7 +117,9 @@ export const BookingForm = ({
       createBooking(venue.id, values),
     onSuccess: (response) => {
       toast.success('Reserva solicitada', {
-        description: `Anticipo requerido: ${formatCurrency(response.booking.depositAmount)}`,
+        description: `${
+          venue.paymentPolicy === 'FULL_UPFRONT' ? 'Pago completo requerido' : 'Anticipo requerido'
+        }: ${formatCurrency(response.booking.depositAmount)}`,
       });
       form.reset();
       setConfirmOpen(false);
@@ -627,11 +629,19 @@ export const BookingForm = ({
       <ConfirmDialog
         open={confirmOpen}
         title="Confirmar solicitud"
-        description={
+        description={`Solicitaras ${venue.name} ${
           isMultiDay
-            ? `Solicitaras ${venue.name} del ${values.eventDate} al ${values.endDate}. El owner debe aprobar antes del pago del anticipo.`
-            : `Solicitaras ${venue.name} para ${values.eventDate || 'la fecha seleccionada'}. El owner debe aprobar antes del pago del anticipo.`
-        }
+            ? `del ${values.eventDate} al ${values.endDate}`
+            : `para ${values.eventDate || 'la fecha seleccionada'}`
+        }. ${
+          venue.instantBooking
+            ? `Este local confirma al instante, asi que vas a poder pagar ${
+                venue.paymentPolicy === 'FULL_UPFRONT' ? 'el total' : 'el anticipo'
+              } apenas la envies.`
+            : `El propietario debe aprobar tu solicitud antes de que puedas pagar ${
+                venue.paymentPolicy === 'FULL_UPFRONT' ? 'el total' : 'el anticipo'
+              }.`
+        }`}
         confirmLabel="Solicitar"
         isLoading={mutation.isPending}
         onOpenChange={setConfirmOpen}

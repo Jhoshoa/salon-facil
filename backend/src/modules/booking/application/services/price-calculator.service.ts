@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PriceUnit } from '@prisma/client';
+import { PaymentPolicy, PriceUnit } from '@prisma/client';
 import { VenuePriceEntity, PriceType } from '../../../venue/domain/entities/venue-price.entity';
 
 export interface PriceCalculationResult {
@@ -38,7 +38,28 @@ export interface RangeDayInput {
 
 @Injectable()
 export class PriceCalculatorService {
-  calculate(prices: VenuePriceEntity[], eventDate: Date): PriceCalculationResult {
+  /**
+   * Unico lugar que sabe calcular un anticipo: pago completo si la politica del local es
+   * FULL_UPFRONT, o el porcentaje configurado del local (`depositPercentage`) en cualquier otro
+   * caso. Todo el resto del modulo de pagos pasa por aca en vez de hardcodear el 30% de antes.
+   */
+  resolveDeposit(
+    paymentPolicy: PaymentPolicy,
+    depositPercentage: number,
+    totalPrice: number,
+  ): number {
+    if (paymentPolicy === PaymentPolicy.FULL_UPFRONT) {
+      return this.round(totalPrice);
+    }
+    return this.round(totalPrice * (depositPercentage / 100));
+  }
+
+  calculate(
+    prices: VenuePriceEntity[],
+    eventDate: Date,
+    paymentPolicy: PaymentPolicy,
+    depositPercentage: number,
+  ): PriceCalculationResult {
     const basePrice = this.findBasePrice(prices);
     const matched = this.findApplicablePrice(prices, eventDate);
 
@@ -59,7 +80,7 @@ export class PriceCalculatorService {
       }
     }
 
-    const depositAmount = Math.round(appliedPrice * 0.3 * 100) / 100;
+    const depositAmount = this.resolveDeposit(paymentPolicy, depositPercentage, appliedPrice);
 
     return {
       basePrice,
@@ -95,6 +116,8 @@ export class PriceCalculatorService {
     prices: VenuePriceEntity[],
     defaultUnit: PriceUnit,
     days: RangeDayInput[],
+    paymentPolicy: PaymentPolicy,
+    depositPercentage: number,
   ): RangePriceCalculationResult {
     if (days.length === 0) {
       throw new Error('calculateRange requires at least one day');
@@ -104,7 +127,7 @@ export class PriceCalculatorService {
 
     const resultDays: DailyPriceBreakdown[] = days.map((day) => {
       const unit = this.resolveUnitForDate(prices, day.date, defaultUnit);
-      const single = this.calculate(prices, day.date);
+      const single = this.calculate(prices, day.date, paymentPolicy, depositPercentage);
       const multiplier = unit === PriceUnit.HOUR ? this.requireHours(day) : 1;
 
       return {
@@ -116,7 +139,7 @@ export class PriceCalculatorService {
     });
 
     const totalPrice = this.round(resultDays.reduce((sum, day) => sum + day.appliedPrice, 0));
-    const depositAmount = this.round(totalPrice * 0.3);
+    const depositAmount = this.resolveDeposit(paymentPolicy, depositPercentage, totalPrice);
 
     return {
       basePrice,
