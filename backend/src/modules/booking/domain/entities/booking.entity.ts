@@ -1,3 +1,5 @@
+import { PaymentPolicy } from '@prisma/client';
+
 export enum BookingStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
@@ -55,7 +57,14 @@ export class BookingEntity {
   createdAt!: Date;
   updatedAt!: Date;
 
-  venue?: { id: string; name: string; slug: string; photos: string[]; capacityMax: number };
+  venue?: {
+    id: string;
+    name: string;
+    slug: string;
+    photos: string[];
+    capacityMax: number;
+    paymentPolicy: PaymentPolicy;
+  };
   client?: { id: string; fullName: string; email: string; phone: string | null };
   payments?: BookingPayment[];
 

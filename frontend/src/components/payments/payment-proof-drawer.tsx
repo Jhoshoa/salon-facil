@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { createPayment, uploadPaymentProof } from '@/lib/api/payments.api';
 import { validateProofFile } from '@/lib/validators/payment.schema';
-import type { Booking, PaymentMethod } from '@/types/api';
+import type { Booking, PaymentMethod, PaymentType } from '@/types/api';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +13,38 @@ import { Label } from '@/components/ui/label';
 
 interface PaymentProofDrawerProps {
   booking: Booking;
+  /** Decided by the caller from the booking's own state + the venue's payment policy — never a
+   * free choice inside the drawer, so a client can't submit a comprobante under the wrong type
+   * (e.g. a full payment recorded as a DEPOSIT, which used to leave the booking stuck showing
+   * "Anticipo pagado" instead of moving on to FULLY_PAID). */
+  paymentType: PaymentType;
+  amount: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const PaymentProofDrawer = ({ booking, open, onOpenChange }: PaymentProofDrawerProps) => {
+const paymentTypeCopy: Record<PaymentType, { title: string; description: string }> = {
+  DEPOSIT: {
+    title: 'Subir comprobante del anticipo',
+    description: 'El propietario revisara el pago del anticipo.',
+  },
+  FULL: {
+    title: 'Subir comprobante del pago completo',
+    description: 'El propietario revisara tu pago completo.',
+  },
+  REMAINING: {
+    title: 'Subir comprobante del saldo restante',
+    description: 'El propietario revisara el pago del saldo restante.',
+  },
+};
+
+export const PaymentProofDrawer = ({
+  booking,
+  paymentType,
+  amount,
+  open,
+  onOpenChange,
+}: PaymentProofDrawerProps) => {
   const queryClient = useQueryClient();
   const [method, setMethod] = useState<PaymentMethod>('BANK_TRANSFER');
   const [reference, setReference] = useState('');
@@ -33,9 +60,9 @@ export const PaymentProofDrawer = ({ booking, open, onOpenChange }: PaymentProof
       }
 
       const payment = await createPayment(booking.id, {
-        paymentType: 'DEPOSIT',
+        paymentType,
         method,
-        amount: booking.depositAmount,
+        amount,
         transactionReference: reference || undefined,
       });
       return uploadPaymentProof(payment.id, file);
@@ -55,12 +82,14 @@ export const PaymentProofDrawer = ({ booking, open, onOpenChange }: PaymentProof
     setFileError(validateProofFile(selected));
   };
 
+  const copy = paymentTypeCopy[paymentType];
+
   return (
     <AppDrawer
       open={open}
       onOpenChange={onOpenChange}
-      title="Subir comprobante"
-      description="El owner revisara el pago del anticipo."
+      title={copy.title}
+      description={copy.description}
     >
       <div className="space-y-4">
         <div className="space-y-2">

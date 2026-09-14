@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { PaymentPolicy } from '@prisma/client';
 import { BookingService } from '../../../src/modules/booking/application/services/booking.service';
 import { PriceCalculatorService } from '../../../src/modules/booking/application/services/price-calculator.service';
 import { AvailabilityService } from '../../../src/modules/booking/application/services/availability.service';
@@ -95,6 +96,7 @@ describe('BookingService', () => {
     calculate: jest.Mock;
     calculateRange: jest.Mock;
     resolveUnitForDate: jest.Mock;
+    resolveDeposit: jest.Mock;
   };
   let mockAvailabilityService: {
     checkAvailability: jest.Mock;
@@ -157,6 +159,9 @@ describe('BookingService', () => {
       // No per-rule unit overrides in these fixtures — mirrors production's fallback to the
       // venue's own priceUnit when no matching VenuePrice declares a unit of its own.
       resolveUnitForDate: jest.fn((_prices, _date, defaultUnit) => defaultUnit),
+      // applySelectedExtras() always calls this for the final depositAmount -- default mirrors
+      // the fixtures above (30% of the 5000 total used everywhere the extras total is 0).
+      resolveDeposit: jest.fn().mockReturnValue(1500),
     };
 
     mockAvailabilityService = {
@@ -317,6 +322,118 @@ describe('BookingService', () => {
 
       await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
         ConflictException,
+      );
+    });
+  });
+
+  describe('requestBooking — instant booking (Venue.instantBooking)', () => {
+    const bookingDto = {
+      eventType: 'Boda',
+      eventDate: '2026-09-15',
+      startTime: '14:00',
+      endTime: '22:00',
+      guestCount: 100,
+    };
+
+    it('creates the booking already APPROVED when the venue has instant booking on', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: true }));
+      mockBookingRepository.create.mockResolvedValue(
+        makeBooking({ status: BookingStatus.APPROVED }),
+      );
+
+      await service.requestBooking('venue-1', 'client-1', bookingDto);
+
+      const createCallArg = mockBookingRepository.create.mock.calls[0][0];
+      expect(createCallArg.status).toBe(BookingStatus.APPROVED);
+    });
+
+    it('still creates the booking as PENDING when instant booking is off (the default)', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: false }));
+      mockBookingRepository.create.mockResolvedValue(makeBooking());
+
+      await service.requestBooking('venue-1', 'client-1', bookingDto);
+
+      const createCallArg = mockBookingRepository.create.mock.calls[0][0];
+      expect(createCallArg.status).toBe(BookingStatus.PENDING);
+    });
+
+    it('does not skip availability validation just because instant booking is on', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: true }));
+      mockBookingRepository.findBookedDatesInRange.mockResolvedValue(['2026-09-15']);
+
+      await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockBookingRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('notifies the owner that the booking auto-confirmed, and notifies the client it can pay already', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: true }));
+      mockVenueService.getOwnerContact.mockResolvedValue({
+        id: 'owner-1',
+        email: 'owner@test.com',
+      });
+      mockBookingRepository.create.mockResolvedValue(
+        makeBooking({
+          status: BookingStatus.APPROVED,
+          client: {
+            id: 'client-1',
+            fullName: 'Cliente Test',
+            email: 'client@test.com',
+            phone: null,
+          },
+        }),
+      );
+
+      await service.requestBooking('venue-1', 'client-1', bookingDto);
+
+      const notifications = mockNotificationService.enqueue.mock.calls.map((call) => call[0]);
+      expect(notifications).toContainEqual(
+        expect.objectContaining({ userId: 'owner-1', type: 'BOOKING_REQUEST' }),
+      );
+      expect(notifications).toContainEqual(
+        expect.objectContaining({ userId: 'client-1', type: 'BOOKING_CONFIRMED' }),
+      );
+    });
+
+    it('does not notify the client when the booking is still PENDING (normal flow)', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: false }));
+      mockBookingRepository.create.mockResolvedValue(
+        makeBooking({
+          client: { id: 'client-1', fullName: 'Cliente Test', email: 'c@test.com', phone: null },
+        }),
+      );
+
+      await service.requestBooking('venue-1', 'client-1', bookingDto);
+
+      const notifications = mockNotificationService.enqueue.mock.calls.map((call) => call[0]);
+      expect(notifications.some((n) => n.type === 'BOOKING_CONFIRMED')).toBe(false);
+    });
+  });
+
+  describe('requestBooking — deposit follows the venue payment policy', () => {
+    const bookingDto = {
+      eventType: 'Boda',
+      eventDate: '2026-09-15',
+      startTime: '14:00',
+      endTime: '22:00',
+      guestCount: 100,
+    };
+
+    it('resolves the deposit through PriceCalculatorService using the venue policy and percentage', async () => {
+      const venue = makeVenue({
+        paymentPolicy: PaymentPolicy.FULL_UPFRONT,
+        depositPercentage: 30,
+      });
+      mockVenueService.getVenueById.mockResolvedValue(venue);
+      mockBookingRepository.create.mockResolvedValue(makeBooking());
+
+      await service.requestBooking('venue-1', 'client-1', bookingDto);
+
+      expect(mockPriceCalculator.resolveDeposit).toHaveBeenCalledWith(
+        venue.paymentPolicy,
+        venue.depositPercentage,
+        expect.any(Number),
       );
     });
   });
@@ -784,6 +901,7 @@ describe('BookingService', () => {
           slug: 'salon-test',
           photos: [],
           capacityMax: 200,
+          paymentPolicy: PaymentPolicy.DEPOSIT_THEN_REMAINING,
         },
         ...overrides,
       });

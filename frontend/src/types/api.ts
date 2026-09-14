@@ -123,6 +123,7 @@ export type AmenityCategory =
 
 export type VenueMediaType = 'IMAGE' | 'VIDEO' | 'VIRTUAL_TOUR';
 export type PriceUnit = 'HOUR' | 'DAY';
+export type PaymentPolicy = 'FULL_UPFRONT' | 'DEPOSIT_THEN_REMAINING';
 
 export interface Amenity {
   id: string;
@@ -212,6 +213,9 @@ export interface Venue {
   priceUnit: PriceUnit;
   instantBooking: boolean;
   allowsMultipleDays: boolean;
+  paymentPolicy: PaymentPolicy;
+  /** Ignorado cuando paymentPolicy es FULL_UPFRONT. */
+  depositPercentage: number;
   photos: string[];
   media?: VenueMedia[];
   rules: string | null;
@@ -309,6 +313,8 @@ export interface VenueFormPayload {
   minimumHours?: number;
   instantBooking?: boolean;
   allowsMultipleDays?: boolean;
+  paymentPolicy?: PaymentPolicy;
+  depositPercentage?: number;
   rules?: string;
   cancellationPolicy?: string;
   prices?: VenuePriceInput[];

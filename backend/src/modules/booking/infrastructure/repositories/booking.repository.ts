@@ -28,7 +28,14 @@ const CONFIRMED_BOOKING_STATUSES: BookingStatus[] = [
 
 const BOOKING_INCLUDE = {
   venue: {
-    select: { id: true, name: true, slug: true, photos: true, capacityMax: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      photos: true,
+      capacityMax: true,
+      paymentPolicy: true,
+    },
   },
   client: {
     select: { id: true, fullName: true, email: true, phone: true },
@@ -159,6 +166,7 @@ export class BookingRepository implements IBookingRepository {
           appliedPrice: new Prisma.Decimal(data.appliedPrice),
           totalPrice: new Prisma.Decimal(data.totalPrice),
           depositAmount: new Prisma.Decimal(data.depositAmount),
+          status: data.status,
           specialRequests: data.specialRequests,
           selectedExtras: data.selectedExtras as unknown as Prisma.InputJsonValue | undefined,
         },
