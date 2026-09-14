@@ -1,10 +1,11 @@
 # Precios y pagos: rediseno
 
 Plan de arquitectura para simplificar como se cobra un local, dejar que cada propietario
-configure su propia politica de pago (pago completo vs. anticipo + saldo), y abstraer la
-pasarela de pago para poder integrar Libelula primero y cambiarla despues sin reescribir el
-sistema. Este documento es la referencia base antes de tocar codigo -- se ejecuta en fases
-(ver "Plan de ejecucion" al final), cada una su propio PR siguiendo
+configure su propia politica de pago (pago completo vs. anticipo + saldo) y como se confirman
+sus reservas (aprobacion manual vs. reserva inmediata), soportar locales sin precio fijo
+("Cotizar"), y abstraer la pasarela de pago para poder integrar Libelula primero y cambiarla
+despues sin reescribir el sistema. Este documento es la referencia base antes de tocar codigo --
+se ejecuta en fases (ver "Plan de ejecucion" al final), cada una su propio PR siguiendo
 [docs/git-workflow/branching-strategy.md](../git-workflow/branching-strategy.md).
 
 ## 1. Por que este documento
@@ -57,7 +58,17 @@ ningun campo `depositPercentage` ni `paymentPolicy` en `Venue` -- confirmado por
 todo el repo, cero resultados. Todo local de la plataforma usa exactamente la misma politica
 hoy: 30% de anticipo obligatorio, sin excepcion.
 
-### 2.3 Pago
+### 2.3 Reserva inmediata (`instantBooking`)
+
+`Venue.instantBooking: boolean` (default `false`) ya existe hoy en el modelo, en el DTO de
+creacion/edicion, como filtro de busqueda (`venue-filter.dto.ts`), como badge "Reserva
+inmediata" en las tarjetas de resultado, y como checkbox real en el formulario del propietario
+(`venue-form.tsx:1011`, pestana "Precios y capacidad", sin explicacion de que hace). Pero es
+**puramente decorativo**: `booking.service.ts` (`requestBooking()`) nunca lo lee -- toda reserva
+nace en `PENDING` sin importar este campo, asi que hoy un propietario puede marcar la casilla y
+no cambia nada en el flujo real.
+
+### 2.4 Pago
 
 `Payment` (`backend/prisma/schema.prisma:543-568`): `amount`, `paymentType`
 (`DEPOSIT | FULL | REMAINING`), `method` (`QR_BANK | BANK_TRANSFER | TIGO_MONEY | CARD | CASH`),
@@ -75,7 +86,7 @@ esperado segun el tipo).
 confirmado (`payment.repository.ts:141`): `DEPOSIT` completado -> `DEPOSIT_PAID`;
 `FULL`/`REMAINING` completado -> `FULLY_PAID`.
 
-### 2.4 Diagrama del flujo actual
+### 2.5 Diagrama del flujo actual
 
 ```mermaid
 sequenceDiagram
@@ -103,6 +114,8 @@ sequenceDiagram
 | 3 | Sin pantalla para pagar el saldo restante | Reservas quedan pagadas a medias sin salida |
 | 4 | Sin pasarela real, todo manual | Mas pasos, mas espera, mas trabajo de verificacion para el propietario |
 | 5 | Sin abstraccion de pasarela | Integrar Libelula ahora atascaria el codigo a un solo proveedor |
+| 6 | `instantBooking` esta en el formulario del propietario pero no hace nada | El propietario cree que ya activo reservas directas y sigue teniendo que aprobar cada una a mano |
+| 7 | Un local sin precio fijo no tiene forma de publicarse | Locales que cobran "segun el evento" (catering, decoracion a medida) no pueden usar la plataforma sin inventar un precio que no es real |
 
 ## 4. Diseno propuesto
 
@@ -157,13 +170,46 @@ model Venue {
   estado de la reserva y la politica del local**, no de una eleccion libre --
   ver 4.3.
 
+### 4.2.1 Reserva inmediata: saltar la aprobacion manual (opcional por local)
+
+Idea del propietario: algunos manejan su calendario 100% desde la app y no quieren el paso
+manual de aprobar/rechazar cada solicitud -- quieren que, si las fechas estan libres, la reserva
+quede lista al toque y el cliente pase directo a pagar. Otros prefieren revisar cada solicitud
+antes de comprometerse (evento raro, cliente nuevo, quieren llamar primero). Como vimos en 2.3,
+la base para esto **ya existe** (`Venue.instantBooking`, incluida la casilla en el formulario del
+propietario) -- lo que falta es conectarla:
+
+- `BookingService.requestBooking()` lee `venue.instantBooking`. Si es `true` y no hubo conflicto
+  de fechas (la validacion de disponibilidad ya corre igual, nada de eso cambia), la reserva se
+  crea directo en `APPROVED` en vez de `PENDING` -- salta el paso de aprobar/rechazar, no salta
+  la validacion de disponibilidad ni el calculo de precio.
+- El cliente ve el mismo siguiente paso que hoy ve despues de que el propietario aprueba: subir
+  el comprobante segun la politica de pago del local (4.2) -- **no cambia nada del lado del
+  pago**, solo se salta la espera de que un humano apruebe.
+- El propietario igual recibe la notificacion de la reserva nueva (mismo `BOOKING_REQUEST`),
+  solo que ahora es informativa ("ya se confirmo") en vez de accionable ("aproba o rechaza").
+- **UI**: en vez de dejar la casilla suelta y sin explicacion como esta hoy, se mueve junto a la
+  seccion "Politica de pago" del formulario (4.2) bajo un titulo comun tipo "Como se confirman
+  tus reservas", con una sola linea de ayuda: *"Si esta activado, la reserva se confirma
+  automaticamente en cuanto el cliente reserva la fecha, sin que tengas que aprobarla vos."* Es
+  la pieza que hace esta seccion "mas amigable para el propietario" (el pedido original del
+  usuario para el dashboard de politica de pago) -- dos decisiones relacionadas (como se
+  confirma, como se cobra) en un solo lugar en vez de dos casillas sueltas en pestañas distintas.
+- **Fuera de alcance de esta fase**: hoy un propietario no tiene forma de cancelar una reserva ya
+  `APPROVED` (`VenueEntity.canBeCancelledByOwner()` existe en el dominio pero no tiene ningun
+  endpoint que lo use -- codigo muerto, confirmado por busqueda en el repo). Con reserva
+  inmediata activada esto se nota mas (nunca hay un paso de "rechazar" antes de comprometerse), 
+  pero conectar esa cancelacion es un problema aparte, no exclusivo de `instantBooking` -- se
+  deja anotado para un futuro documento, no se resuelve aca.
+
 ### 4.3 Completar el flujo de pago (antes de tocar la pasarela)
 
 Con la politica configurable, el flujo de pago que le corresponde a cada reserva queda asi:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING
+    [*] --> PENDING: local pide aprobacion manual
+    [*] --> APPROVED: local con reserva inmediata (instantBooking)
     PENDING --> APPROVED: propietario aprueba
     PENDING --> CANCELLED_BY_OWNER: propietario rechaza
     PENDING --> CANCELLED_BY_CLIENT: cliente cancela
@@ -272,6 +318,62 @@ documentacion real de la API de Libelula, que todavia no se reviso). A alto nive
 - El comprobante manual sigue disponible como respaldo -- no todos los propietarios ni clientes
   van a preferir la pasarela de entrada, sobre todo al principio.
 
+### 4.6 Modo "Cotizar" (locales sin precio fijo)
+
+Idea del propietario: no todos los locales tienen un precio fijo publicable -- algunos cobran
+"segun el evento" (numero de invitados, servicios adicionales, temporada) y hoy no pueden
+publicarse sin inventar un precio base que no es real (confirmado en 2.1: `basePrice` es
+obligatorio, sin excepcion, en todo el formulario y validacion actual). Para estos, el pedido es
+un boton "Cotizar" que abra el contacto con el propietario en vez del flujo de reserva con
+precio.
+
+Esto es un **modo distinto de publicar el local**, no una opcion mas de la politica de pago
+(4.2) -- resuelve "¿cuanto cuesta?" en vez de "¿como se cobra?", y son preguntas independientes:
+un local puede pedir cotizacion y, una vez que el propietario le pone un precio a esa
+cotizacion puntual, igual aplica su politica de anticipo/pago completo de siempre. Por eso se
+documenta a alto nivel aca -- igual que 4.5 con Libelula -- y se detalla en su propio momento en
+vez de sobre-disenarlo ahora:
+
+```prisma
+enum PricingMode {
+  FIXED_PRICE  // el actual: precio base obligatorio, reserva con precio calculado
+  QUOTE_ONLY   // sin precio publicado, el cliente pide cotizacion
+}
+
+model Venue {
+  // ...
+  pricingMode PricingMode @default(FIXED_PRICE) @map("pricing_mode")
+  // con QUOTE_ONLY, basePrice deja de ser obligatorio en el formulario y en la validacion
+}
+```
+
+A alto nivel, lo que cambia por capa:
+
+- **Formulario del propietario**: con `pricingMode: QUOTE_ONLY`, se oculta la seccion de precio
+  base/reglas (4.2 no aplica hasta que el local tenga un precio real que cobrar) y la seccion
+  "Politica de pago" queda deshabilitada con una nota -- no hay nada que cobrar todavia.
+- **Detalle del local (cliente)**: donde hoy esta el precio y el boton "Solicitar reserva", con
+  `QUOTE_ONLY` aparece "Consultar precio" y un boton "Cotizar" en su lugar.
+- **La solicitud de cotizacion no es una reserva con precio** -- es una nueva entidad liviana
+  (ej. `QuoteRequest`: fechas tentativas, cantidad de invitados, mensaje del cliente, datos de
+  contacto) que aparece en el dashboard del propietario junto a sus solicitudes de reserva, pero
+  claramente marcada como "cotizacion pendiente", no como una reserva. El punto de entrada
+  natural es el mismo canal de contacto que ya existe hoy (el link de WhatsApp del local, ya
+  usado en el modal de detalle de reserva del propietario) para no duplicar un sistema de
+  mensajeria propio.
+- **De cotizacion a reserva real**: cuando el propietario y el cliente acuerdan un precio (fuera
+  o dentro del sistema, a definir), el propietario le pone un precio a esa solicitud puntual --
+  recien ahi se convierte en una reserva de verdad y entra al mismo flujo de siempre (aprobacion
+  si aplica, politica de pago del local si ya la tiene configurada, o una politica puntual para
+  ese evento). El diseno exacto de ese "convertir cotizacion en reserva" (¿un campo de precio
+  editable en el detalle de la solicitud? ¿arranca siempre en `PENDING` sin importar
+  `instantBooking`, porque recien se definio el precio?) se resuelve cuando se llegue a esta
+  fase, no ahora.
+
+Fuera de alcance de este documento por ahora: cotizacion parcial de items (ej. cotizar solo el
+salon vs. salon+catering por separado) -- se arranca con una cotizacion, un local, un precio
+final.
+
 ## 5. Plan de ejecucion
 
 Cada fase es su propio PR contra `develop`, en este orden (cada una depende de que la anterior
@@ -280,10 +382,11 @@ ya este mergeada):
 | Fase | Que incluye | Tamano | Por que en este orden |
 |---|---|---|---|
 | **0** | Sacar `EVENT`: migracion de datos, borrar rama muerta del calculo, actualizar UI y tests | Chico | Corrige lo que ya esta confundiendo a un cliente hoy; no depende de nada mas |
-| **1** | `paymentPolicy` + `depositPercentage` en `Venue`, centralizar el calculo del deposito, UI del propietario | Mediano | La pasarela (fase 3) necesita saber si el local pide anticipo o pago completo -- se define antes |
+| **1** | `paymentPolicy` + `depositPercentage` en `Venue`, centralizar el calculo del deposito, conectar `instantBooking` en `requestBooking()` (4.2.1), UI unificada "Como se confirman tus reservas / Como se cobran" en el dashboard | Mediano | La pasarela (fase 3) necesita saber si el local pide anticipo o pago completo -- se define antes. `instantBooking` entra en la misma fase porque comparte pantalla y es chico (una condicion, sin modelo nuevo) |
 | **2** | Pantalla de saldo restante, `paymentType` derivado (no hardcodeado), seccion "Estado de pago" en el modal de reserva | Mediano | Completa el flujo manual antes de abstraerlo -- la fase 3 envuelve algo terminado, no a medias |
 | **3** | `IPaymentGateway` + `ManualProofGateway` (mismo comportamiento de hoy, solo reorganizado detras del puerto) | Chico-mediano | Refactor puro, sin cambio de comportamiento -- valida que el diseno del puerto sirve antes de sumar un proveedor real |
 | **4** | `LibelulaGateway` + webhook + rollout | Grande, proyecto aparte | Necesita su propia investigacion de la API de Libelula antes de estimarse en detalle |
+| **5** | Modo "Cotizar" (`pricingMode`, `QuoteRequest`, boton "Cotizar" en el detalle del local, bandeja de cotizaciones en el dashboard) -- ver 4.6 | Mediano-grande, requiere su propio diseno de detalle | Independiente del resto (resuelve "cuanto cuesta", no "como se cobra") -- solo depende de la Fase 0 por compartir el modelo de precio. Puede ejecutarse en paralelo a las fases 2-4 |
 
 ## 6. Fuera de alcance (por ahora)
 
@@ -295,3 +398,8 @@ ya este mergeada):
   logica de cuando reembolsar (cancelaciones, disputas) es una decision de producto aparte.
   Se abre despues, cuando la Fase 4 este en marcha.
 - Pagos parciales fuera de deposito/saldo (ej. planes de cuotas) -- no pedido, no se diseña.
+- Cancelacion por parte del propietario de una reserva ya `APPROVED`/`DEPOSIT_PAID` (conectar
+  `VenueEntity.canBeCancelledByOwner()`, hoy codigo muerto) -- se nota mas con reserva inmediata
+  (4.2.1) porque ahi nunca hubo un paso de "rechazar" antes de comprometerse, pero es un problema
+  del flujo de cancelacion en general, no exclusivo de esta fase. Documento aparte cuando se
+  priorice.
