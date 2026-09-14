@@ -116,7 +116,7 @@ export const VenueFilterSidebar = ({
           <div className="sf-filter-section">
             <p className="sf-filter-title">Presupuesto</p>
             <div className="flex flex-wrap gap-2">
-              {(['EVENT', 'HOUR', 'DAY'] as PriceUnit[]).map((unit) => (
+              {(['HOUR', 'DAY'] as PriceUnit[]).map((unit) => (
                 <button
                   key={unit}
                   type="button"
