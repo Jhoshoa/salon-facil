@@ -97,6 +97,10 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
 
   const booking = bookingQuery.data;
   const isFullUpfront = booking.venue?.paymentPolicy === 'FULL_UPFRONT';
+  // El primer pago de una reserva es DEPOSIT o FULL segun la politica del local -- nunca una
+  // eleccion libre del cliente. (El pago del saldo restante, tras un anticipo, todavia no tiene
+  // pantalla propia -- REMAINING queda para cuando se construya esa fase.)
+  const initialPaymentType: 'DEPOSIT' | 'FULL' = isFullUpfront ? 'FULL' : 'DEPOSIT';
   const showPaymentAction = canUploadDeposit(booking.status, booking.depositPaid);
   const showCancelAction = ['PENDING', 'APPROVED'].includes(booking.status);
   const showReviewAction =
@@ -239,7 +243,13 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
         </section>
       ) : null}
 
-      <PaymentProofDrawer booking={booking} open={paymentOpen} onOpenChange={setPaymentOpen} />
+      <PaymentProofDrawer
+        booking={booking}
+        paymentType={initialPaymentType}
+        amount={booking.depositAmount}
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
+      />
       <ReviewFormDialog
         bookingId={bookingId}
         venueName={booking.venue?.name}

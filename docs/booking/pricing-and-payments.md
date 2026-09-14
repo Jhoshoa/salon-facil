@@ -237,6 +237,9 @@ abstraccion del paso 4.4 envuelve un flujo completo, no uno a medias:
   correcto como prop segun de donde se lo invoco (aprobada+sin pagos -> `DEPOSIT` o `FULL` segun
   la politica del local; con anticipo ya pagado -> `REMAINING`), en vez de tenerlo hardcodeado.
   Esto tambien cierra la puerta a que un cliente suba un comprobante del tipo equivocado.
+  **La mitad `DEPOSIT`/`FULL` ya esta hecha** (adelantada a la Fase 1, ver la tabla de abajo) --
+  falta la mitad `REMAINING`, que depende de construir primero el punto de entrada de arriba
+  (todavia no existe ningun boton que dispare el drawer para pagar el saldo).
 - **Reducir el ida-y-vuelta percibido**: el modal de detalle de reserva del propietario (ya
   construido, `frontend/src/components/dashboard/owner-booking-management.tsx`) suma una
   seccion "Estado de pago" con una linea de tiempo simple (Anticipo: pagado/pendiente · Saldo:
@@ -379,14 +382,16 @@ final.
 Cada fase es su propio PR contra `develop`, en este orden (cada una depende de que la anterior
 ya este mergeada):
 
-| Fase | Que incluye | Tamano | Por que en este orden |
-|---|---|---|---|
-| **0** | Sacar `EVENT`: migracion de datos, borrar rama muerta del calculo, actualizar UI y tests | Chico | Corrige lo que ya esta confundiendo a un cliente hoy; no depende de nada mas |
-| **1** | `paymentPolicy` + `depositPercentage` en `Venue`, centralizar el calculo del deposito, conectar `instantBooking` en `requestBooking()` (4.2.1), UI unificada "Como se confirman tus reservas / Como se cobran" en el dashboard | Mediano | La pasarela (fase 3) necesita saber si el local pide anticipo o pago completo -- se define antes. `instantBooking` entra en la misma fase porque comparte pantalla y es chico (una condicion, sin modelo nuevo) |
-| **2** | Pantalla de saldo restante, `paymentType` derivado (no hardcodeado), seccion "Estado de pago" en el modal de reserva | Mediano | Completa el flujo manual antes de abstraerlo -- la fase 3 envuelve algo terminado, no a medias |
-| **3** | `IPaymentGateway` + `ManualProofGateway` (mismo comportamiento de hoy, solo reorganizado detras del puerto) | Chico-mediano | Refactor puro, sin cambio de comportamiento -- valida que el diseno del puerto sirve antes de sumar un proveedor real |
-| **4** | `LibelulaGateway` + webhook + rollout | Grande, proyecto aparte | Necesita su propia investigacion de la API de Libelula antes de estimarse en detalle |
-| **5** | Modo "Cotizar" (`pricingMode`, `QuoteRequest`, boton "Cotizar" en el detalle del local, bandeja de cotizaciones en el dashboard) -- ver 4.6 | Mediano-grande, requiere su propio diseno de detalle | Independiente del resto (resuelve "cuanto cuesta", no "como se cobra") -- solo depende de la Fase 0 por compartir el modelo de precio. Puede ejecutarse en paralelo a las fases 2-4 |
+| Estado | Fase | Que incluye | Tamano | Por que en este orden |
+|---|---|---|---|---|
+| Hecho | **0** | Sacar `EVENT`: migracion de datos, borrar rama muerta del calculo, actualizar UI y tests | Chico | Corrige lo que ya esta confundiendo a un cliente hoy; no depende de nada mas |
+| Hecho | **1** | `paymentPolicy` + `depositPercentage` en `Venue`, centralizar el calculo del deposito, conectar `instantBooking` en `requestBooking()` (4.2.1), UI unificada "Como se confirman tus reservas / Como se cobran" en el dashboard. Suma tambien el `paymentType` derivado (`DEPOSIT`/`FULL`) del primer pago -- se adelanto de la Fase 2 porque, sin esto, una reserva con `FULL_UPFRONT` quedaba mal marcada `DEPOSIT_PAID` en vez de `FULLY_PAID` (bug real encontrado probando la fase, no solo teorico) | Mediano | La pasarela (fase 3) necesita saber si el local pide anticipo o pago completo -- se define antes. `instantBooking` entra en la misma fase porque comparte pantalla y es chico (una condicion, sin modelo nuevo) |
+| Pendiente | **2** | Pantalla de saldo restante (`paymentType: REMAINING`, todavia sin punto de entrada en la UI), seccion "Estado de pago" en el modal de reserva | Mediano | Completa el flujo manual antes de abstraerlo -- la fase 3 envuelve algo terminado, no a medias |
+| Pendiente | **3** | `IPaymentGateway` + `ManualProofGateway` (mismo comportamiento de hoy, solo reorganizado detras del puerto) | Chico-mediano | Refactor puro, sin cambio de comportamiento -- valida que el diseno del puerto sirve antes de sumar un proveedor real |
+| Pendiente | **4** | `LibelulaGateway` + webhook + rollout | Grande, proyecto aparte | Necesita su propia investigacion de la API de Libelula antes de estimarse en detalle |
+| Pendiente | **5** | Modo "Cotizar" (`pricingMode`, `QuoteRequest`, boton "Cotizar" en el detalle del local, bandeja de cotizaciones en el dashboard) -- ver 4.6 | Mediano-grande, requiere su propio diseno de detalle | Independiente del resto (resuelve "cuanto cuesta", no "como se cobra") -- solo depende de la Fase 0 por compartir el modelo de precio. Puede ejecutarse en paralelo a las fases 2-4 |
+
+Diagramas actualizados con el estado real de cada flujo: [payment-flows.html](payment-flows.html).
 
 ## 6. Fuera de alcance (por ahora)
 

@@ -12,6 +12,7 @@
     --navy-soft: rgba(30, 58, 95, 0.08);
     --gold: #c9a227;
     --gold-deep: #a9861d;
+    --gold-bg: rgba(201, 162, 39, 0.14);
     --line: rgba(16, 32, 47, 0.14);
     --ok: #2f7d4f;
     --ok-bg: #e7f3ec;
@@ -32,6 +33,7 @@
       --navy-soft: rgba(143, 180, 224, 0.12);
       --gold: #e0bf60;
       --gold-deep: #f0d488;
+      --gold-bg: rgba(224, 191, 96, 0.14);
       --line: rgba(234, 230, 218, 0.16);
       --ok: #6fcf9a;
       --ok-bg: rgba(111, 207, 154, 0.12);
@@ -52,6 +54,7 @@
     --navy-soft: rgba(143, 180, 224, 0.12);
     --gold: #e0bf60;
     --gold-deep: #f0d488;
+    --gold-bg: rgba(224, 191, 96, 0.14);
     --line: rgba(234, 230, 218, 0.16);
     --ok: #6fcf9a;
     --ok-bg: rgba(111, 207, 154, 0.12);
@@ -129,8 +132,10 @@
     padding: 5px 12px;
     border-radius: 999px;
     border: 1px solid var(--line);
+    white-space: nowrap;
   }
   .pill.live { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); background: var(--ok-bg); }
+  .pill.partial { color: var(--gold-deep); border-color: color-mix(in srgb, var(--gold-deep) 40%, var(--line)); background: var(--gold-bg); }
   .pill.planned { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); background: var(--warn-bg); }
 
   section.flow {
@@ -142,11 +147,13 @@
 
   .flow-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 14px;
     flex-wrap: wrap;
     margin-bottom: 6px;
   }
+
+  .flow-head .pill { font-size: 0.68rem; padding: 3px 10px; }
 
   .flow-num {
     font-family: "Fraunces", Georgia, serif;
@@ -206,6 +213,12 @@
   }
   .note strong { color: var(--warn); }
 
+  .note.fixed {
+    border-left-color: var(--ok);
+    background: var(--ok-bg);
+  }
+  .note.fixed strong { color: var(--ok); }
+
   footer {
     margin-top: 64px;
     padding-top: 24px;
@@ -225,32 +238,36 @@
 <div class="kicker">Mi Evento &middot; referencia interna</div>
 <h1>Como fluye el pago de una reserva</h1>
 <p class="lede">
-  Todo pago pasa por el mismo esqueleto — <strong>el cliente solicita, el propietario aprueba,
-  el cliente paga, el propietario confirma</strong> — pero tres cosas cambian segun la
-  <strong>configuracion de cada local</strong>: si hace falta que el propietario apruebe cada
-  solicitud a mano, cuantos pagos hacen falta y de que tamano, y si el local tiene un precio
-  publicado o pide cotizacion. Hoy nada de esto es configurable: todo local pide aprobacion
-  manual, pide el mismo 30% de anticipo fijo, y necesita un precio publicado. Los diagramas 2 a 5
-  muestran las opciones que se estan planificando para que cada propietario elija las suyas.
+  Todo pago pasa por el mismo esqueleto — <strong>el cliente solicita, el propietario aprueba (o
+  no, si activo reserva inmediata), el cliente paga, el propietario confirma</strong> — pero cada
+  local elige su propia configuracion: si hace falta aprobar cada solicitud a mano, cuanto
+  anticipo pide (o si pide el pago completo de una), y si tiene un precio publicado. La
+  <strong>Fase 1</strong> del plan ya esta en produccion — politica de pago, porcentaje de
+  anticipo y reserva inmediata son reales, no solo diseño — y de paso corregimos un bug real que
+  encontramos probando: un pago completo quedaba mal etiquetado como &ldquo;anticipo&rdquo; y
+  nunca llegaba a <code>FULLY_PAID</code>. Lo que todavia falta es la pantalla para pagar el
+  saldo restante (diagrama 1) y el modo &ldquo;Cotizar&rdquo; sin precio fijo (diagrama 4).
 </p>
 
 <div class="status-row">
-  <span class="pill live">&#9679; Vigente hoy en produccion</span>
-  <span class="pill planned">&#9679; Planeado &mdash; docs/booking/pricing-and-payments.md</span>
+  <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
+  <span class="pill partial">&#9679; Vigente, con un hueco conocido</span>
+  <span class="pill planned">&#9679; Planeado, sin codigo todavia</span>
 </div>
 
 <section class="flow">
   <div class="flow-head">
     <span class="flow-num">Uno</span>
-    <h2>El flujo de hoy &mdash; anticipo fijo del 30%</h2>
+    <h2>Politica &ldquo;Anticipo + saldo restante&rdquo;</h2>
+    <span class="pill partial">&#9679; Vigente, con un hueco conocido</span>
   </div>
   <p class="flow-desc">
-    El unico flujo que existe en produccion ahora mismo. No hay forma de que un propietario pida
-    pago completo por adelantado, ni de ajustar el porcentaje del anticipo &mdash; y una vez
-    pagado el anticipo, no hay ninguna pantalla para pagar el saldo restante. La aprobacion
-    manual del propietario tampoco se puede saltar hoy: existe una casilla &ldquo;Reserva
-    inmediata&rdquo; en el formulario del local, pero no esta conectada a nada todavia (ver
-    diagrama 4).
+    La politica por defecto de todo local nuevo (30% de anticipo) y la que usa hoy la mayoria del
+    catalogo. El porcentaje ya es configurable por local (10%&ndash;90%) desde el dashboard del
+    propietario, y el anticipo se calcula, cobra y confirma correctamente. Lo que sigue sin
+    existir es la pantalla para pagar el <strong>saldo restante</strong> una vez pagado el
+    anticipo &mdash; hoy ese saldo se sigue cobrando fuera del sistema, igual que antes de la
+    Fase 1.
   </p>
   <div class="diagram-frame">
 <pre class="mermaid">
@@ -258,8 +275,8 @@
 flowchart TD
     A["Cliente solicita reserva&lt;br/&gt;&lt;b&gt;PENDING&lt;/b&gt;"]:::step --> B{"Propietario&lt;br/&gt;revisa"}:::decision
     B -->|Rechaza| R1(["CANCELLED_BY_OWNER"]):::danger
-    B -->|Aprueba| C["&lt;b&gt;APPROVED&lt;/b&gt;&lt;br/&gt;el cliente ya puede pagar"]:::step
-    C -->|"Cliente sube comprobante&lt;br/&gt;anticipo fijo: 30%"| D{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
+    B -->|Aprueba| C["&lt;b&gt;APPROVED&lt;/b&gt;"]:::step
+    C -->|"Cliente paga el anticipo&lt;br/&gt;% configurado por el local&lt;br/&gt;&#40;30% por defecto&#41;"| D{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
     D -->|Rechaza| C
     D -->|Confirma| E["&lt;b&gt;DEPOSIT_PAID&lt;/b&gt;"]:::step
     E -.->|"sin pantalla para el saldo"| GAP["el saldo se cobra&lt;br/&gt;fuera del sistema"]:::gap
@@ -284,45 +301,14 @@ flowchart TD
 <section class="flow">
   <div class="flow-head">
     <span class="flow-num">Dos</span>
-    <h2>Politica &ldquo;Anticipo + saldo restante&rdquo;</h2>
-  </div>
-  <p class="flow-desc">
-    La politica que se ofrece por defecto en la Fase 1 &mdash; el mismo esqueleto de hoy, pero con
-    el anticipo configurable por local (no fijo en 30%) y agregando el paso que hoy falta: pagar
-    el saldo restante ya dentro del sistema, no por fuera.
-  </p>
-  <div class="diagram-frame">
-<pre class="mermaid">
-%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
-flowchart TD
-    A["Cliente solicita reserva&lt;br/&gt;&lt;b&gt;PENDING&lt;/b&gt;"]:::step --> B{"Propietario&lt;br/&gt;revisa"}:::decision
-    B -->|Rechaza| R1(["CANCELLED_BY_OWNER"]):::danger
-    B -->|Aprueba| C["&lt;b&gt;APPROVED&lt;/b&gt;"]:::step
-    C -->|"Cliente paga el anticipo&lt;br/&gt;% configurado por el local"| D{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
-    D -->|Rechaza| C
-    D -->|Confirma| E["&lt;b&gt;DEPOSIT_PAID&lt;/b&gt;"]:::step
-    E -->|"Cliente paga el saldo&lt;br/&gt;restante &mdash; pantalla nueva"| F{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
-    F -->|Rechaza| E
-    F -->|Confirma| G["&lt;b&gt;FULLY_PAID&lt;/b&gt;"]:::step
-    G --> H["Propietario marca completada&lt;br/&gt;despues del evento"]:::step
-    H --> I(["COMPLETED"]):::success
-
-    classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
-    classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
-    classDef success fill:#e7f3ec,stroke:#2f7d4f,stroke-width:1.5px,color:#1c5233
-    classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
-</pre>
-  </div>
-</section>
-
-<section class="flow">
-  <div class="flow-head">
-    <span class="flow-num">Tres</span>
     <h2>Politica &ldquo;Pago completo por adelantado&rdquo;</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
   </div>
   <p class="flow-desc">
-    La opcion nueva de la Fase 1. Mas corta: un solo pago cubre el 100%, sin paso de anticipo ni
-    de saldo &mdash; util para locales que prefieren cobrar todo de una vez antes del evento.
+    Un solo pago cubre el 100%, sin paso de anticipo ni de saldo &mdash; util para locales que
+    prefieren cobrar todo de una vez antes del evento. Probamos el flujo completo en la
+    aplicacion real: la reserva llega a <code>FULLY_PAID</code> apenas el propietario confirma el
+    comprobante.
   </p>
   <div class="diagram-frame">
 <pre class="mermaid">
@@ -343,32 +329,41 @@ flowchart TD
     classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
 </pre>
   </div>
+  <div class="note fixed">
+    <strong>Bug encontrado y corregido:</strong> hasta hace poco, la pantalla de subir
+    comprobante mandaba siempre <code>paymentType: DEPOSIT</code>, sin importar la politica del
+    local. Un local con pago completo por adelantado terminaba con la reserva marcada
+    <code>DEPOSIT_PAID</code> (&ldquo;Anticipo pagado&rdquo;) en vez de <code>FULLY_PAID</code>,
+    aunque el monto cobrado ya era el correcto. Se corrigio: el tipo de pago ahora lo decide
+    quien invoca la pantalla segun el estado de la reserva y la politica del local, nunca es una
+    eleccion libre ni un valor fijo.
+  </div>
 </section>
 
 <section class="flow">
   <div class="flow-head">
-    <span class="flow-num">Cuatro</span>
+    <span class="flow-num">Tres</span>
     <h2>Reserva inmediata &mdash; saltar la aprobacion manual</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
   </div>
   <p class="flow-desc">
-    Idea nueva para la Fase 1: algunos propietarios manejan su calendario 100% desde la app y no
-    quieren revisar cada solicitud a mano &mdash; si las fechas estan libres, quieren que la
-    reserva quede confirmada al toque. La base ya existe (<code>Venue.instantBooking</code>,
-    incluida la casilla en el formulario del propietario) pero hoy no hace nada &mdash; falta
-    conectarla en <code>BookingService.requestBooking()</code>. La validacion de disponibilidad y
-    el calculo de precio no cambian; lo unico que se salta es el paso de aprobar/rechazar.
+    Para locales que manejan su calendario 100% desde la app: si activan &ldquo;Reserva
+    inmediata&rdquo; en su dashboard, la solicitud nace directo en <code>APPROVED</code> en
+    cuanto el cliente elige una fecha libre, sin esperar a que el propietario la revise. La
+    validacion de disponibilidad y el calculo de precio no cambian &mdash; solo se salta el paso
+    de aprobar/rechazar.
   </p>
   <div class="diagram-frame">
 <pre class="mermaid">
 %%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
 flowchart TD
     A["Cliente elige fechas disponibles&lt;br/&gt;y confirma la solicitud"]:::step --> B{"El local tiene&lt;br/&gt;'Reserva inmediata' activada?&lt;br/&gt;&#40;Venue.instantBooking&#41;"}:::decision
-    B -->|"No &mdash; revision manual&lt;br/&gt;&#40;el flujo de hoy&#41;"| C["&lt;b&gt;PENDING&lt;/b&gt;"]:::step
+    B -->|"No &mdash; revision manual"| C["&lt;b&gt;PENDING&lt;/b&gt;"]:::step
     C --> D{"Propietario&lt;br/&gt;revisa"}:::decision
     D -->|Rechaza| R(["CANCELLED_BY_OWNER"]):::danger
     D -->|Aprueba| E["&lt;b&gt;APPROVED&lt;/b&gt;"]:::step
     B -->|"Si &mdash; se salta&lt;br/&gt;la revision"| E2["&lt;b&gt;APPROVED&lt;/b&gt; directo&lt;br/&gt;&#40;sin paso de aprobar/rechazar&#41;"]:::step
-    E --> F["El cliente paga segun la&lt;br/&gt;politica de pago del local&lt;br/&gt;&#40;ver diagramas 2 y 3&#41;"]:::step
+    E --> F["El cliente paga segun la&lt;br/&gt;politica de pago del local&lt;br/&gt;&#40;ver diagramas 1 y 2&#41;"]:::step
     E2 --> F
 
     classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
@@ -380,15 +375,16 @@ flowchart TD
 
 <section class="flow">
   <div class="flow-head">
-    <span class="flow-num">Cinco</span>
+    <span class="flow-num">Cuatro</span>
     <h2>Modo &ldquo;Cotizar&rdquo; &mdash; locales sin precio fijo</h2>
+    <span class="pill planned">&#9679; Planeado, sin codigo todavia</span>
   </div>
   <p class="flow-desc">
-    Idea nueva para una Fase futura (5): locales que cobran &ldquo;segun el evento&rdquo; y no
-    pueden publicar un precio fijo real. En vez de precio + reservar, el detalle del local
-    muestra &ldquo;Consultar precio&rdquo; y un boton &ldquo;Cotizar&rdquo; que abre el contacto
-    con el propietario. Recien cuando el propietario le pone un precio a esa solicitud puntual se
-    convierte en una reserva de verdad y entra al mismo flujo de siempre.
+    Idea para una fase futura: locales que cobran &ldquo;segun el evento&rdquo; y no pueden
+    publicar un precio fijo real. En vez de precio + reservar, el detalle del local mostraria
+    &ldquo;Consultar precio&rdquo; y un boton &ldquo;Cotizar&rdquo; que abre el contacto con el
+    propietario. Recien cuando el propietario le pone un precio a esa solicitud puntual se
+    convertiria en una reserva de verdad y entraria al mismo flujo de siempre.
   </p>
   <div class="diagram-frame">
 <pre class="mermaid">
@@ -399,7 +395,7 @@ flowchart TD
     C --> D["Contacto directo con el&lt;br/&gt;propietario &#40;ej. WhatsApp&#41;"]:::gap
     D -.->|"negociacion de precio,&lt;br/&gt;fuera del sistema"| E{"Propietario le pone&lt;br/&gt;un precio a la solicitud"}:::decision
     E --> F["Se crea una reserva real&lt;br/&gt;con ese precio"]:::step
-    F --> G["Sigue el flujo normal del local&lt;br/&gt;&#40;diagramas 1&ndash;4, segun su&lt;br/&gt;configuracion&#41;"]:::step
+    F --> G["Sigue el flujo normal del local&lt;br/&gt;&#40;diagramas 1&ndash;3, segun su&lt;br/&gt;configuracion&#41;"]:::step
 
     classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
     classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
@@ -417,11 +413,12 @@ flowchart TD
 
 <section class="flow">
   <div class="flow-head">
-    <span class="flow-num">Seis</span>
+    <span class="flow-num">Cinco</span>
     <h2>Cuando el flujo no llega a completarse</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
   </div>
   <p class="flow-desc">
-    Estas ramas aplican por igual a cualquiera de las tres politicas de arriba &mdash; son las
+    Estas ramas aplican por igual a cualquiera de las dos politicas de pago &mdash; son las
     salidas que no terminan en <code>COMPLETED</code>.
   </p>
   <div class="diagram-frame">
@@ -432,7 +429,7 @@ flowchart TD
     A -->|Cliente cancela| C(["CANCELLED_BY_CLIENT"]):::danger
     D["APPROVED"]:::step -->|Cliente cancela| C
     D -->|Nunca paga ni se presenta| E(["NO_SHOW"]):::danger
-    F["Comprobante rechazado&lt;br/&gt;&#40;anticipo, saldo o pago completo&#41;"]:::step -->|El cliente puede subir uno nuevo| G["La reserva sigue en el&lt;br/&gt;mismo estado &mdash; no se pierde"]:::step
+    F["Comprobante rechazado&lt;br/&gt;&#40;anticipo o pago completo&#41;"]:::step -->|El cliente puede subir uno nuevo| G["La reserva sigue en el&lt;br/&gt;mismo estado &mdash; no se pierde"]:::step
 
     classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
     classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
@@ -451,8 +448,10 @@ flowchart TD
 
 <footer>
   Diagramas generados a partir del codigo real (<code>booking.service.ts</code>,
-  <code>payment.service.ts</code>, <code>venue.entity.ts</code>) y del plan en
-  <code>docs/booking/pricing-and-payments.md</code>. Los diagramas 2, 3 y 4 describen diseno
-  planeado para la Fase 1; el diagrama 5 describe diseno planeado para la Fase 5 &mdash; ninguno
-  esta implementado todavia.
+  <code>payment.service.ts</code>, <code>payment-proof-drawer.tsx</code>,
+  <code>venue.entity.ts</code>) y verificados a mano en la aplicacion corriendo, no solo leidos
+  del codigo. Los diagramas 1 a 3 y 5 describen la Fase 1, ya en produccion
+  (<code>docs/booking/pricing-and-payments.md</code>) &mdash; el diagrama 1 todavia tiene el
+  hueco de la pantalla de saldo restante, pendiente para la Fase 2. El diagrama 4
+  (&ldquo;Cotizar&rdquo;) sigue siendo solo diseño, sin codigo todavia.
 </footer>
