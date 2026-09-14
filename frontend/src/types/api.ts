@@ -122,7 +122,7 @@ export type AmenityCategory =
   | 'SERVICES';
 
 export type VenueMediaType = 'IMAGE' | 'VIDEO' | 'VIRTUAL_TOUR';
-export type PriceUnit = 'EVENT' | 'HOUR' | 'DAY';
+export type PriceUnit = 'HOUR' | 'DAY';
 
 export interface Amenity {
   id: string;

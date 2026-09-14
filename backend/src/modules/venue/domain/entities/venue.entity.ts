@@ -44,7 +44,7 @@ export class VenueEntity {
   capacityMax!: number;
   spaceTypeId: string | null = null;
   minimumHours: number = 4;
-  priceUnit: PriceUnit = PriceUnit.EVENT;
+  priceUnit: PriceUnit = PriceUnit.DAY;
   instantBooking: boolean = false;
   allowsMultipleDays: boolean = false;
   squareMeters: number | null = null;

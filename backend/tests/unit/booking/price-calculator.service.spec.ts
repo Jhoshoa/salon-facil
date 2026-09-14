@@ -190,15 +190,15 @@ describe('PriceCalculatorService', () => {
       expect(result.totalPrice).toBe(7280);
     });
 
-    it('EVENT unit: one flat total resolved from the start date, not multiplied by days', () => {
+    it('DAY unit: a multi-day booking always costs more than a single day (regression -- this is exactly what EVENT used to get wrong, charging the same total no matter how many days were booked)', () => {
       const prices = [makePrice({ priceType: PriceType.BASE, price: 5000 })];
 
-      const result = service.calculateRange(prices, PriceUnit.EVENT, toDays(friSatSun, 8));
+      const oneDay = service.calculateRange(prices, PriceUnit.DAY, toDays([friSatSun[0]], 8));
+      const threeDays = service.calculateRange(prices, PriceUnit.DAY, toDays(friSatSun, 8));
 
-      expect(result.totalPrice).toBe(5000);
-      expect(result.days[0].appliedPrice).toBe(5000);
-      expect(result.days[1].appliedPrice).toBe(0);
-      expect(result.days[2].appliedPrice).toBe(0);
+      expect(oneDay.totalPrice).toBe(5000);
+      expect(threeDays.totalPrice).toBe(15000);
+      expect(threeDays.totalPrice).toBeGreaterThan(oneDay.totalPrice);
     });
 
     it('always keeps sum(days.appliedPrice) === totalPrice, regardless of priceUnit', () => {
@@ -207,7 +207,7 @@ describe('PriceCalculatorService', () => {
         makePrice({ id: 'price-2', priceType: PriceType.WEEKEND, dayOfWeek: 6, price: 350 }),
       ];
 
-      for (const unit of [PriceUnit.EVENT, PriceUnit.DAY, PriceUnit.HOUR]) {
+      for (const unit of [PriceUnit.DAY, PriceUnit.HOUR]) {
         const result = service.calculateRange(prices, unit, toDays(friSatSun, 8));
         const sum = result.days.reduce((total, day) => total + day.appliedPrice, 0);
         expect(sum).toBe(result.totalPrice);

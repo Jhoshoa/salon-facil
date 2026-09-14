@@ -86,14 +86,10 @@ export class PriceCalculatorService {
   }
 
   /**
-   * Resolves a total for a date range.
-   * - When the venue's default unit is EVENT, the whole range is treated as a single flat
-   *   fee resolved from day one (per-rule unit overrides are ignored in this mode — mixing
-   *   a flat event fee with per-day units isn't a supported combination). The full amount is
-   *   booked on day one (other days carry 0) so `sum(days[].appliedPrice) === totalPrice`.
-   * - Otherwise, each day resolves its own effective unit (`resolveUnitForDate`): DAY days
-   *   charge the matched price as-is, HOUR days multiply it by that day's `hours` (required,
-   *   the caller must have validated/supplied it beforehand).
+   * Resolves a total for a date range. Each day resolves its own effective unit
+   * (`resolveUnitForDate`): DAY days charge the matched price as-is, HOUR days multiply it by
+   * that day's `hours` (required, the caller must have validated/supplied it beforehand). The
+   * total is the sum across every day in the range, so a longer stay always costs more.
    */
   calculateRange(
     prices: VenuePriceEntity[],
@@ -105,24 +101,6 @@ export class PriceCalculatorService {
     }
 
     const basePrice = this.findBasePrice(prices);
-
-    if (defaultUnit === PriceUnit.EVENT) {
-      const single = this.calculate(prices, days[0].date);
-      const resultDays: DailyPriceBreakdown[] = days.map((day, index) => ({
-        date: this.toDateOnly(day.date),
-        matchedPriceType: index === 0 ? single.priceBreakdown.matchedPriceType : PriceType.BASE,
-        unit: PriceUnit.EVENT,
-        appliedPrice: index === 0 ? single.totalPrice : 0,
-      }));
-
-      return {
-        basePrice,
-        appliedPrice: single.totalPrice,
-        totalPrice: single.totalPrice,
-        depositAmount: single.depositAmount,
-        days: resultDays,
-      };
-    }
 
     const resultDays: DailyPriceBreakdown[] = days.map((day) => {
       const unit = this.resolveUnitForDate(prices, day.date, defaultUnit);

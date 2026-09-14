@@ -22,7 +22,6 @@ const getBasePrice = (venue: Venue) => {
 };
 
 const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
-  EVENT: 'evento',
   HOUR: 'hora',
   DAY: 'dia',
 };

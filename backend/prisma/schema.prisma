@@ -88,7 +88,6 @@ enum VenueMediaType {
 }
 
 enum PriceUnit {
-  EVENT
   HOUR
   DAY
 }
@@ -244,7 +243,7 @@ model Venue {
   videoUrl           String?      @map("video_url")
   spaceTypeId        String?      @map("space_type_id")
   minimumHours       Int          @default(4) @map("minimum_hours")
-  priceUnit          PriceUnit    @default(EVENT) @map("price_unit")
+  priceUnit          PriceUnit    @default(DAY) @map("price_unit")
   instantBooking     Boolean      @default(false) @map("instant_booking")
   allowsMultipleDays Boolean      @default(false) @map("allows_multiple_days")
   rules              String?      @db.Text

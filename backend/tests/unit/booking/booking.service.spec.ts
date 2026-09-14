@@ -152,7 +152,7 @@ describe('BookingService', () => {
         appliedPrice: 5000,
         totalPrice: 5000,
         depositAmount: 1500,
-        days: [{ date: '2026-09-15', matchedPriceType: 'BASE', unit: 'EVENT', appliedPrice: 5000 }],
+        days: [{ date: '2026-09-15', matchedPriceType: 'BASE', unit: 'DAY', appliedPrice: 5000 }],
       }),
       // No per-rule unit overrides in these fixtures — mirrors production's fallback to the
       // venue's own priceUnit when no matching VenuePrice declares a unit of its own.
