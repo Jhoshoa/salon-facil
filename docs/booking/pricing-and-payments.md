@@ -10,77 +10,91 @@ se ejecuta en fases (ver "Plan de ejecucion" al final), cada una su propio PR si
 
 ## 1. Por que este documento
 
-Disparador: un local con precio "por evento" (`priceUnit: EVENT`) cobra lo mismo si el cliente
-reserva 1 dia o 5 -- confirmado en el codigo, y es **comportamiento intencional documentado**,
-no un descuido (`price-calculator.service.ts:88-97`). La decision de negocio ahora es sacar esa
-unidad por completo: confunde al cliente (ve el mismo precio sin importar cuantos dias elige) y
-no tiene un caso de uso claro que "por dia" no cubra ya.
+Disparador original: un local con precio "por evento" (`priceUnit: EVENT`) cobraba lo mismo si
+el cliente reservaba 1 dia o 5 -- confirmado en el codigo como **comportamiento intencional
+documentado**, no un descuido. Confundia al cliente (veia el mismo precio sin importar cuantos
+dias elegia) y no tenia un caso de uso claro que "por dia" no cubriera ya. **Ya se resolvio**
+(Fase 0): `EVENT` se saco por completo del enum `PriceUnit`.
 
-Al revisar el modulo de pagos para arreglar eso, aparecieron problemas mas de fondo que este
-documento tambien resuelve:
+Al revisar el modulo de pagos para arreglar eso, aparecieron problemas mas de fondo, que tambien
+quedaron resueltos en las fases siguientes:
 
-- El anticipo es **30% fijo, hardcodeado en 3 lugares distintos** del codigo -- ningun
-  propietario puede pedir pago completo por adelantado, ni ajustar el porcentaje.
-- El flujo para pagar el **saldo restante** (`PaymentType.REMAINING`) existe en el backend pero
-  **no tiene ninguna pantalla en el frontend** -- una reserva puede quedar pagada solo a medias
-  sin salida.
-- No hay pasarela de pago real -- todo es "el cliente sube una foto del comprobante, el
-  propietario la confirma a mano". Ya hay dos columnas (`stripePaymentIntentId`,
-  `stripeChargeId`) que anticipaban una integracion que nunca se completo.
+- El anticipo era **30% fijo, hardcodeado en 3 lugares distintos** del codigo -- ningun
+  propietario podia pedir pago completo por adelantado, ni ajustar el porcentaje. **Ya se
+  resolvio** (Fase 1): `paymentPolicy` + `depositPercentage` configurables por local, calculo
+  centralizado en `PriceCalculatorService.resolveDeposit()`.
+- El flujo para pagar el **saldo restante** (`PaymentType.REMAINING`) existia en el backend pero
+  no tenia ninguna pantalla en el frontend -- una reserva podia quedar pagada solo a medias sin
+  salida. **Ya se resolvio** (Fase 2): pantalla de pago del saldo restante en el detalle de
+  reserva del cliente, mas validaciones de integridad por `BookingStatus` en el backend.
+- Sigue sin haber pasarela de pago real -- todo es "el cliente sube una foto del comprobante, el
+  propietario la confirma a mano". Esto **sigue pendiente** (Fases 3-4, ver seccion 4.4 en
+  adelante). Ya hay dos columnas (`stripePaymentIntentId`, `stripeChargeId`) en el modelo
+  `Payment` que anticipaban una integracion que nunca se completo.
 
 ## 2. Estado actual (con referencias exactas)
 
 ### 2.1 Precio
 
-- `Venue.priceUnit`: `HOUR | DAY | EVENT` (default de todo el local).
-- `VenuePrice` (`backend/prisma/schema.prisma:443-466`): reglas de excepcion sobre el precio
+- `Venue.priceUnit`: `HOUR | DAY` (`EVENT` se saco del enum en la Fase 0 --
+  `backend/prisma/schema.prisma:90-93`).
+- `VenuePrice` (`backend/prisma/schema.prisma:450-473`): reglas de excepcion sobre el precio
   base -- `priceType` (`BASE | WEEKEND | HOLIDAY | CUSTOM_DATE | SEASON_HIGH | EARLY_BIRD`),
   `dayOfWeek`, `specificDate`, `startDate`/`endDate`, `price`, `unit` (override opcional de
   `priceUnit` solo para esa regla), `discountPercent`, `discountLabel`.
 - Solo `BASE`, `WEEKEND` (reusado para cualquier dia de la semana, diferenciado por
   `dayOfWeek`) y `SEASON_HIGH` tienen UI hoy, en `frontend/src/components/dashboard/venue-form.tsx`
   (pestana "Precios y capacidad", `pricingMode`: `single | weekday | weekday_season`).
-  `HOLIDAY`, `CUSTOM_DATE`, `EARLY_BIRD` existen en el modelo pero no tienen formulario.
-- `PriceCalculatorService.calculate()` (`price-calculator.service.ts:41-76`) resuelve que regla
-  aplica en orden fijo `CUSTOM_DATE > HOLIDAY > SEASON_HIGH > WEEKEND`, si ninguna aplica usa
-  `BASE`. `EARLY_BIRD` nunca se evalua ahi -- prioridad muerta.
-- `calculateRange()` (`price-calculator.service.ts:98-150`) es el calculo real de una reserva
-  (posiblemente multi-dia): con `EVENT`, colapsa todo el rango a un solo `calculate()` del
-  primer dia y pone `0` en el resto (**la causa exacta del bug**); con `HOUR`/`DAY`, cada dia
-  resuelve su propia regla aplicable y se suman.
+  `HOLIDAY`, `CUSTOM_DATE`, `EARLY_BIRD` existen en el modelo pero todavia no tienen formulario.
+- `PriceCalculatorService.calculate()` (`price-calculator.service.ts:57-97`) resuelve que regla
+  aplica en orden fijo `CUSTOM_DATE > HOLIDAY > SEASON_HIGH > WEEKEND` (`findApplicablePrice()`,
+  lineas 173-200); si ninguna aplica usa `BASE`. `EARLY_BIRD` nunca se evalua ahi -- prioridad
+  muerta, sigue sin resolverse (fuera del alcance de este documento).
+- `calculateRange()` (`price-calculator.service.ts:115-151`) es el calculo real de una reserva
+  (posiblemente multi-dia): cada dia resuelve su propia unidad efectiva
+  (`resolveUnitForDate()`, linea 104) y su propia regla aplicable, y el total es la suma de
+  todos los dias -- una reserva mas larga siempre cuesta mas. Ya no existe la rama `EVENT` que
+  colapsaba todo el rango a un solo dia.
 
 ### 2.2 Anticipo (deposito)
 
-`depositAmount = appliedPrice * 0.3` hardcodeado, duplicado en:
-`price-calculator.service.ts:62`, `price-calculator.service.ts:141`, y de nuevo en
-`booking.service.ts:272` (`calculateRangeWithExtras`, al sumar el costo de los extras). No hay
-ningun campo `depositPercentage` ni `paymentPolicy` en `Venue` -- confirmado por busqueda en
-todo el repo, cero resultados. Todo local de la plataforma usa exactamente la misma politica
-hoy: 30% de anticipo obligatorio, sin excepcion.
+`PriceCalculatorService.resolveDeposit(paymentPolicy, depositPercentage, totalPrice)`
+(`price-calculator.service.ts:46-55`) es el unico lugar que calcula un anticipo: devuelve el
+`totalPrice` completo si la politica del local es `FULL_UPFRONT`, o
+`totalPrice * (depositPercentage / 100)` en cualquier otro caso. Los 3 lugares que antes
+hardcodeaban `* 0.3` ahora llaman a este metodo. `Venue.paymentPolicy` (default
+`DEPOSIT_THEN_REMAINING`) y `Venue.depositPercentage` (default `30`, rango valido 10-90, ver
+`CreateVenueDto`) son campos reales en `backend/prisma/schema.prisma:254-256`, configurables
+desde la seccion "Politica de pago" del formulario del propietario.
 
 ### 2.3 Reserva inmediata (`instantBooking`)
 
-`Venue.instantBooking: boolean` (default `false`) ya existe hoy en el modelo, en el DTO de
-creacion/edicion, como filtro de busqueda (`venue-filter.dto.ts`), como badge "Reserva
-inmediata" en las tarjetas de resultado, y como checkbox real en el formulario del propietario
-(`venue-form.tsx:1011`, pestana "Precios y capacidad", sin explicacion de que hace). Pero es
-**puramente decorativo**: `booking.service.ts` (`requestBooking()`) nunca lo lee -- toda reserva
-nace en `PENDING` sin importar este campo, asi que hoy un propietario puede marcar la casilla y
-no cambia nada en el flujo real.
+`Venue.instantBooking: boolean` (default `false`) ya esta conectado:
+`BookingService.requestBooking()` (`booking.service.ts:163`) calcula
+`initialStatus = venue.instantBooking ? APPROVED : PENDING` y crea la reserva directo en ese
+estado -- la validacion de disponibilidad y el calculo de precio no cambian, solo se salta el
+paso de aprobar/rechazar. La UI (checkbox en `venue-form.tsx`, badge "Reserva inmediata" en las
+tarjetas de resultado, filtro de busqueda) es la misma que ya existia antes, ahora con
+comportamiento real detras.
 
 ### 2.4 Pago
 
-`Payment` (`backend/prisma/schema.prisma:543-568`): `amount`, `paymentType`
+`Payment` (`backend/prisma/schema.prisma:550-575`): `amount`, `paymentType`
 (`DEPOSIT | FULL | REMAINING`), `method` (`QR_BANK | BANK_TRANSFER | TIGO_MONEY | CARD | CASH`),
 `status` (`PENDING | COMPLETED | FAILED | REFUNDED | PARTIAL`), `comprobanteUrl` + metadatos de
 subida, `confirmedByOwnerId`/`confirmedAt`, y las columnas `stripePaymentIntentId`/
-`stripeChargeId` que nunca se usan (no hay SDK de Stripe en el proyecto).
+`stripeChargeId` que siguen sin usarse (no hay SDK de Stripe en el proyecto).
 
-El unico punto del frontend que crea un pago es
-`frontend/src/components/payments/payment-proof-drawer.tsx`, con `paymentType: 'DEPOSIT'`
-**hardcodeado** (linea 36) -- nunca se ofrece pagar `REMAINING` ni `FULL`, aunque el backend ya
-lo valida correctamente (`payment.service.ts:66-86`, exige que el monto coincida exacto con lo
-esperado segun el tipo).
+`frontend/src/components/payments/payment-proof-drawer.tsx` recibe `paymentType` como prop
+obligatoria -- ya no esta hardcodeado. Quien decide ese valor es `resolvePayableAction()` en
+`booking-detail-client.tsx:38-54`: `DEPOSIT` o `FULL` (segun la politica del local) si la
+reserva esta `APPROVED`, `REMAINING` si esta `DEPOSIT_PAID`, y sin boton de pago en cualquier
+otro estado -- mismos gates que exige el backend.
+
+`PaymentService.createPayment()` (`payment.service.ts:68-124`) valida, ademas del monto exacto
+por tipo (con redondeo a centavos para `REMAINING`), que el `paymentType` corresponda al
+`BookingStatus` real de la reserva, y bloquea un segundo comprobante del mismo tipo mientras el
+anterior sigue `PENDING`.
 
 `PaymentService.confirmPayment()` decide el nuevo estado de la reserva segun el tipo de pago
 confirmado (`payment.repository.ts:141`): `DEPOSIT` completado -> `DEPOSIT_PAID`;
@@ -94,115 +108,109 @@ sequenceDiagram
     participant S as Sistema
     participant O as Propietario
 
-    C->>S: Solicita reserva (PENDING)
-    S->>O: Notifica solicitud
+    C->>S: Solicita reserva (PENDING, o APPROVED directo si el local tiene instantBooking)
+    S->>O: Notifica solicitud (o la aprobacion automatica)
     O->>S: Aprueba (APPROVED) o Rechaza
-    S->>C: Notifica aprobacion -- "sube tu comprobante de anticipo"
-    C->>S: Sube comprobante (30% fijo, DEPOSIT)
+    S->>C: Notifica aprobacion -- "sube tu comprobante" (anticipo o pago completo, segun la politica del local)
+    C->>S: Sube comprobante (DEPOSIT o FULL, monto resuelto por el sistema)
     S->>O: Notifica pago pendiente de confirmar
-    O->>S: Confirma (DEPOSIT_PAID) o Rechaza
-    Note over C,S: Sin pantalla para pagar el saldo restante -- la reserva queda aqui
+    O->>S: Confirma (DEPOSIT_PAID o FULLY_PAID) o Rechaza
+    alt Politica DEPOSIT_THEN_REMAINING
+        S->>C: Notifica anticipo confirmado -- "paga el saldo restante"
+        C->>S: Sube comprobante (REMAINING, monto exacto calculado por el sistema)
+        S->>O: Notifica pago pendiente de confirmar
+        O->>S: Confirma (FULLY_PAID) o Rechaza
+    end
     O->>S: Marca como completada (despues del evento)
 ```
 
 ## 3. Problemas a resolver
 
-| # | Problema | Impacto |
-|---|---|---|
-| 1 | `EVENT` cobra igual sin importar los dias | Cliente confundido, propietario pierde ingreso en reservas largas |
-| 2 | Anticipo 30% fijo, en 3 lugares | Ningun propietario puede pedir pago completo o ajustar el % |
-| 3 | Sin pantalla para pagar el saldo restante | Reservas quedan pagadas a medias sin salida |
-| 4 | Sin pasarela real, todo manual | Mas pasos, mas espera, mas trabajo de verificacion para el propietario |
-| 5 | Sin abstraccion de pasarela | Integrar Libelula ahora atascaria el codigo a un solo proveedor |
-| 6 | `instantBooking` esta en el formulario del propietario pero no hace nada | El propietario cree que ya activo reservas directas y sigue teniendo que aprobar cada una a mano |
-| 7 | Un local sin precio fijo no tiene forma de publicarse | Locales que cobran "segun el evento" (catering, decoracion a medida) no pueden usar la plataforma sin inventar un precio que no es real |
+| # | Problema | Impacto | Estado |
+|---|---|---|---|
+| 1 | `EVENT` cobraba igual sin importar los dias | Cliente confundido, propietario perdia ingreso en reservas largas | Resuelto (Fase 0) |
+| 2 | Anticipo 30% fijo, en 3 lugares | Ningun propietario podia pedir pago completo o ajustar el % | Resuelto (Fase 1) |
+| 3 | Sin pantalla para pagar el saldo restante | Reservas quedaban pagadas a medias sin salida | Resuelto (Fase 2) |
+| 4 | Sin pasarela real, todo manual | Mas pasos, mas espera, mas trabajo de verificacion para el propietario | Pendiente (Fase 3-4) |
+| 5 | Sin abstraccion de pasarela | Integrar Libelula ahora atascaria el codigo a un solo proveedor | Pendiente (Fase 3-4) |
+| 6 | `instantBooking` estaba en el formulario del propietario pero no hacia nada | El propietario creia que ya activo reservas directas y seguia teniendo que aprobar cada una a mano | Resuelto (Fase 1) |
+| 7 | Un local sin precio fijo no tiene forma de publicarse | Locales que cobran "segun el evento" (catering, decoracion a medida) no pueden usar la plataforma sin inventar un precio que no es real | Pendiente (Fase 5) |
 
 ## 4. Diseno propuesto
 
-### 4.1 Sacar `EVENT`, dejar solo `HOUR` y `DAY`
+### 4.1 Sacar `EVENT`, dejar solo `HOUR` y `DAY` (Fase 0 -- hecho)
 
-`PriceUnit` pasa a `HOUR | DAY`. Migracion de datos: todo local con `priceUnit: EVENT` pasa a
-`DAY` -- es la conversion mas directa (un local que hoy cobra "Bs 2000 por evento" pasa a cobrar
-"Bs 2000 por dia", que es ademas exactamente la logica que ya corrige el bug sin tocar el
-calculo de `DAY`, que ya suma correctamente por rango). Esto **cambia el precio efectivo de una
-reserva multi-dia** para esos locales -- antes de correr la migracion hay que avisarle a cada
-propietario afectado (notificacion in-app + email) para que revise su precio base si quiere.
+`PriceUnit` paso a `HOUR | DAY` (`backend/prisma/schema.prisma:90-93`). La migracion de datos
+llevo todo local con `priceUnit: EVENT` a `DAY` -- la conversion mas directa (un local que
+cobraba "Bs 2000 por evento" pasa a cobrar "Bs 2000 por dia", que ademas es exactamente la
+logica que corrige el bug sin tocar el calculo de `DAY`, que ya sumaba correctamente por rango).
 
-Cambios de codigo:
-- Migracion de Prisma: `UPDATE venues SET price_unit = 'DAY' WHERE price_unit = 'EVENT'`, y
-  recien despues eliminar `EVENT` del enum (en ese orden, para no romper filas existentes).
-- Borrar la rama `EVENT` completa de `calculateRange()` (`price-calculator.service.ts:109-125`)
-  -- despues de la migracion nunca se vuelve a ejecutar.
-- Sacar la opcion "Evento" del selector de unidad en `venue-form.tsx` y de cualquier
+Cambios que se hicieron:
+- Migracion de Prisma que actualizo las filas existentes (`price_unit = 'DAY'` donde era
+  `EVENT`) antes de eliminar `EVENT` del enum, en ese orden, para no romper filas existentes.
+- Se borro la rama `EVENT` completa de `calculateRange()` -- ya no se vuelve a ejecutar.
+- Se saco la opcion "Evento" del selector de unidad en `venue-form.tsx` y de cualquier
   `priceUnitLabel` map en el frontend (galeria de resultados, detalle del local, resumen de
   reserva).
-- Actualizar `tests/unit/booking/price-calculator.service.spec.ts` (los tests que documentan el
-  comportamiento `EVENT` se borran, no se "arreglan" -- el comportamiento deja de existir).
+- Se actualizo `tests/unit/booking/price-calculator.service.spec.ts` -- los tests que
+  documentaban el comportamiento `EVENT` se borraron, no se "arreglaron" (el comportamiento dejo
+  de existir).
 
-### 4.2 Politica de pago configurable por local
+### 4.2 Politica de pago configurable por local (Fase 1 -- hecho)
 
-Nuevo campo en `Venue`:
+Campo nuevo en `Venue` (`backend/prisma/schema.prisma:95-98, 254-256`):
 
 ```prisma
 enum PaymentPolicy {
-  FULL_UPFRONT          // un solo pago, cubre el 100%
-  DEPOSIT_THEN_REMAINING // anticipo + saldo restante (el default actual, para no
-                          // sorprender a los locales ya publicados)
+  FULL_UPFRONT           // un solo pago, cubre el 100%
+  DEPOSIT_THEN_REMAINING // anticipo + saldo restante (el default, el comportamiento de siempre)
 }
 
 model Venue {
   // ...
   paymentPolicy     PaymentPolicy @default(DEPOSIT_THEN_REMAINING) @map("payment_policy")
-  depositPercentage Decimal?      @default(30) @db.Decimal(5, 2) @map("deposit_percentage")
+  depositPercentage Decimal       @default(30) @db.Decimal(5, 2) @map("deposit_percentage")
   // depositPercentage se ignora cuando paymentPolicy = FULL_UPFRONT
 }
 ```
 
-- UI: nueva seccion "Politica de pago" en la pestana de precios del formulario del propietario
-  -- radio `Pago completo por adelantado` / `Anticipo + saldo restante`, con un slider o input
-  numerico para el porcentaje (limitado a un rango razonable, ej. 10%-90%) que solo aparece con
-  la segunda opcion.
-- **Se centraliza el calculo del deposito en un solo lugar** (hoy duplicado 3 veces): un metodo
-  unico, por ejemplo `PriceCalculatorService.resolveDeposit(venue, totalPrice)`, que devuelve
-  `totalPrice` completo si `FULL_UPFRONT`, o `totalPrice * (depositPercentage / 100)` si
-  `DEPOSIT_THEN_REMAINING`. Los 3 sitios que hoy hardcodean `* 0.3` pasan a llamar a este metodo.
-- El tipo de pago que se le ofrece al cliente deja de estar fijo en el frontend: se **deriva del
-  estado de la reserva y la politica del local**, no de una eleccion libre --
-  ver 4.3.
+- UI: seccion "Politica de pago" en la pestana de precios del formulario del propietario --
+  radio `Pago completo por adelantado` / `Anticipo + saldo restante`, con un input numerico para
+  el porcentaje (limitado a 10%-90%) que solo aparece con la segunda opcion.
+- El calculo del deposito quedo centralizado en `PriceCalculatorService.resolveDeposit()` (ver
+  2.2) -- ya no hay ningun `* 0.3` hardcodeado en el codigo.
+- El tipo de pago que se le ofrece al cliente ya no esta fijo en el frontend: se deriva del
+  estado de la reserva y la politica del local (ver 2.4 y 4.3), no de una eleccion libre.
 
-### 4.2.1 Reserva inmediata: saltar la aprobacion manual (opcional por local)
+### 4.2.1 Reserva inmediata: saltar la aprobacion manual (opcional por local) (Fase 1 -- hecho)
 
 Idea del propietario: algunos manejan su calendario 100% desde la app y no quieren el paso
 manual de aprobar/rechazar cada solicitud -- quieren que, si las fechas estan libres, la reserva
 quede lista al toque y el cliente pase directo a pagar. Otros prefieren revisar cada solicitud
-antes de comprometerse (evento raro, cliente nuevo, quieren llamar primero). Como vimos en 2.3,
-la base para esto **ya existe** (`Venue.instantBooking`, incluida la casilla en el formulario del
-propietario) -- lo que falta es conectarla:
+antes de comprometerse (evento raro, cliente nuevo, quieren llamar primero). `Venue.instantBooking`
+ya existia (ver 2.3) pero era decorativo -- ahora esta conectado:
 
-- `BookingService.requestBooking()` lee `venue.instantBooking`. Si es `true` y no hubo conflicto
-  de fechas (la validacion de disponibilidad ya corre igual, nada de eso cambia), la reserva se
-  crea directo en `APPROVED` en vez de `PENDING` -- salta el paso de aprobar/rechazar, no salta
-  la validacion de disponibilidad ni el calculo de precio.
-- El cliente ve el mismo siguiente paso que hoy ve despues de que el propietario aprueba: subir
-  el comprobante segun la politica de pago del local (4.2) -- **no cambia nada del lado del
-  pago**, solo se salta la espera de que un humano apruebe.
+- `BookingService.requestBooking()` (`booking.service.ts:163`) lee `venue.instantBooking`. Si es
+  `true` y no hay conflicto de fechas (la validacion de disponibilidad corre igual, nada de eso
+  cambio), la reserva se crea directo en `APPROVED` en vez de `PENDING` -- salta el paso de
+  aprobar/rechazar, no la validacion de disponibilidad ni el calculo de precio.
+- El cliente ve el mismo siguiente paso que ya veia despues de que el propietario aprobaba:
+  subir el comprobante segun la politica de pago del local (4.2) -- no cambio nada del lado del
+  pago, solo se salta la espera de que un humano apruebe.
 - El propietario igual recibe la notificacion de la reserva nueva (mismo `BOOKING_REQUEST`),
   solo que ahora es informativa ("ya se confirmo") en vez de accionable ("aproba o rechaza").
-- **UI**: en vez de dejar la casilla suelta y sin explicacion como esta hoy, se mueve junto a la
-  seccion "Politica de pago" del formulario (4.2) bajo un titulo comun tipo "Como se confirman
-  tus reservas", con una sola linea de ayuda: *"Si esta activado, la reserva se confirma
-  automaticamente en cuanto el cliente reserva la fecha, sin que tengas que aprobarla vos."* Es
-  la pieza que hace esta seccion "mas amigable para el propietario" (el pedido original del
-  usuario para el dashboard de politica de pago) -- dos decisiones relacionadas (como se
-  confirma, como se cobra) en un solo lugar en vez de dos casillas sueltas en pestañas distintas.
-- **Fuera de alcance de esta fase**: hoy un propietario no tiene forma de cancelar una reserva ya
+- **UI**: la casilla se movio junto a la seccion "Politica de pago" del formulario (4.2) bajo un
+  titulo comun "Como se confirman tus reservas", con una linea de ayuda: *"Si esta activado, la
+  reserva se confirma automaticamente en cuanto el cliente reserva la fecha, sin que tengas que
+  aprobarla vos."*
+- **Sigue fuera de alcance**: un propietario todavia no tiene forma de cancelar una reserva ya
   `APPROVED` (`VenueEntity.canBeCancelledByOwner()` existe en el dominio pero no tiene ningun
   endpoint que lo use -- codigo muerto, confirmado por busqueda en el repo). Con reserva
-  inmediata activada esto se nota mas (nunca hay un paso de "rechazar" antes de comprometerse), 
-  pero conectar esa cancelacion es un problema aparte, no exclusivo de `instantBooking` -- se
-  deja anotado para un futuro documento, no se resuelve aca.
+  inmediata activada esto se nota mas (nunca hay un paso de "rechazar" antes de comprometerse),
+  pero conectar esa cancelacion sigue siendo un problema aparte, no exclusivo de `instantBooking`
+  -- no resuelto en ninguna fase todavia.
 
-### 4.3 Completar el flujo de pago (antes de tocar la pasarela)
+### 4.3 Completar el flujo de pago (antes de tocar la pasarela) (Fase 2 -- hecho)
 
 Con la politica configurable, el flujo de pago que le corresponde a cada reserva queda asi:
 
