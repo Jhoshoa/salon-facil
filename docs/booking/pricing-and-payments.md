@@ -28,9 +28,11 @@ quedaron resueltos en las fases siguientes:
   salida. **Ya se resolvio** (Fase 2): pantalla de pago del saldo restante en el detalle de
   reserva del cliente, mas validaciones de integridad por `BookingStatus` en el backend.
 - Sigue sin haber pasarela de pago real -- todo es "el cliente sube una foto del comprobante, el
-  propietario la confirma a mano". Esto **sigue pendiente** (Fases 3-4, ver seccion 4.4 en
-  adelante). Ya hay dos columnas (`stripePaymentIntentId`, `stripeChargeId`) en el modelo
-  `Payment` que anticipaban una integracion que nunca se completo.
+  propietario la confirma a mano". **La abstraccion ya esta lista** (Fase 3): `IPaymentGateway` +
+  `ManualProofGateway` envuelven el flujo manual actual detras de un puerto, sin cambiar nada del
+  comportamiento. Lo que **sigue pendiente** es el proveedor real (Fase 4, `LibelulaGateway`, ver
+  seccion 4.4 en adelante). Ya hay dos columnas (`stripePaymentIntentId`, `stripeChargeId`) en el
+  modelo `Payment` que anticipaban una integracion que nunca se completo.
 
 ## 2. Estado actual (con referencias exactas)
 
@@ -131,8 +133,8 @@ sequenceDiagram
 | 1 | `EVENT` cobraba igual sin importar los dias | Cliente confundido, propietario perdia ingreso en reservas largas | Resuelto (Fase 0) |
 | 2 | Anticipo 30% fijo, en 3 lugares | Ningun propietario podia pedir pago completo o ajustar el % | Resuelto (Fase 1) |
 | 3 | Sin pantalla para pagar el saldo restante | Reservas quedaban pagadas a medias sin salida | Resuelto (Fase 2) |
-| 4 | Sin pasarela real, todo manual | Mas pasos, mas espera, mas trabajo de verificacion para el propietario | Pendiente (Fase 3-4) |
-| 5 | Sin abstraccion de pasarela | Integrar Libelula ahora atascaria el codigo a un solo proveedor | Pendiente (Fase 3-4) |
+| 4 | Sin pasarela real, todo manual | Mas pasos, mas espera, mas trabajo de verificacion para el propietario | Pendiente (Fase 4) |
+| 5 | Sin abstraccion de pasarela | Integrar Libelula ahora atascaria el codigo a un solo proveedor | Resuelto (Fase 3) |
 | 6 | `instantBooking` estaba en el formulario del propietario pero no hacia nada | El propietario creia que ya activo reservas directas y seguia teniendo que aprobar cada una a mano | Resuelto (Fase 1) |
 | 7 | Un local sin precio fijo no tiene forma de publicarse | Locales que cobran "segun el evento" (catering, decoracion a medida) no pueden usar la plataforma sin inventar un precio que no es real | Pendiente (Fase 5) |
 
@@ -262,7 +264,7 @@ abstraccion del paso 4.4 envuelve un flujo completo, no uno a medias:
   el propietario tenga que cruzar datos entre la tarjeta de la reserva y la seccion separada de
   "Pagos pendientes" para entender en que paso esta cada una. **Hecho** (Fase 2).
 
-### 4.4 Pasarela de pago abstraida (Ports & Adapters)
+### 4.4 Pasarela de pago abstraida (Ports & Adapters) (Fase 3 -- hecho)
 
 Mismo patron que ya usa el resto del backend para repositorios (`IVenueRepository` +
 `VENUE_REPOSITORY` como token de inyeccion, `IPaymentRepository` + `PAYMENT_REPOSITORY`) --
@@ -273,8 +275,6 @@ se define un puerto para la pasarela y el dominio nunca depende de un proveedor 
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
 
 export interface IPaymentGateway {
-  // Arranca un cobro. El manual devuelve instrucciones (numero de cuenta/QR estatico);
-  // un proveedor real devuelve una URL de pago o los datos de un QR dinamico.
   createCharge(input: {
     paymentId: string;
     amount: number;
@@ -282,9 +282,8 @@ export interface IPaymentGateway {
     description: string;
   }): Promise<{ externalReference: string; redirectUrl?: string; qrData?: string }>;
 
-  // Solo lo implementan proveedores que soportan confirmacion automatica (Libelula si).
-  // El adaptador manual lo deja sin implementar -- la confirmacion sigue siendo manual,
-  // por eso el metodo devuelve null en vez de forzar un webhook que no existe.
+  // Solo lo implementan proveedores con confirmacion automatica via webhook (Libelula si). El
+  // adaptador manual no lo define -- la confirmacion sigue siendo un click del propietario.
   verifyWebhookSignature?(payload: unknown, signature: string): boolean;
 
   refund(externalReference: string, amount?: number): Promise<{ success: boolean }>;
@@ -295,33 +294,45 @@ Adaptadores:
 
 ```mermaid
 graph TB
-    subgraph "Dominio / Aplicacion (no conoce proveedores)"
-        PS[PaymentService]
-        PORT[["IPaymentGateway (puerto)"]]
-    end
     subgraph "Infraestructura (adaptadores intercambiables)"
-        MANUAL["ManualProofGateway<br/>(comprobante + confirmacion a mano -- el actual)"]
+        PORT[["IPaymentGateway (puerto)"]]
+        MANUAL["ManualProofGateway<br/>(comprobante + confirmacion a mano -- el actual, ya construido)"]
         LIBELULA["LibelulaGateway<br/>(fase futura)"]
         OTRO["Proximo proveedor<br/>(si algun dia se cambia)"]
     end
 
-    PS --> PORT
     PORT -.implementa.-> MANUAL
     PORT -.implementa.-> LIBELULA
     PORT -.implementa.-> OTRO
     LIBELULA --> API[API de Libelula]
     API --> WEBHOOK[Webhook de confirmacion]
-    WEBHOOK --> PS
 ```
 
-- Cual adaptador esta activo se decide por configuracion (variable de entorno
-  `PAYMENT_GATEWAY_PROVIDER=manual|libelula`), inyectado una sola vez en el modulo de Nest
-  (mismo patron `useFactory`/`useClass` que ya usan otros providers del proyecto). Cambiar de
-  proveedor el dia de manana es escribir un adaptador nuevo + un valor de config, sin tocar
-  `PaymentService` ni nada de dominio.
-- El adaptador manual (`ManualProofGateway`) **envuelve exactamente el flujo que ya existe hoy**
-  -- se construye primero, sin cambiar ningun comportamiento, solo para validar que el puerto
-  esta bien disenado antes de escribir un segundo adaptador real.
+**Lo que se construyo (`ManualProofGateway`,
+`backend/src/modules/payment/infrastructure/gateways/manual-proof.gateway.ts`) envuelve
+exactamente lo que ya existia**, sin cambiar ningun comportamiento: como no hay ningun proveedor
+externo al que llamar, `createCharge()` devuelve el propio `paymentId` como `externalReference`
+(sin `redirectUrl` ni `qrData` -- no hay a donde redirigir), y `refund()` devuelve
+`{ success: false }` con un log explicando que el reembolso, si hace falta, lo hace el
+propietario por fuera del sistema. `verifyWebhookSignature` queda sin implementar, tal cual
+preveia el diseno. Wired en `payment.module.ts` con el mismo patron `useClass` que ya usa
+`PAYMENT_REPOSITORY` -- confirmado en verde: 26 tests unitarios nuevos/existentes del modulo de
+pagos, `tsc --noEmit` limpio, y arranque real del backend en Docker sin errores de resolucion de
+dependencias.
+
+**Dos decisiones de alcance, a proposito, para esta fase:**
+- **`PaymentService` todavia no depende de `IPaymentGateway`.** El flujo de comprobante manual
+  (`createPayment` / `uploadProof` / `confirmPayment`) no tiene hoy ningun paso que corresponda
+  a "arrancar un cobro" o "pedir un reembolso" -- el cliente ya pago por su cuenta antes de subir
+  el comprobante. Forzar una llamada a `createCharge()`/`refund()` sin nada real que hacer con el
+  resultado hubiera sido un llamado sin uso, no una validacion del diseno. El puerto se prueba
+  via DI (el modulo resuelve `PAYMENT_GATEWAY` sin error) y con los tests del adaptador; el punto
+  de union real con `PaymentService` llega en la Fase 4, cuando exista un flujo de "pagar con la
+  pasarela" (no solo "subir comprobante") que de verdad necesite un `redirectUrl`/`qrData`.
+- **No existe todavia el switch por configuracion `PAYMENT_GATEWAY_PROVIDER=manual|libelula`.**
+  Con un solo adaptador real (`manual`), esa variable no tendria mas que un valor posible --
+  se agrega en la Fase 4 junto con `LibelulaGateway`, que es cuando efectivamente hay algo entre
+  lo que elegir.
 
 ### 4.5 Adaptador Libelula (fase futura, alcance alto nivel)
 
@@ -402,7 +413,7 @@ ya este mergeada):
 | Hecho | **0** | Sacar `EVENT`: migracion de datos, borrar rama muerta del calculo, actualizar UI y tests | Chico | Corrige lo que ya esta confundiendo a un cliente hoy; no depende de nada mas |
 | Hecho | **1** | `paymentPolicy` + `depositPercentage` en `Venue`, centralizar el calculo del deposito, conectar `instantBooking` en `requestBooking()` (4.2.1), UI unificada "Como se confirman tus reservas / Como se cobran" en el dashboard. Suma tambien el `paymentType` derivado (`DEPOSIT`/`FULL`) del primer pago -- se adelanto de la Fase 2 porque, sin esto, una reserva con `FULL_UPFRONT` quedaba mal marcada `DEPOSIT_PAID` en vez de `FULLY_PAID` (bug real encontrado probando la fase, no solo teorico) | Mediano | La pasarela (fase 3) necesita saber si el local pide anticipo o pago completo -- se define antes. `instantBooking` entra en la misma fase porque comparte pantalla y es chico (una condicion, sin modelo nuevo) |
 | Hecho | **2** | Pantalla de saldo restante (`paymentType: REMAINING`, boton en el detalle de reserva del cliente), seccion "Estado de pago" en el modal de reserva del propietario. Suma tambien validacion de `paymentType` por `BookingStatus` en el backend, redondeo de centavos consistente frontend/backend, y bloqueo de un segundo comprobante pendiente del mismo tipo -- tres bugs reales encontrados probando la fase | Mediano | Completa el flujo manual antes de abstraerlo -- la fase 3 envuelve algo terminado, no a medias |
-| Pendiente | **3** | `IPaymentGateway` + `ManualProofGateway` (mismo comportamiento de hoy, solo reorganizado detras del puerto) | Chico-mediano | Refactor puro, sin cambio de comportamiento -- valida que el diseno del puerto sirve antes de sumar un proveedor real |
+| Hecho | **3** | `IPaymentGateway` + `ManualProofGateway` (mismo comportamiento de hoy, solo reorganizado detras del puerto). `PaymentService` todavia no lo llama -- el flujo de comprobante manual no tiene un paso real de "cobro"/"reembolso" que necesite el puerto todavia, ver 4.4 | Chico-mediano | Refactor puro, sin cambio de comportamiento -- valida que el diseno del puerto sirve antes de sumar un proveedor real |
 | Pendiente | **4** | `LibelulaGateway` + webhook + rollout | Grande, proyecto aparte | Necesita su propia investigacion de la API de Libelula antes de estimarse en detalle |
 | Pendiente | **5** | Modo "Cotizar" (`pricingMode`, `QuoteRequest`, boton "Cotizar" en el detalle del local, bandeja de cotizaciones en el dashboard) -- ver 4.6 | Mediano-grande, requiere su propio diseno de detalle | Independiente del resto (resuelve "cuanto cuesta", no "como se cobra") -- solo depende de la Fase 0 por compartir el modelo de precio. Puede ejecutarse en paralelo a las fases 2-4 |
 
