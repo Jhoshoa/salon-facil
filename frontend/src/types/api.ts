@@ -410,6 +410,9 @@ export interface Booking {
   selectedExtras: SelectedExtra[] | null;
   venue?: Venue;
   client?: { id: string; fullName: string; email: string; phone: string | null };
+  /** The backend always includes this (every booking query eager-loads payments), so it's safe
+   * to read directly off a fetched Booking instead of firing a second request for it. */
+  payments?: Payment[];
 }
 
 export interface Review {

@@ -109,7 +109,7 @@ describe('PaymentService', () => {
   beforeEach(async () => {
     paymentRepository = {
       findById: jest.fn(),
-      findByBooking: jest.fn(),
+      findByBooking: jest.fn().mockResolvedValue([]),
       findByClient: jest.fn(),
       findPendingByOwner: jest.fn(),
       findAllPending: jest.fn(),
@@ -288,6 +288,114 @@ describe('PaymentService', () => {
           amount: 1,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rounds the remaining amount before comparing, so floating-point noise never causes a false rejection', async () => {
+      // 2333 - 1049.85 is not a clean float subtraction (raw JS gives 1283.1499999999999) --
+      // this only passes if the service rounds its own expected value the same way the
+      // frontend rounds what it sends.
+      bookingRepository.findById.mockResolvedValue(
+        makeBooking({
+          totalPrice: 2333,
+          depositAmount: 1049.85,
+          status: BookingStatus.DEPOSIT_PAID,
+          depositPaid: true,
+        }),
+      );
+      paymentRepository.create.mockResolvedValue(
+        makePayment({ paymentType: PaymentType.REMAINING, amount: 1283.15 }),
+      );
+
+      await service.createPayment('booking-1', 'client-1', {
+        paymentType: PaymentType.REMAINING,
+        method: PaymentMethod.CASH,
+        amount: 1283.15,
+      });
+
+      expect(paymentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 1283.15 }),
+      );
+    });
+
+    it('rejects a REMAINING payment while the booking is still APPROVED (deposit not confirmed yet) -- without this, the payment would be created for only the balance, and confirming it would still jump the booking straight to FULLY_PAID', async () => {
+      bookingRepository.findById.mockResolvedValue(makeBooking({ status: BookingStatus.APPROVED }));
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.REMAINING,
+          method: PaymentMethod.CASH,
+          amount: 3500,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(paymentRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a DEPOSIT payment once the booking is already DEPOSIT_PAID', async () => {
+      bookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.DEPOSIT_PAID, depositPaid: true }),
+      );
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.DEPOSIT,
+          method: PaymentMethod.BANK_TRANSFER,
+          amount: 1500,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects a FULL payment once the booking is already DEPOSIT_PAID', async () => {
+      bookingRepository.findById.mockResolvedValue(
+        makeBooking({ status: BookingStatus.DEPOSIT_PAID, depositPaid: true }),
+      );
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.FULL,
+          method: PaymentMethod.BANK_TRANSFER,
+          amount: 5000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects creating a second payment of the same type while one is already pending -- otherwise the owner could see two identical rows and confirm both, double-counting the payment', async () => {
+      bookingRepository.findById.mockResolvedValue(makeBooking());
+      paymentRepository.findByBooking.mockResolvedValue([
+        makePayment({
+          id: 'payment-existing',
+          paymentType: PaymentType.DEPOSIT,
+          status: PaymentStatus.PENDING,
+        }),
+      ]);
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.DEPOSIT,
+          method: PaymentMethod.BANK_TRANSFER,
+          amount: 1500,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(paymentRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('allows a new payment of the same type once the earlier one was rejected (FAILED), not just PENDING', async () => {
+      bookingRepository.findById.mockResolvedValue(makeBooking());
+      paymentRepository.findByBooking.mockResolvedValue([
+        makePayment({
+          id: 'payment-rejected',
+          paymentType: PaymentType.DEPOSIT,
+          status: PaymentStatus.FAILED,
+        }),
+      ]);
+      paymentRepository.create.mockResolvedValue(makePayment({ id: 'payment-2' }));
+
+      await service.createPayment('booking-1', 'client-1', {
+        paymentType: PaymentType.DEPOSIT,
+        method: PaymentMethod.BANK_TRANSFER,
+        amount: 1500,
+      });
+
+      expect(paymentRepository.create).toHaveBeenCalled();
     });
   });
 

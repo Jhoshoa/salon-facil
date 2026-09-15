@@ -242,16 +242,17 @@
   no, si activo reserva inmediata), el cliente paga, el propietario confirma</strong> — pero cada
   local elige su propia configuracion: si hace falta aprobar cada solicitud a mano, cuanto
   anticipo pide (o si pide el pago completo de una), y si tiene un precio publicado. La
-  <strong>Fase 1</strong> del plan ya esta en produccion — politica de pago, porcentaje de
-  anticipo y reserva inmediata son reales, no solo diseño — y de paso corregimos un bug real que
-  encontramos probando: un pago completo quedaba mal etiquetado como &ldquo;anticipo&rdquo; y
-  nunca llegaba a <code>FULLY_PAID</code>. Lo que todavia falta es la pantalla para pagar el
-  saldo restante (diagrama 1) y el modo &ldquo;Cotizar&rdquo; sin precio fijo (diagrama 4).
+  <strong>Fase 1</strong> y la <strong>Fase 2</strong> del plan ya estan en produccion —
+  politica de pago, porcentaje de anticipo, reserva inmediata y la pantalla para pagar el saldo
+  restante son reales, no solo diseño. En el camino corregimos dos bugs reales que encontramos
+  probando: un pago completo quedaba mal etiquetado como &ldquo;anticipo&rdquo; y nunca llegaba a
+  <code>FULLY_PAID</code> (Fase 1), y el saldo restante se podia intentar pagar antes de que el
+  anticipo estuviera confirmado (Fase 2). Lo unico que todavia falta es el modo
+  &ldquo;Cotizar&rdquo; sin precio fijo (diagrama 4).
 </p>
 
 <div class="status-row">
   <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
-  <span class="pill partial">&#9679; Vigente, con un hueco conocido</span>
   <span class="pill planned">&#9679; Planeado, sin codigo todavia</span>
 </div>
 
@@ -259,15 +260,13 @@
   <div class="flow-head">
     <span class="flow-num">Uno</span>
     <h2>Politica &ldquo;Anticipo + saldo restante&rdquo;</h2>
-    <span class="pill partial">&#9679; Vigente, con un hueco conocido</span>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
   </div>
   <p class="flow-desc">
     La politica por defecto de todo local nuevo (30% de anticipo) y la que usa hoy la mayoria del
     catalogo. El porcentaje ya es configurable por local (10%&ndash;90%) desde el dashboard del
-    propietario, y el anticipo se calcula, cobra y confirma correctamente. Lo que sigue sin
-    existir es la pantalla para pagar el <strong>saldo restante</strong> una vez pagado el
-    anticipo &mdash; hoy ese saldo se sigue cobrando fuera del sistema, igual que antes de la
-    Fase 1.
+    propietario, y tanto el anticipo como el <strong>saldo restante</strong> se calculan, cobran
+    y confirman dentro del sistema &mdash; ya no hay que cobrar nada por fuera.
   </p>
   <div class="diagram-frame">
 <pre class="mermaid">
@@ -279,22 +278,31 @@ flowchart TD
     C -->|"Cliente paga el anticipo&lt;br/&gt;% configurado por el local&lt;br/&gt;&#40;30% por defecto&#41;"| D{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
     D -->|Rechaza| C
     D -->|Confirma| E["&lt;b&gt;DEPOSIT_PAID&lt;/b&gt;"]:::step
-    E -.->|"sin pantalla para el saldo"| GAP["el saldo se cobra&lt;br/&gt;fuera del sistema"]:::gap
-    E --> F["Propietario marca completada&lt;br/&gt;despues del evento"]:::step
+    E -->|"Cliente paga el saldo restante&lt;br/&gt;&#40;monto exacto, validado&lt;br/&gt;por el backend&#41;"| H{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
+    H -->|Rechaza| E
+    H -->|Confirma| I["&lt;b&gt;FULLY_PAID&lt;/b&gt;"]:::step
+    I --> F["Propietario marca completada&lt;br/&gt;despues del evento"]:::step
     F --> G(["COMPLETED"]):::success
 
     classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
     classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
     classDef success fill:#e7f3ec,stroke:#2f7d4f,stroke-width:1.5px,color:#1c5233
     classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
-    classDef gap fill:#fff4e0,stroke:#c87f0a,stroke-width:1.5px,color:#7a4d06,stroke-dasharray: 4 3
 </pre>
   </div>
   <div class="legend">
     <span><i class="swatch" style="background:#efe7d6;border-color:#a9861d"></i>decision del propietario</span>
     <span><i class="swatch" style="background:#e7f3ec;border-color:#2f7d4f"></i>estado final exitoso</span>
     <span><i class="swatch" style="background:#fbeceb;border-color:#b3261e"></i>estado final cancelado</span>
-    <span><i class="swatch" style="background:#fff4e0;border-color:#c87f0a"></i>hueco conocido</span>
+  </div>
+  <div class="note fixed">
+    <strong>Fase 2, corregido probando:</strong> el backend ahora exige que el saldo restante
+    solo se pueda pagar desde <code>DEPOSIT_PAID</code> (no desde <code>APPROVED</code>, sin
+    anticipo confirmado) y que el anticipo/pago completo solo se pueda pagar desde
+    <code>APPROVED</code> &mdash; antes esto no se validaba por tipo de pago. Tambien se corrigio
+    un desajuste de redondeo de centavos entre lo que calcula el frontend y lo que valida el
+    backend, y se bloqueo la posibilidad de subir dos comprobantes del mismo tipo mientras uno ya
+    esta esperando confirmacion del propietario.
   </div>
 </section>
 
@@ -449,9 +457,9 @@ flowchart TD
 <footer>
   Diagramas generados a partir del codigo real (<code>booking.service.ts</code>,
   <code>payment.service.ts</code>, <code>payment-proof-drawer.tsx</code>,
-  <code>venue.entity.ts</code>) y verificados a mano en la aplicacion corriendo, no solo leidos
-  del codigo. Los diagramas 1 a 3 y 5 describen la Fase 1, ya en produccion
-  (<code>docs/booking/pricing-and-payments.md</code>) &mdash; el diagrama 1 todavia tiene el
-  hueco de la pantalla de saldo restante, pendiente para la Fase 2. El diagrama 4
-  (&ldquo;Cotizar&rdquo;) sigue siendo solo diseño, sin codigo todavia.
+  <code>booking-detail-client.tsx</code>, <code>venue.entity.ts</code>) y verificados a mano en la
+  aplicacion corriendo, no solo leidos del codigo. Los diagramas 1, 2, 3 y 5 describen la Fase 1 y
+  la Fase 2, ambas ya en produccion (<code>docs/booking/pricing-and-payments.md</code>) &mdash; el
+  diagrama 1 ya incluye la pantalla de saldo restante. El diagrama 4 (&ldquo;Cotizar&rdquo;) sigue
+  siendo solo diseño, sin codigo todavia.
 </footer>
