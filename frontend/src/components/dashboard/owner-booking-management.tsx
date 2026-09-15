@@ -23,15 +23,17 @@ import {
 import { getMyVenues } from '@/lib/api/venues.api';
 import { getPendingOwnerPayments, confirmPayment, rejectPayment } from '@/lib/api/payments.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
-import type { Booking, BookingStatus, Payment } from '@/types/api';
+import type { Booking, BookingStatus, Payment, PaymentType } from '@/types/api';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
+import { paymentTypeLabels } from '@/components/payments/payment-labels';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { WhatsAppIcon } from '@/components/shared/brand-icons';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { SubmitButton } from '@/components/shared/submit-button';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -76,6 +78,37 @@ interface RejectState {
 
 const extrasTotalOf = (booking: Booking) =>
   booking.selectedExtras?.reduce((sum, extra) => sum + extra.extraCost, 0) ?? 0;
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+type PaymentLegStatus = 'pagado' | 'revisando' | 'pendiente';
+
+/** Looks at every payment of a given type ever created for this booking (there can be more than
+ * one if the owner rejected an earlier comprobante) and reduces it to one status: a confirmed
+ * one always wins, otherwise a pending one means "check the queue below", otherwise nothing has
+ * been submitted yet. */
+const paymentLegStatus = (payments: Payment[] | undefined, type: PaymentType): PaymentLegStatus => {
+  const relevant = (payments ?? []).filter((payment) => payment.paymentType === type);
+  if (relevant.some((payment) => payment.status === 'COMPLETED')) return 'pagado';
+  if (relevant.some((payment) => payment.status === 'PENDING')) return 'revisando';
+  return 'pendiente';
+};
+
+const paymentLegStatusLabel: Record<PaymentLegStatus, string> = {
+  pagado: 'Pagado',
+  revisando: 'Revisando comprobante',
+  pendiente: 'Pendiente',
+};
+
+const paymentLegStatusVariant: Record<PaymentLegStatus, 'default' | 'secondary' | 'outline'> = {
+  pagado: 'default',
+  revisando: 'secondary',
+  pendiente: 'outline',
+};
+
+const PaymentLegBadge = ({ status }: { status: PaymentLegStatus }) => (
+  <Badge variant={paymentLegStatusVariant[status]}>{paymentLegStatusLabel[status]}</Badge>
+);
 
 const OwnerBookingRow = ({
   booking,
@@ -170,6 +203,7 @@ const OwnerBookingRow = ({
 
 const BookingDetailModal = ({
   booking,
+  isFullUpfront,
   onOpenChange,
   onApprove,
   onReject,
@@ -178,6 +212,7 @@ const BookingDetailModal = ({
   completing,
 }: {
   booking: Booking | null;
+  isFullUpfront: boolean;
   onOpenChange: (open: boolean) => void;
   onApprove: (booking: Booking) => void;
   onReject: (booking: Booking) => void;
@@ -279,10 +314,49 @@ const BookingDetailModal = ({
                   <span>Total</span>
                   <span>{formatCurrency(booking.totalPrice)}</span>
                 </li>
-                <li className="flex items-center justify-between gap-3 text-muted-foreground">
-                  <span>Anticipo {booking.depositPaid ? '(pagado)' : '(pendiente)'}</span>
-                  <span>{formatCurrency(booking.depositAmount)}</span>
-                </li>
+                {isFullUpfront ? null : (
+                  <>
+                    <li className="flex items-center justify-between gap-3 text-muted-foreground">
+                      <span>Anticipo</span>
+                      <span>{formatCurrency(booking.depositAmount)}</span>
+                    </li>
+                    <li className="flex items-center justify-between gap-3 text-muted-foreground">
+                      <span>Saldo restante</span>
+                      <span>
+                        {formatCurrency(round2(booking.totalPrice - booking.depositAmount))}
+                      </span>
+                    </li>
+                  </>
+                )}
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Estado de pago
+              </p>
+              <ul className="mt-1 space-y-1.5">
+                {isFullUpfront ? (
+                  <li className="flex items-center justify-between gap-3">
+                    <span>Pago completo</span>
+                    <PaymentLegBadge status={paymentLegStatus(booking.payments, 'FULL')} />
+                  </li>
+                ) : (
+                  <>
+                    <li className="flex items-center justify-between gap-3">
+                      <span>Anticipo</span>
+                      <PaymentLegBadge status={paymentLegStatus(booking.payments, 'DEPOSIT')} />
+                    </li>
+                    <li className="flex items-center justify-between gap-3">
+                      <span>Saldo restante</span>
+                      {booking.status === 'PENDING' || booking.status === 'APPROVED' ? (
+                        <Badge variant="outline">No aplica todavia</Badge>
+                      ) : (
+                        <PaymentLegBadge status={paymentLegStatus(booking.payments, 'REMAINING')} />
+                      )}
+                    </li>
+                  </>
+                )}
               </ul>
             </div>
           </div>
@@ -328,7 +402,9 @@ const OwnerPaymentRow = ({
 }) => (
   <div className="sf-card grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
     <div>
-      <p className="font-medium">{formatCurrency(payment.amount)}</p>
+      <p className="font-medium">
+        {paymentTypeLabels[payment.paymentType]} · {formatCurrency(payment.amount)}
+      </p>
       <p className="text-sm text-muted-foreground">
         {payment.booking?.venue?.name ?? 'Salon'} · {payment.booking?.eventType ?? 'Reserva'} ·{' '}
         {payment.method}
@@ -464,6 +540,9 @@ export const OwnerBookingManagement = () => {
   if (!venuesQuery.data?.length)
     return <EmptyState icon={CreditCard} title="No tienes salones para gestionar" />;
 
+  const selectedVenue = venuesQuery.data.find((venue) => venue.id === venueId);
+  const isFullUpfront = selectedVenue?.paymentPolicy === 'FULL_UPFRONT';
+
   const allBookings = bookingsQuery.data ?? [];
   const filteredBookings = allBookings.filter((booking) =>
     matchesStatusFilter(booking, statusFilter),
@@ -586,6 +665,7 @@ export const OwnerBookingManagement = () => {
 
       <BookingDetailModal
         booking={bookingDetail}
+        isFullUpfront={Boolean(isFullUpfront)}
         onOpenChange={(open) => {
           if (!open) setBookingDetail(null);
         }}
@@ -607,7 +687,7 @@ export const OwnerBookingManagement = () => {
         title="Aprobar reserva"
         description={
           bookingToApprove
-            ? `Vas a aprobar la solicitud de "${bookingToApprove.eventType}" de ${bookingToApprove.client?.fullName ?? 'este cliente'}. El cliente podra continuar con el pago del anticipo.`
+            ? `Vas a aprobar la solicitud de "${bookingToApprove.eventType}" de ${bookingToApprove.client?.fullName ?? 'este cliente'}. El cliente podra continuar con el pago ${isFullUpfront ? 'completo' : 'del anticipo'}.`
             : ''
         }
         confirmLabel="Aprobar"
@@ -650,7 +730,13 @@ export const OwnerBookingManagement = () => {
       <ConfirmDialog
         open={Boolean(paymentToConfirm)}
         title="Confirmar pago"
-        description="La reserva pasara a anticipo pagado cuando el pago sea de tipo anticipo."
+        description={
+          paymentToConfirm
+            ? paymentToConfirm.paymentType === 'DEPOSIT'
+              ? 'La reserva pasara a "Anticipo pagado". El cliente va a poder pagar el saldo restante despues.'
+              : 'La reserva quedara completamente pagada.'
+            : ''
+        }
         confirmLabel="Confirmar pago"
         isLoading={confirmPaymentMutation.isPending}
         onOpenChange={(open) => {

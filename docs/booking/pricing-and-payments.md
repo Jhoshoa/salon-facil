@@ -230,22 +230,29 @@ Antes de meter una pasarela nueva, se termina el camino manual que ya existe -- 
 abstraccion del paso 4.4 envuelve un flujo completo, no uno a medias:
 
 - **Pantalla para pagar el saldo restante**: mismo componente que ya sube comprobantes
-  (`payment-proof-drawer.tsx`), pero disparado desde la vista de "Mis reservas" del cliente
-  cuando `booking.status === 'DEPOSIT_PAID'`, con `paymentType: 'REMAINING'` y el monto ya
-  calculado (`totalPrice - depositAmount`), no editable por el cliente.
+  (`payment-proof-drawer.tsx`), disparado desde la vista de detalle de reserva del cliente
+  (`booking-detail-client.tsx`) cuando `booking.status === 'DEPOSIT_PAID'`, con
+  `paymentType: 'REMAINING'` y el monto ya calculado (`totalPrice - depositAmount`, redondeado a
+  centavos), no editable por el cliente. **Hecho** (Fase 2) -- el boton solo aparece si no hay ya
+  un comprobante `REMAINING` pendiente de confirmacion (si lo hay, se muestra un mensaje de
+  espera en su lugar).
 - **El tipo de pago deja de ser una eleccion libre**: el drawer recibe el `paymentType`
   correcto como prop segun de donde se lo invoco (aprobada+sin pagos -> `DEPOSIT` o `FULL` segun
   la politica del local; con anticipo ya pagado -> `REMAINING`), en vez de tenerlo hardcodeado.
-  Esto tambien cierra la puerta a que un cliente suba un comprobante del tipo equivocado.
-  **La mitad `DEPOSIT`/`FULL` ya esta hecha** (adelantada a la Fase 1, ver la tabla de abajo) --
-  falta la mitad `REMAINING`, que depende de construir primero el punto de entrada de arriba
-  (todavia no existe ningun boton que dispare el drawer para pagar el saldo).
+  Esto tambien cierra la puerta a que un cliente suba un comprobante del tipo equivocado. **Hecho
+  por completo** -- la mitad `DEPOSIT`/`FULL` se adelanto a la Fase 1 (ver la tabla de abajo), y
+  la mitad `REMAINING` se cerro en la Fase 2. Ademas, el backend ahora valida por su cuenta que
+  cada `paymentType` solo se pueda crear desde el `BookingStatus` que le corresponde
+  (`DEPOSIT`/`FULL` solo desde `APPROVED`, `REMAINING` solo desde `DEPOSIT_PAID`) y bloquea un
+  segundo comprobante del mismo tipo mientras el anterior sigue `PENDING` -- no es solo disciplina
+  del frontend, el backend no confia en el `paymentType` que le llega sin revalidarlo contra el
+  estado real de la reserva.
 - **Reducir el ida-y-vuelta percibido**: el modal de detalle de reserva del propietario (ya
   construido, `frontend/src/components/dashboard/owner-booking-management.tsx`) suma una
-  seccion "Estado de pago" con una linea de tiempo simple (Anticipo: pagado/pendiente · Saldo:
-  pagado/pendiente/no aplica) en vez de que el propietario tenga que cruzar datos entre la
-  tarjeta de la reserva y la seccion separada de "Pagos pendientes" para entender en que paso
-  esta cada una.
+  seccion "Estado de pago" con una linea de tiempo simple (Anticipo: pagado/revisando
+  comprobante/pendiente · Saldo: pagado/revisando comprobante/pendiente/no aplica) en vez de que
+  el propietario tenga que cruzar datos entre la tarjeta de la reserva y la seccion separada de
+  "Pagos pendientes" para entender en que paso esta cada una. **Hecho** (Fase 2).
 
 ### 4.4 Pasarela de pago abstraida (Ports & Adapters)
 
@@ -386,7 +393,7 @@ ya este mergeada):
 |---|---|---|---|---|
 | Hecho | **0** | Sacar `EVENT`: migracion de datos, borrar rama muerta del calculo, actualizar UI y tests | Chico | Corrige lo que ya esta confundiendo a un cliente hoy; no depende de nada mas |
 | Hecho | **1** | `paymentPolicy` + `depositPercentage` en `Venue`, centralizar el calculo del deposito, conectar `instantBooking` en `requestBooking()` (4.2.1), UI unificada "Como se confirman tus reservas / Como se cobran" en el dashboard. Suma tambien el `paymentType` derivado (`DEPOSIT`/`FULL`) del primer pago -- se adelanto de la Fase 2 porque, sin esto, una reserva con `FULL_UPFRONT` quedaba mal marcada `DEPOSIT_PAID` en vez de `FULLY_PAID` (bug real encontrado probando la fase, no solo teorico) | Mediano | La pasarela (fase 3) necesita saber si el local pide anticipo o pago completo -- se define antes. `instantBooking` entra en la misma fase porque comparte pantalla y es chico (una condicion, sin modelo nuevo) |
-| Pendiente | **2** | Pantalla de saldo restante (`paymentType: REMAINING`, todavia sin punto de entrada en la UI), seccion "Estado de pago" en el modal de reserva | Mediano | Completa el flujo manual antes de abstraerlo -- la fase 3 envuelve algo terminado, no a medias |
+| Hecho | **2** | Pantalla de saldo restante (`paymentType: REMAINING`, boton en el detalle de reserva del cliente), seccion "Estado de pago" en el modal de reserva del propietario. Suma tambien validacion de `paymentType` por `BookingStatus` en el backend, redondeo de centavos consistente frontend/backend, y bloqueo de un segundo comprobante pendiente del mismo tipo -- tres bugs reales encontrados probando la fase | Mediano | Completa el flujo manual antes de abstraerlo -- la fase 3 envuelve algo terminado, no a medias |
 | Pendiente | **3** | `IPaymentGateway` + `ManualProofGateway` (mismo comportamiento de hoy, solo reorganizado detras del puerto) | Chico-mediano | Refactor puro, sin cambio de comportamiento -- valida que el diseno del puerto sirve antes de sumar un proveedor real |
 | Pendiente | **4** | `LibelulaGateway` + webhook + rollout | Grande, proyecto aparte | Necesita su propia investigacion de la API de Libelula antes de estimarse en detalle |
 | Pendiente | **5** | Modo "Cotizar" (`pricingMode`, `QuoteRequest`, boton "Cotizar" en el detalle del local, bandeja de cotizaciones en el dashboard) -- ver 4.6 | Mediano-grande, requiere su propio diseno de detalle | Independiente del resto (resuelve "cuanto cuesta", no "como se cobra") -- solo depende de la Fase 0 por compartir el modelo de precio. Puede ejecutarse en paralelo a las fases 2-4 |
