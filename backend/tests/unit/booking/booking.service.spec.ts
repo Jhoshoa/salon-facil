@@ -19,14 +19,46 @@ import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/enti
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
 import { NotificationService } from '../../../src/modules/notification/application/services/notification.service';
 
+// Dates below are computed relative to "now" (in UTC, matching how the service parses bare
+// yyyy-MM-dd strings and how the mixed-pricing-unit mocks read getUTCDay()) instead of hardcoded
+// literals, so this suite never goes stale again the way it did when the dates it shipped with
+// caught up to the real calendar and started tripping the "no puede ser en el pasado" guard.
+const startOfTodayUTC = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+};
+const addDaysUTC = (date: Date, days: number) => new Date(date.getTime() + days * 86400000);
+const toISODate = (date: Date) => date.toISOString().slice(0, 10);
+const nextWeekdayUTC = (from: Date, targetUTCDay: number) =>
+  addDaysUTC(from, (targetUTCDay - from.getUTCDay() + 7) % 7);
+
+// A generic "today" for these tests, comfortably 30 days out so it's never at risk of landing
+// in the past for however long the suite goes unrun.
+const ANCHOR = addDaysUTC(startOfTodayUTC(), 30);
+const ANCHOR_DATE = toISODate(ANCHOR);
+const ANCHOR_PLUS_1 = addDaysUTC(ANCHOR, 1);
+const ANCHOR_PLUS_1_DATE = toISODate(ANCHOR_PLUS_1);
+const ANCHOR_PLUS_2 = addDaysUTC(ANCHOR, 2);
+const ANCHOR_PLUS_2_DATE = toISODate(ANCHOR_PLUS_2);
+const ANCHOR_MINUS_5_DATE = toISODate(addDaysUTC(ANCHOR, -5));
+// Beyond whatever the venue's max multi-day booking range is (same ~77-day gap the original
+// fixed dates used between their "today" and their "exceeds max days" endDate).
+const EXCEEDS_MAX_DAYS_DATE = toISODate(addDaysUTC(ANCHOR, 77));
+// The mixed-pricing-unit and midnight-hours fixtures need a real Friday/Saturday pair (the venue
+// mocks key opening hours off dayOfWeek 5/6), so these are computed rather than picked by hand.
+const FRIDAY = nextWeekdayUTC(ANCHOR, 5);
+const FRIDAY_DATE = toISODate(FRIDAY);
+const SATURDAY = addDaysUTC(FRIDAY, 1);
+const SATURDAY_DATE = toISODate(SATURDAY);
+
 const makeBooking = (overrides: Partial<BookingEntity> = {}) =>
   new BookingEntity({
     id: 'booking-1',
     venueId: 'venue-1',
     clientId: 'client-1',
     eventType: 'Boda',
-    eventDate: new Date('2026-09-15'),
-    endDate: new Date('2026-09-15'),
+    eventDate: ANCHOR,
+    endDate: ANCHOR,
     startTime: '14:00',
     endTime: '22:00',
     guestCount: 100,
@@ -154,7 +186,7 @@ describe('BookingService', () => {
         appliedPrice: 5000,
         totalPrice: 5000,
         depositAmount: 1500,
-        days: [{ date: '2026-09-15', matchedPriceType: 'BASE', unit: 'DAY', appliedPrice: 5000 }],
+        days: [{ date: ANCHOR_DATE, matchedPriceType: 'BASE', unit: 'DAY', appliedPrice: 5000 }],
       }),
       // No per-rule unit overrides in these fixtures — mirrors production's fallback to the
       // venue's own priceUnit when no matching VenuePrice declares a unit of its own.
@@ -197,7 +229,7 @@ describe('BookingService', () => {
   describe('requestBooking', () => {
     const bookingDto = {
       eventType: 'Boda',
-      eventDate: '2026-09-15',
+      eventDate: ANCHOR_DATE,
       startTime: '14:00',
       endTime: '22:00',
       guestCount: 100,
@@ -247,7 +279,7 @@ describe('BookingService', () => {
 
     it('should throw ConflictException when date is not available', async () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue());
-      mockBookingRepository.findBookedDatesInRange.mockResolvedValue(['2026-09-15']);
+      mockBookingRepository.findBookedDatesInRange.mockResolvedValue([ANCHOR_DATE]);
 
       await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
         ConflictException,
@@ -257,7 +289,7 @@ describe('BookingService', () => {
     it('should throw ConflictException when a date in range is blocked by the owner', async () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue());
       mockBookingRepository.getCalendarBlocks.mockResolvedValue([
-        { id: 'block-1', date: new Date('2026-09-15'), reason: 'Mantenimiento' },
+        { id: 'block-1', date: ANCHOR, reason: 'Mantenimiento' },
       ]);
 
       await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
@@ -269,7 +301,10 @@ describe('BookingService', () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: false }));
 
       await expect(
-        service.requestBooking('venue-1', 'client-1', { ...bookingDto, endDate: '2026-09-17' }),
+        service.requestBooking('venue-1', 'client-1', {
+          ...bookingDto,
+          endDate: ANCHOR_PLUS_2_DATE,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -277,7 +312,10 @@ describe('BookingService', () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: true }));
 
       await expect(
-        service.requestBooking('venue-1', 'client-1', { ...bookingDto, endDate: '2026-09-10' }),
+        service.requestBooking('venue-1', 'client-1', {
+          ...bookingDto,
+          endDate: ANCHOR_MINUS_5_DATE,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -285,7 +323,10 @@ describe('BookingService', () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: true }));
 
       await expect(
-        service.requestBooking('venue-1', 'client-1', { ...bookingDto, endDate: '2026-12-01' }),
+        service.requestBooking('venue-1', 'client-1', {
+          ...bookingDto,
+          endDate: EXCEEDS_MAX_DAYS_DATE,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -297,18 +338,16 @@ describe('BookingService', () => {
         totalPrice: 15000,
         depositAmount: 4500,
         days: [
-          { date: '2026-09-15', matchedPriceType: 'BASE', appliedPrice: 5000 },
-          { date: '2026-09-16', matchedPriceType: 'BASE', appliedPrice: 5000 },
-          { date: '2026-09-17', matchedPriceType: 'BASE', appliedPrice: 5000 },
+          { date: ANCHOR_DATE, matchedPriceType: 'BASE', appliedPrice: 5000 },
+          { date: ANCHOR_PLUS_1_DATE, matchedPriceType: 'BASE', appliedPrice: 5000 },
+          { date: ANCHOR_PLUS_2_DATE, matchedPriceType: 'BASE', appliedPrice: 5000 },
         ],
       });
-      mockBookingRepository.create.mockResolvedValue(
-        makeBooking({ endDate: new Date('2026-09-17') }),
-      );
+      mockBookingRepository.create.mockResolvedValue(makeBooking({ endDate: ANCHOR_PLUS_2 }));
 
       const result = await service.requestBooking('venue-1', 'client-1', {
         ...bookingDto,
-        endDate: '2026-09-17',
+        endDate: ANCHOR_PLUS_2_DATE,
       });
 
       expect(result.priceCalculation.totalPrice).toBe(15000);
@@ -329,7 +368,7 @@ describe('BookingService', () => {
   describe('requestBooking — instant booking (Venue.instantBooking)', () => {
     const bookingDto = {
       eventType: 'Boda',
-      eventDate: '2026-09-15',
+      eventDate: ANCHOR_DATE,
       startTime: '14:00',
       endTime: '22:00',
       guestCount: 100,
@@ -359,7 +398,7 @@ describe('BookingService', () => {
 
     it('does not skip availability validation just because instant booking is on', async () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: true }));
-      mockBookingRepository.findBookedDatesInRange.mockResolvedValue(['2026-09-15']);
+      mockBookingRepository.findBookedDatesInRange.mockResolvedValue([ANCHOR_DATE]);
 
       await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
         ConflictException,
@@ -414,7 +453,7 @@ describe('BookingService', () => {
   describe('requestBooking — deposit follows the venue payment policy', () => {
     const bookingDto = {
       eventType: 'Boda',
-      eventDate: '2026-09-15',
+      eventDate: ANCHOR_DATE,
       startTime: '14:00',
       endTime: '22:00',
       guestCount: 100,
@@ -451,8 +490,8 @@ describe('BookingService', () => {
       });
     const mixedDto = {
       eventType: 'Boda',
-      eventDate: '2026-09-18', // Friday
-      endDate: '2026-09-19', // Saturday
+      eventDate: FRIDAY_DATE,
+      endDate: SATURDAY_DATE,
       startTime: '09:00',
       endTime: '22:00',
       guestCount: 100,
@@ -469,19 +508,19 @@ describe('BookingService', () => {
         totalPrice: 3140,
         depositAmount: 942,
         days: [
-          { date: '2026-09-18', matchedPriceType: 'BASE', unit: 'HOUR', appliedPrice: 2240 },
-          { date: '2026-09-19', matchedPriceType: 'WEEKEND', unit: 'DAY', appliedPrice: 900 },
+          { date: FRIDAY_DATE, matchedPriceType: 'BASE', unit: 'HOUR', appliedPrice: 2240 },
+          { date: SATURDAY_DATE, matchedPriceType: 'WEEKEND', unit: 'DAY', appliedPrice: 900 },
         ],
       });
       mockBookingRepository.create.mockResolvedValue(
-        makeBooking({ eventDate: new Date('2026-09-18'), endDate: new Date('2026-09-19') }),
+        makeBooking({ eventDate: FRIDAY, endDate: SATURDAY }),
       );
     });
 
     it('builds one BookingDate per day with its own resolved start/end time', async () => {
       await service.requestBooking('venue-1', 'client-1', {
         ...mixedDto,
-        dailySchedule: [{ date: '2026-09-18', startTime: '18:00', endTime: '21:00' }],
+        dailySchedule: [{ date: FRIDAY_DATE, startTime: '18:00', endTime: '21:00' }],
       });
 
       const createCallArg = mockBookingRepository.create.mock.calls[0][0];
@@ -504,7 +543,7 @@ describe('BookingService', () => {
       await expect(
         service.requestBooking('venue-1', 'client-1', {
           ...mixedDto,
-          dailySchedule: [{ date: '2026-09-18', startTime: '07:00', endTime: '10:00' }],
+          dailySchedule: [{ date: FRIDAY_DATE, startTime: '07:00', endTime: '10:00' }],
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -520,8 +559,8 @@ describe('BookingService', () => {
         service.requestBooking('venue-1', 'client-1', {
           ...mixedDto,
           dailySchedule: [
-            { date: '2026-09-18', startTime: '18:00', endTime: '21:00' },
-            { date: '2026-09-19', startTime: '11:00', endTime: '15:00' },
+            { date: FRIDAY_DATE, startTime: '18:00', endTime: '21:00' },
+            { date: SATURDAY_DATE, startTime: '11:00', endTime: '15:00' },
           ],
         }),
       ).rejects.toThrow(/no lo necesitan/);
@@ -541,7 +580,7 @@ describe('BookingService', () => {
       });
     const midnightDto = {
       eventType: 'Rodaje',
-      eventDate: '2026-09-18', // Friday
+      eventDate: FRIDAY_DATE,
       startTime: '18:00',
       endTime: '23:00',
       guestCount: 50,
