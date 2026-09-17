@@ -434,3 +434,8 @@ Diagramas actualizados con el estado real de cada flujo: [payment-flows.html](pa
   (4.2.1) porque ahi nunca hubo un paso de "rechazar" antes de comprometerse, pero es un problema
   del flujo de cancelacion en general, no exclusivo de esta fase. Documento aparte cuando se
   priorice.
+- **Como monetiza SalonFacil como plataforma** (comision, suscripcion, etc.) -- a proposito no es
+  parte de este documento, que resuelve como se cobra una reserva, no como cobra la plataforma.
+  Ver [owner-subscription-model.md](owner-subscription-model.md): se decidio suscripcion mensual
+  al propietario (no comision por reserva) por la falta de split de pagos confirmado en las
+  pasarelas evaluadas -- decision de modelo tomada, implementacion todavia sin empezar.
