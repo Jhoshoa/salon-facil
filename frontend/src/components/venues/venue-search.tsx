@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { CalendarDays, Map as MapIcon, Search, SlidersHorizontal, Users } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
   searchVenues,
 } from '@/lib/api/venues.api';
 import type { Departamento, PriceUnit, VenueSearchParams } from '@/types/api';
+import { useInfiniteScrollSentinel } from '@/hooks/use-infinite-scroll-sentinel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -113,9 +114,18 @@ export const VenueSearch = ({
     };
   });
 
-  const query = useQuery({
+  // Infinite scroll, not a fixed first page: the backend has always supported page/limit and
+  // returned total/totalPages, but nothing on this screen ever asked for page 2 -- a search
+  // with more than 12 results had the rest silently unreachable, with no "load more" and no
+  // indication anything was missing. `pageParam` drives the page requested; every new search
+  // or filter change gets a fresh queryKey, so TanStack Query naturally restarts at page 1
+  // instead of appending onto a stale filter's results.
+  const query = useInfiniteQuery({
     queryKey: ['venues', submittedParams],
-    queryFn: () => searchVenues(submittedParams!),
+    queryFn: ({ pageParam }) => searchVenues({ ...submittedParams!, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled: Boolean(submittedParams),
   });
   const amenitiesQuery = useQuery({
@@ -131,7 +141,13 @@ export const VenueSearch = ({
     queryFn: getUseTypesCatalog,
   });
 
-  const venues = query.data?.venues ?? query.data?.data ?? [];
+  const venues = query.data?.pages.flatMap((page) => page.venues ?? page.data ?? []) ?? [];
+  const total = query.data?.pages[0]?.total ?? venues.length;
+  const sentinelRef = useInfiniteScrollSentinel(() => {
+    if (query.hasNextPage && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  }, query.hasNextPage === true);
   const isCatalogLoading =
     amenitiesQuery.isLoading || spaceTypesQuery.isLoading || useTypesQuery.isLoading;
 
@@ -378,9 +394,7 @@ export const VenueSearch = ({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-2xl font-bold">
-                  {venues.length
-                    ? `${query.data?.total ?? venues.length} locales encontrados`
-                    : 'Locales disponibles'}
+                  {venues.length ? `${total} locales encontrados` : 'Locales disponibles'}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Resultados para {capacity} personas desde {startDate}
@@ -442,6 +456,20 @@ export const VenueSearch = ({
               ))}
             </div>
           ) : null}
+
+          {query.isFetchingNextPage ? (
+            <div className="space-y-4">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <VenueCardSkeleton key={`more-${index}`} />
+              ))}
+            </div>
+          ) : null}
+
+          {/* Invisible trigger for the next page -- sits right after the results (and after the
+              "loading more" skeletons, so it only re-enters view once those have rendered) and
+              fires fetchNextPage() as it nears the viewport. No button, no manual page number:
+              matches the "keeps loading as you scroll" catalog feel the rest of the site has. */}
+          {query.hasNextPage ? <div ref={sentinelRef} aria-hidden="true" className="h-1" /> : null}
         </section>
       </div>
 
