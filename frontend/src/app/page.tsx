@@ -122,8 +122,9 @@ export default function HomePage() {
             Cuaderno de bitacora — N.º 001
           </p>
           <h1 className="max-w-xl text-4xl font-semibold leading-[1.12] tracking-tight sm:text-5xl lg:text-[3.2rem]">
-            Un catalogo de los espacios <em className="font-normal italic text-primary">mas singulares</em>{' '}
-            de Bolivia, anotados uno por uno.
+            Un catalogo de los espacios{' '}
+            <em className="font-normal italic text-primary">mas singulares</em> de Bolivia, anotados
+            uno por uno.
           </h1>
           <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">
             No agregamos listados al azar. Cada salon, jardin o cholet que ves aqui fue visitado,
@@ -143,6 +144,7 @@ export default function HomePage() {
                 src={verdeManzanaGarden}
                 alt="Jardin Santa Cruz"
                 fill
+                priority
                 className="object-cover"
                 sizes="(min-width: 640px) 280px, 68vw"
               />
@@ -155,13 +157,17 @@ export default function HomePage() {
             </p>
           </PinnedPrint>
 
-          <PinnedPrint rotate="3deg" className="absolute right-0 top-[190px] z-10 w-[58%] sm:top-[50px] sm:w-[230px]">
+          <PinnedPrint
+            rotate="3deg"
+            className="absolute right-0 top-[190px] z-10 w-[58%] sm:top-[50px] sm:w-[230px]"
+          >
             <span className="sf-print-pin" />
             <div className="relative h-[140px] sm:h-[170px]">
               <Image
                 src={salonVipInterior}
                 alt="Interior El Alto"
                 fill
+                priority
                 className="object-cover"
                 sizes="(min-width: 640px) 230px, 58vw"
               />
@@ -174,13 +180,17 @@ export default function HomePage() {
             </p>
           </PinnedPrint>
 
-          <PinnedPrint rotate="2deg" className="absolute bottom-8 left-[30%] z-30 hidden w-[210px] sm:block sm:bottom-10 lg:bottom-14 lg:left-[34%]">
+          <PinnedPrint
+            rotate="2deg"
+            className="absolute bottom-8 left-[30%] z-30 hidden w-[210px] sm:bottom-10 sm:block lg:bottom-14 lg:left-[34%]"
+          >
             <span className="sf-print-pin" />
             <div className="relative h-[190px]">
               <Image
                 src={megatronFacade}
                 alt="Cholet El Alto"
                 fill
+                priority
                 className="object-cover"
                 sizes="210px"
               />
@@ -216,7 +226,11 @@ export default function HomePage() {
         <div className="grid gap-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-10">
           {galleryPrints.map((print, index) => {
             const rotate =
-              index % 3 === 0 ? '-rotate-[1.4deg]' : index % 3 === 1 ? 'rotate-[1.1deg]' : '-rotate-[0.8deg]';
+              index % 3 === 0
+                ? '-rotate-[1.4deg]'
+                : index % 3 === 1
+                  ? 'rotate-[1.1deg]'
+                  : '-rotate-[0.8deg]';
             return (
               <div key={print.name}>
                 <div className={`border border-border bg-card p-2.5 pb-0 shadow-md ${rotate}`}>
@@ -252,8 +266,8 @@ export default function HomePage() {
       <section className="border-y border-border">
         <div className="sf-container grid gap-10 py-16 lg:grid-cols-[1.2fr_repeat(3,1fr)]">
           <p className="font-serif text-xl italic leading-snug sm:col-span-2 lg:col-span-1 lg:max-w-[280px]">
-            No prometemos &ldquo;los mejores espacios de Bolivia&rdquo;. Anotamos los datos para
-            que decidas tu.
+            No prometemos &ldquo;los mejores espacios de Bolivia&rdquo;. Anotamos los datos para que
+            decidas tu.
           </p>
           {fieldStats.map((stat) => (
             <div key={stat.n}>
@@ -322,8 +336,7 @@ export default function HomePage() {
           </span>
           <h3 className="mx-auto max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
             Tu espacio tambien merece{' '}
-            <em className="font-normal italic text-secondary">su propia entrada</em> en el
-            cuaderno.
+            <em className="font-normal italic text-secondary">su propia entrada</em> en el cuaderno.
           </h3>
           <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-primary-foreground/70">
             Publica capacidad, precios y disponibilidad real. En cinco minutos tu ficha esta lista
