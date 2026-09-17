@@ -39,8 +39,7 @@ interface BookingFormProps {
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const FALLBACK_SCHEDULE = { startTime: '18:00', endTime: '23:00' };
 
-const unitLabels: Record<'EVENT' | 'HOUR' | 'DAY', string> = {
-  EVENT: 'por evento',
+const unitLabels: Record<'HOUR' | 'DAY', string> = {
   HOUR: 'por hora',
   DAY: 'por dia',
 };
@@ -50,24 +49,31 @@ const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slic
 const fieldInputClass =
   'h-auto w-full rounded-none border-0 border-b border-foreground bg-transparent px-0 pb-1.5 pt-1 text-sm shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0';
 
-const fieldLabelClass = 'mb-1.5 block text-[0.68rem] font-bold uppercase tracking-wider text-muted-foreground';
+const fieldLabelClass =
+  'mb-1.5 block text-[0.68rem] font-bold uppercase tracking-wider text-muted-foreground';
 
 /** A sensible startTime/endTime to preload the form with — the venue's own opening hours for
  * that weekday, rather than an arbitrary fixed range that may fall outside them (a HOUR-unit
  * venue would otherwise show a "horario invalido" error before the client has touched anything).
  * "00:00" as a closing time means "open until midnight" (see booking.service.ts); a real time
  * input can't represent 24:00, so it's mapped to 23:59 for the default. */
-const computeDefaultSchedule = (venue: Venue, dateStr: string): { startTime: string; endTime: string } => {
+const computeDefaultSchedule = (
+  venue: Venue,
+  dateStr: string,
+): { startTime: string; endTime: string } => {
   const hours = venue.openingHours;
   if (!hours?.length) return FALLBACK_SCHEDULE;
 
   const dayOfWeek = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
-  const entry = hours.find((h) => h.dayOfWeek === dayOfWeek && !h.isClosed) ?? hours.find((h) => !h.isClosed);
+  const entry =
+    hours.find((h) => h.dayOfWeek === dayOfWeek && !h.isClosed) ?? hours.find((h) => !h.isClosed);
   if (!entry) return FALLBACK_SCHEDULE;
 
   const startTime = entry.opensAt;
   const endTime = entry.closesAt === '00:00' ? '23:59' : entry.closesAt;
-  return timeToMinutes(startTime) < endTimeToMinutes(endTime) ? { startTime, endTime } : FALLBACK_SCHEDULE;
+  return timeToMinutes(startTime) < endTimeToMinutes(endTime)
+    ? { startTime, endTime }
+    : FALLBACK_SCHEDULE;
 };
 
 export const BookingForm = ({
@@ -111,7 +117,9 @@ export const BookingForm = ({
       createBooking(venue.id, values),
     onSuccess: (response) => {
       toast.success('Reserva solicitada', {
-        description: `Anticipo requerido: ${formatCurrency(response.booking.depositAmount)}`,
+        description: `${
+          venue.paymentPolicy === 'FULL_UPFRONT' ? 'Pago completo requerido' : 'Anticipo requerido'
+        }: ${formatCurrency(response.booking.depositAmount)}`,
       });
       form.reset();
       setConfirmOpen(false);
@@ -139,9 +147,9 @@ export const BookingForm = ({
   // Per-day time overrides, only used for days whose effective unit resolves to HOUR in a
   // mixed range (some days billed per-hour, others per-day) — see docs/fase-1 §6.2. Keyed by
   // date; seeded (and re-seeded) from the preview's resolved HOUR days once known below.
-  const [dailySchedule, setDailySchedule] = useState<Record<string, { startTime: string; endTime: string }>>(
-    {},
-  );
+  const [dailySchedule, setDailySchedule] = useState<
+    Record<string, { startTime: string; endTime: string }>
+  >({});
 
   const dailyScheduleEntries = useMemo<DailyScheduleEntry[] | undefined>(() => {
     const entries = Object.entries(dailySchedule).map(([date, t]) => ({ date, ...t }));
@@ -215,11 +223,19 @@ export const BookingForm = ({
   /** Hours actually billed for a given day in the range — from its per-day override if the
    * client customized it, otherwise the global startTime/endTime used for every HOUR day. */
   const hoursForDate = (date: string): number => {
-    const schedule = dailySchedule[date] ?? { startTime: values.startTime, endTime: values.endTime };
-    return Math.round(((endTimeToMinutes(schedule.endTime) - timeToMinutes(schedule.startTime)) / 60) * 10) / 10;
+    const schedule = dailySchedule[date] ?? {
+      startTime: values.startTime,
+      endTime: values.endTime,
+    };
+    return (
+      Math.round(
+        ((endTimeToMinutes(schedule.endTime) - timeToMinutes(schedule.startTime)) / 60) * 10,
+      ) / 10
+    );
   };
 
-  const singleDayHours = !isMultiDay && previewDays[0]?.unit === 'HOUR' ? hoursForDate(previewDays[0].date) : null;
+  const singleDayHours =
+    !isMultiDay && previewDays[0]?.unit === 'HOUR' ? hoursForDate(previewDays[0].date) : null;
 
   // Once we know which days resolved to HOUR in a mixed range, seed a per-day override for
   // each (defaulting to the global start/end time) so the user can adjust them individually.
@@ -241,7 +257,10 @@ export const BookingForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMixedUnits, previewQuery.data]);
 
-  const updateDailySchedule = (date: string, patch: Partial<{ startTime: string; endTime: string }>) => {
+  const updateDailySchedule = (
+    date: string,
+    patch: Partial<{ startTime: string; endTime: string }>,
+  ) => {
     setDailySchedule((prev) => ({ ...prev, [date]: { ...prev[date], ...patch } }));
   };
 
@@ -250,7 +269,8 @@ export const BookingForm = ({
   };
 
   const previewError = previewQuery.isError
-    ? ((previewQuery.error as { message?: string })?.message ?? 'Revisa las fechas y horarios elegidos.')
+    ? ((previewQuery.error as { message?: string })?.message ??
+      'Revisa las fechas y horarios elegidos.')
     : null;
 
   const canSubmit = form.formState.isValid && !mutation.isPending && !previewError;
@@ -287,7 +307,9 @@ export const BookingForm = ({
                 : ''}
             </p>
           ) : !previewQuery.data && basePrice > 0 ? (
-            <p className="mt-1 text-xs text-muted-foreground">{capitalize(unitLabels[venue.priceUnit])}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {capitalize(unitLabels[venue.priceUnit])}
+            </p>
           ) : null}
           {previewQuery.data?.extrasTotal ? (
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -298,7 +320,8 @@ export const BookingForm = ({
             <ul className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
               {previewQuery.data.days.map((day) => {
                 const hours = day.unit === 'HOUR' ? hoursForDate(day.date) : null;
-                const rate = hours && hours > 0 ? Math.round((day.appliedPrice / hours) * 100) / 100 : null;
+                const rate =
+                  hours && hours > 0 ? Math.round((day.appliedPrice / hours) * 100) / 100 : null;
                 return (
                   <li key={day.date} className="flex items-center justify-between gap-3">
                     <span>
@@ -343,7 +366,9 @@ export const BookingForm = ({
             {...form.register('eventType')}
           />
           {form.formState.errors.eventType ? (
-            <p className="mt-1 text-xs text-destructive">{form.formState.errors.eventType.message}</p>
+            <p className="mt-1 text-xs text-destructive">
+              {form.formState.errors.eventType.message}
+            </p>
           ) : null}
         </div>
 
@@ -370,7 +395,9 @@ export const BookingForm = ({
               })}
             />
             {form.formState.errors.eventDate ? (
-              <p className="mt-1 text-xs text-destructive">{form.formState.errors.eventDate.message}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {form.formState.errors.eventDate.message}
+              </p>
             ) : null}
           </div>
           {venue.allowsMultipleDays ? (
@@ -390,7 +417,9 @@ export const BookingForm = ({
                 })}
               />
               {form.formState.errors.endDate ? (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.endDate.message}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {form.formState.errors.endDate.message}
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -409,7 +438,9 @@ export const BookingForm = ({
             {...form.register('guestCount')}
           />
           {form.formState.errors.guestCount ? (
-            <p className="mt-1 text-xs text-destructive">{form.formState.errors.guestCount.message}</p>
+            <p className="mt-1 text-xs text-destructive">
+              {form.formState.errors.guestCount.message}
+            </p>
           ) : null}
         </div>
 
@@ -419,9 +450,8 @@ export const BookingForm = ({
               Horario para los dias por hora
             </Label>
             <p className="mb-2 text-xs text-muted-foreground">
-              Este local cobra por hora algunos dias del rango elegido y por dia completo
-              otros. Se usa por defecto en los dias por hora; podes ajustarlo
-              individualmente mas abajo.
+              Este local cobra por hora algunos dias del rango elegido y por dia completo otros. Se
+              usa por defecto en los dias por hora; podes ajustarlo individualmente mas abajo.
             </p>
             <div className="flex items-center gap-2">
               <Input
@@ -439,10 +469,14 @@ export const BookingForm = ({
               />
             </div>
             {form.formState.errors.startTime ? (
-              <p className="mt-1 text-xs text-destructive">{form.formState.errors.startTime.message}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {form.formState.errors.startTime.message}
+              </p>
             ) : null}
             {form.formState.errors.endTime ? (
-              <p className="mt-1 text-xs text-destructive">{form.formState.errors.endTime.message}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {form.formState.errors.endTime.message}
+              </p>
             ) : null}
           </div>
         ) : (
@@ -458,16 +492,25 @@ export const BookingForm = ({
                 {...form.register('startTime')}
               />
               {form.formState.errors.startTime ? (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.startTime.message}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {form.formState.errors.startTime.message}
+                </p>
               ) : null}
             </div>
             <div>
               <Label htmlFor="endTime" className={fieldLabelClass}>
                 Fin
               </Label>
-              <Input id="endTime" type="time" className={fieldInputClass} {...form.register('endTime')} />
+              <Input
+                id="endTime"
+                type="time"
+                className={fieldInputClass}
+                {...form.register('endTime')}
+              />
               {form.formState.errors.endTime ? (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.endTime.message}</p>
+                <p className="mt-1 text-xs text-destructive">
+                  {form.formState.errors.endTime.message}
+                </p>
               ) : null}
             </div>
           </div>
@@ -482,7 +525,10 @@ export const BookingForm = ({
               const schedule = dailySchedule[day.date];
 
               return (
-                <div key={day.date} className="border-t border-border pt-3 text-sm first:border-t-0 first:pt-0">
+                <div
+                  key={day.date}
+                  className="border-t border-border pt-3 text-sm first:border-t-0 first:pt-0"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium capitalize">{formatDate(day.date)}</span>
                     {day.unit !== 'HOUR' ? (
@@ -497,7 +543,9 @@ export const BookingForm = ({
                         type="time"
                         className={`${fieldInputClass} w-full`}
                         value={schedule.startTime}
-                        onChange={(e) => updateDailySchedule(day.date, { startTime: e.target.value })}
+                        onChange={(e) =>
+                          updateDailySchedule(day.date, { startTime: e.target.value })
+                        }
                       />
                       <span className="text-muted-foreground">a</span>
                       <Input
@@ -581,11 +629,19 @@ export const BookingForm = ({
       <ConfirmDialog
         open={confirmOpen}
         title="Confirmar solicitud"
-        description={
+        description={`Solicitaras ${venue.name} ${
           isMultiDay
-            ? `Solicitaras ${venue.name} del ${values.eventDate} al ${values.endDate}. El owner debe aprobar antes del pago del anticipo.`
-            : `Solicitaras ${venue.name} para ${values.eventDate || 'la fecha seleccionada'}. El owner debe aprobar antes del pago del anticipo.`
-        }
+            ? `del ${values.eventDate} al ${values.endDate}`
+            : `para ${values.eventDate || 'la fecha seleccionada'}`
+        }. ${
+          venue.instantBooking
+            ? `Este local confirma al instante, asi que vas a poder pagar ${
+                venue.paymentPolicy === 'FULL_UPFRONT' ? 'el total' : 'el anticipo'
+              } apenas la envies.`
+            : `El propietario debe aprobar tu solicitud antes de que puedas pagar ${
+                venue.paymentPolicy === 'FULL_UPFRONT' ? 'el total' : 'el anticipo'
+              }.`
+        }`}
         confirmLabel="Solicitar"
         isLoading={mutation.isPending}
         onOpenChange={setConfirmOpen}

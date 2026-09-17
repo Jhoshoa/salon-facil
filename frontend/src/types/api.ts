@@ -122,7 +122,8 @@ export type AmenityCategory =
   | 'SERVICES';
 
 export type VenueMediaType = 'IMAGE' | 'VIDEO' | 'VIRTUAL_TOUR';
-export type PriceUnit = 'EVENT' | 'HOUR' | 'DAY';
+export type PriceUnit = 'HOUR' | 'DAY';
+export type PaymentPolicy = 'FULL_UPFRONT' | 'DEPOSIT_THEN_REMAINING';
 
 export interface Amenity {
   id: string;
@@ -212,6 +213,9 @@ export interface Venue {
   priceUnit: PriceUnit;
   instantBooking: boolean;
   allowsMultipleDays: boolean;
+  paymentPolicy: PaymentPolicy;
+  /** Ignorado cuando paymentPolicy es FULL_UPFRONT. */
+  depositPercentage: number;
   photos: string[];
   media?: VenueMedia[];
   rules: string | null;
@@ -309,6 +313,8 @@ export interface VenueFormPayload {
   minimumHours?: number;
   instantBooking?: boolean;
   allowsMultipleDays?: boolean;
+  paymentPolicy?: PaymentPolicy;
+  depositPercentage?: number;
   rules?: string;
   cancellationPolicy?: string;
   prices?: VenuePriceInput[];
@@ -404,6 +410,9 @@ export interface Booking {
   selectedExtras: SelectedExtra[] | null;
   venue?: Venue;
   client?: { id: string; fullName: string; email: string; phone: string | null };
+  /** The backend always includes this (every booking query eager-loads payments), so it's safe
+   * to read directly off a fetched Booking instead of firing a second request for it. */
+  payments?: Payment[];
 }
 
 export interface Review {

@@ -148,12 +148,19 @@ export class BookingService {
       venue.prices ?? [],
       venue.priceUnit,
       schedule.map((day) => ({ date: day.date, hours: day.hours })),
+      venue.paymentPolicy,
+      venue.depositPercentage,
     );
     const priceCalculation = this.applySelectedExtras(
       venue,
       dto.selectedAmenityIds,
       rangeCalculation,
     );
+
+    // Si el local tiene reserva inmediata activada, la solicitud nace ya aprobada -- el cliente
+    // pasa directo a pagar, sin esperar que el propietario la revise a mano. No cambia nada de
+    // la validacion de disponibilidad ni del calculo de precio de arriba, solo el estado inicial.
+    const initialStatus = venue.instantBooking ? BookingStatus.APPROVED : BookingStatus.PENDING;
 
     const bookingData: CreateBookingData = {
       venueId,
@@ -168,6 +175,7 @@ export class BookingService {
       appliedPrice: priceCalculation.appliedPrice,
       totalPrice: priceCalculation.totalPrice,
       depositAmount: priceCalculation.depositAmount,
+      status: initialStatus,
       specialRequests: dto.specialRequests,
       selectedExtras: priceCalculation.extras.length ? priceCalculation.extras : undefined,
       dailyBreakdown: priceCalculation.days.map((day, index) => ({
@@ -195,9 +203,27 @@ export class BookingService {
       this.notify({
         userId: ownerContact.id,
         type: NotificationType.BOOKING_REQUEST,
-        title: `Nueva solicitud de reserva: ${venue.name}`,
-        content: `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Revisala en tu panel de reservas.`,
+        title:
+          initialStatus === BookingStatus.APPROVED
+            ? `Reserva confirmada: ${venue.name}`
+            : `Nueva solicitud de reserva: ${venue.name}`,
+        content:
+          initialStatus === BookingStatus.APPROVED
+            ? `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Se confirmo automaticamente porque tenes activada la reserva inmediata.`
+            : `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Revisala en tu panel de reservas.`,
         recipientEmail: ownerContact.email,
+      });
+    }
+
+    // En reserva inmediata no hay paso de "aprobar" que dispare la notificacion de siempre
+    // (approveBooking) -- se la mandamos aca para que el cliente sepa igual que ya puede pagar.
+    if (initialStatus === BookingStatus.APPROVED && booking.client) {
+      this.notify({
+        userId: booking.client.id,
+        type: NotificationType.BOOKING_CONFIRMED,
+        title: `Tu reserva en ${venue.name} fue confirmada`,
+        content: `Este local confirma sus reservas al instante. Ya podes subir el comprobante del anticipo desde "Mis reservas".`,
+        recipientEmail: booking.client.email,
       });
     }
 
@@ -244,6 +270,8 @@ export class BookingService {
       venue.prices ?? [],
       venue.priceUnit,
       schedule.map((day) => ({ date: day.date, hours: day.hours })),
+      venue.paymentPolicy,
+      venue.depositPercentage,
     );
     return this.applySelectedExtras(venue, dto.selectedAmenityIds, rangeCalculation);
   }
@@ -269,7 +297,11 @@ export class BookingService {
 
     const extrasTotal = this.round(extras.reduce((sum, extra) => sum + extra.extraCost, 0));
     const totalPrice = this.round(priceCalculation.totalPrice + extrasTotal);
-    const depositAmount = this.round(totalPrice * 0.3);
+    const depositAmount = this.priceCalculator.resolveDeposit(
+      venue.paymentPolicy,
+      venue.depositPercentage,
+      totalPrice,
+    );
 
     return { ...priceCalculation, totalPrice, depositAmount, extras, extrasTotal };
   }

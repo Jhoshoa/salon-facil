@@ -129,6 +129,8 @@ const fieldTab: Record<keyof VenueFormValues, TabKey> = {
   minimumHours: 'pricing',
   instantBooking: 'pricing',
   allowsMultipleDays: 'pricing',
+  paymentPolicy: 'pricing',
+  depositPercentage: 'pricing',
   basePrice: 'pricing',
   amenities: 'amenities',
   useTypes: 'general',
@@ -162,6 +164,8 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     minimumHours: venue.minimumHours,
     instantBooking: venue.instantBooking,
     allowsMultipleDays: venue.allowsMultipleDays,
+    paymentPolicy: venue.paymentPolicy,
+    depositPercentage: venue.depositPercentage,
     rules: venue.rules ?? '',
     cancellationPolicy: venue.cancellationPolicy ?? '',
     basePrice,
@@ -208,6 +212,8 @@ const toPayload = (
   minimumHours: values.minimumHours,
   instantBooking: values.instantBooking,
   allowsMultipleDays: values.allowsMultipleDays,
+  paymentPolicy: values.paymentPolicy,
+  depositPercentage: values.depositPercentage,
   rules: values.rules || undefined,
   cancellationPolicy: values.cancellationPolicy || undefined,
   // BASE + the weekday/season rules edited on this tab (priceRules), plus any rule type not
@@ -261,7 +267,10 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     buildInitialSeasonRules(venue),
   );
 
-  const amenitiesQuery = useQuery({ queryKey: ['venue-catalog', 'amenities'], queryFn: getAmenitiesCatalog });
+  const amenitiesQuery = useQuery({
+    queryKey: ['venue-catalog', 'amenities'],
+    queryFn: getAmenitiesCatalog,
+  });
   const spaceTypesQuery = useQuery({
     queryKey: ['venue-catalog', 'space-types'],
     queryFn: getSpaceTypesCatalog,
@@ -364,8 +373,10 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     const effectiveUnit = rule.unit || defaultPriceUnit;
     const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
     if (!price) return null;
-    if (effectiveUnit === 'HOUR') return `Se cobrara Bs ${price} por cada hora dentro de esta temporada.`;
-    if (effectiveUnit === 'DAY') return `Se cobrara Bs ${price} por dia completo, sin importar las horas.`;
+    if (effectiveUnit === 'HOUR')
+      return `Se cobrara Bs ${price} por cada hora dentro de esta temporada.`;
+    if (effectiveUnit === 'DAY')
+      return `Se cobrara Bs ${price} por dia completo, sin importar las horas.`;
     return `Se cobrara Bs ${price} una sola vez por todo el evento.`;
   };
 
@@ -452,6 +463,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   const departamento = form.watch('departamento');
   const defaultPriceUnit = form.watch('priceUnit');
   const defaultBasePrice = form.watch('basePrice');
+  const paymentPolicy = form.watch('paymentPolicy');
 
   // "Horas minimas de alquiler" only means something for hourly bookings — show it only when
   // an HOUR unit is actually in play somewhere (the default, a weekday rule, or a season rule).
@@ -497,8 +509,13 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     form.setValue('useTypes', next, { shouldDirty: true });
   };
 
-  const updateOpeningHour = (dayOfWeek: number, patch: Partial<VenueFormValues['openingHours'][number]>) => {
-    const next = openingHours.map((item) => (item.dayOfWeek === dayOfWeek ? { ...item, ...patch } : item));
+  const updateOpeningHour = (
+    dayOfWeek: number,
+    patch: Partial<VenueFormValues['openingHours'][number]>,
+  ) => {
+    const next = openingHours.map((item) =>
+      item.dayOfWeek === dayOfWeek ? { ...item, ...patch } : item,
+    );
     form.setValue('openingHours', next, { shouldDirty: true });
   };
 
@@ -591,7 +608,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                 <Select
                   id="spaceType"
                   value={spaceType}
-                  onChange={(event) => form.setValue('spaceType', event.target.value, { shouldDirty: true })}
+                  onChange={(event) =>
+                    form.setValue('spaceType', event.target.value, { shouldDirty: true })
+                  }
                   disabled={spaceTypesQuery.isLoading}
                 >
                   <option value="">Selecciona un tipo</option>
@@ -637,7 +656,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
               <div className="sf-form-group">
                 <Label htmlFor="district">Distrito o zona</Label>
                 <Input id="district" placeholder="Villa Adela" {...form.register('district')} />
-                {errors.district ? <p className="sf-form-error">{errors.district.message}</p> : null}
+                {errors.district ? (
+                  <p className="sf-form-error">{errors.district.message}</p>
+                ) : null}
               </div>
 
               <div className="sf-form-group">
@@ -646,9 +667,13 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                   id="departamento"
                   value={departamento}
                   onChange={(event) =>
-                    form.setValue('departamento', event.target.value as VenueFormValues['departamento'], {
-                      shouldDirty: true,
-                    })
+                    form.setValue(
+                      'departamento',
+                      event.target.value as VenueFormValues['departamento'],
+                      {
+                        shouldDirty: true,
+                      },
+                    )
                   }
                 >
                   {Object.entries(departamentoLabels).map(([value, label]) => (
@@ -668,7 +693,10 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                   id="contactPhone"
                   value={form.watch('contactPhone') ?? ''}
                   onChange={(value) =>
-                    form.setValue('contactPhone', value, { shouldValidate: true, shouldDirty: true })
+                    form.setValue('contactPhone', value, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
                   }
                 />
                 <p className="text-xs text-muted-foreground">
@@ -754,8 +782,8 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                 <div>
                   <Label>Modo de precio</Label>
                   <p className="text-sm text-muted-foreground">
-                    Elegi como se calculan los precios de este local antes de configurar el
-                    monto — las opciones de abajo cambian segun lo que elijas aca.
+                    Elegi como se calculan los precios de este local antes de configurar el monto —
+                    las opciones de abajo cambian segun lo que elijas aca.
                   </p>
                 </div>
                 <div className="space-y-3">
@@ -764,7 +792,8 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                       {
                         value: 'single',
                         label: 'Un solo precio y unidad para todo el local',
-                        description: 'Todos los dias se cobran igual, con el precio y la unidad de abajo.',
+                        description:
+                          'Todos los dias se cobran igual, con el precio y la unidad de abajo.',
                       },
                       {
                         value: 'weekday',
@@ -790,7 +819,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                       />
                       <span>
                         <span className="block font-medium">{option.label}</span>
-                        <span className="block text-xs text-muted-foreground">{option.description}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {option.description}
+                        </span>
                       </span>
                     </label>
                   ))}
@@ -804,7 +835,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                       {pricingMode === 'single' ? 'Precio base (Bs)' : 'Precio por defecto (Bs)'}
                     </Label>
                     <Input id="basePrice" type="number" min={1} {...form.register('basePrice')} />
-                    {errors.basePrice ? <p className="sf-form-error">{errors.basePrice.message}</p> : null}
+                    {errors.basePrice ? (
+                      <p className="sf-form-error">{errors.basePrice.message}</p>
+                    ) : null}
                   </div>
                   <div className="sf-form-group">
                     <Label htmlFor="priceUnit">
@@ -821,8 +854,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                 </div>
                 {pricingMode !== 'single' ? (
                   <p className="text-xs text-muted-foreground">
-                    Se usa en los dias de la semana{pricingMode === 'weekday_season' ? ' y fechas de temporada' : ''} que
-                    no tengan su propia regla mas abajo.
+                    Se usa en los dias de la semana
+                    {pricingMode === 'weekday_season' ? ' y fechas de temporada' : ''} que no tengan
+                    su propia regla mas abajo.
                   </p>
                 ) : null}
               </div>
@@ -834,10 +868,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                     {weekdayRules.map((rule) => {
                       const hint = rule.enabled ? weekdayPricingHint(rule) : null;
                       return (
-                        <div
-                          key={rule.dayOfWeek}
-                          className="rounded-[var(--radius)] border p-3"
-                        >
+                        <div key={rule.dayOfWeek} className="rounded-[var(--radius)] border p-3">
                           <div className="flex flex-wrap items-center gap-3">
                             <label className="flex w-36 items-center gap-2 text-sm font-medium">
                               <input
@@ -885,7 +916,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                               </span>
                             )}
                           </div>
-                          {hint ? <p className="mt-2 text-xs text-muted-foreground">{hint}</p> : null}
+                          {hint ? (
+                            <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -909,72 +942,72 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                   ) : null}
 
                   {seasonRules.map((rule) => (
-                      <div key={rule.key} className="space-y-3 rounded-[var(--radius)] border p-3">
-                        {seasonalEventsQuery.data && seasonalEventsQuery.data.length > 0 ? (
-                          <Select
-                            value=""
-                            onChange={(e) =>
-                              e.target.value && applySeasonSuggestion(rule.key, e.target.value)
-                            }
-                          >
-                            <option value="">Usar una sugerencia...</option>
-                            {seasonalEventsQuery.data.map((event) => (
-                              <option key={event.id} value={event.id}>
-                                {event.name}
-                              </option>
-                            ))}
-                          </Select>
-                        ) : null}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <Input
-                            placeholder="Nombre (opcional, ej. Fin de año)"
-                            value={rule.name}
-                            onChange={(e) => updateSeasonRule(rule.key, { name: e.target.value })}
-                          />
-                          <Input
-                            type="number"
-                            min={0}
-                            placeholder="Precio (Bs)"
-                            value={rule.price}
-                            onChange={(e) => updateSeasonRule(rule.key, { price: e.target.value })}
-                          />
-                          <Input
-                            type="date"
-                            value={rule.startDate}
-                            onChange={(e) =>
-                              updateSeasonRule(rule.key, { startDate: e.target.value })
-                            }
-                          />
-                          <Input
-                            type="date"
-                            value={rule.endDate}
-                            onChange={(e) => updateSeasonRule(rule.key, { endDate: e.target.value })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <Select
-                            className="w-48"
-                            value={rule.unit}
-                            onChange={(e) =>
-                              updateSeasonRule(rule.key, { unit: e.target.value as PriceUnit | '' })
-                            }
-                          >
-                            <option value="">Hereda unidad del local</option>
-                            {Object.entries(priceUnitLabels).map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </Select>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => removeSeasonRule(rule.key)}
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
+                    <div key={rule.key} className="space-y-3 rounded-[var(--radius)] border p-3">
+                      {seasonalEventsQuery.data && seasonalEventsQuery.data.length > 0 ? (
+                        <Select
+                          value=""
+                          onChange={(e) =>
+                            e.target.value && applySeasonSuggestion(rule.key, e.target.value)
+                          }
+                        >
+                          <option value="">Usar una sugerencia...</option>
+                          {seasonalEventsQuery.data.map((event) => (
+                            <option key={event.id} value={event.id}>
+                              {event.name}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : null}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Input
+                          placeholder="Nombre (opcional, ej. Fin de año)"
+                          value={rule.name}
+                          onChange={(e) => updateSeasonRule(rule.key, { name: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="Precio (Bs)"
+                          value={rule.price}
+                          onChange={(e) => updateSeasonRule(rule.key, { price: e.target.value })}
+                        />
+                        <Input
+                          type="date"
+                          value={rule.startDate}
+                          onChange={(e) =>
+                            updateSeasonRule(rule.key, { startDate: e.target.value })
+                          }
+                        />
+                        <Input
+                          type="date"
+                          value={rule.endDate}
+                          onChange={(e) => updateSeasonRule(rule.key, { endDate: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Select
+                          className="w-48"
+                          value={rule.unit}
+                          onChange={(e) =>
+                            updateSeasonRule(rule.key, { unit: e.target.value as PriceUnit | '' })
+                          }
+                        >
+                          <option value="">Hereda unidad del local</option>
+                          {Object.entries(priceUnitLabels).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removeSeasonRule(rule.key)}
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
                       {seasonPricingHint(rule) ? (
                         <p className="text-xs text-muted-foreground">{seasonPricingHint(rule)}</p>
                       ) : null}
@@ -985,7 +1018,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
 
               <div
                 className={
-                  anyHourPricing ? 'grid gap-5 border-t pt-5 sm:grid-cols-2' : 'grid gap-5 border-t pt-5'
+                  anyHourPricing
+                    ? 'grid gap-5 border-t pt-5 sm:grid-cols-2'
+                    : 'grid gap-5 border-t pt-5'
                 }
               >
                 {anyHourPricing ? (
@@ -1002,19 +1037,110 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                 ) : null}
                 <div className="sf-form-group">
                   <Label htmlFor="squareMeters">Metros cuadrados (opcional)</Label>
-                  <Input id="squareMeters" type="number" min={1} {...form.register('squareMeters')} />
+                  <Input
+                    id="squareMeters"
+                    type="number"
+                    min={1}
+                    {...form.register('squareMeters')}
+                  />
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-6">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="h-4 w-4" {...form.register('instantBooking')} />
-                  Reserva inmediata
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="h-4 w-4" {...form.register('allowsMultipleDays')} />
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    {...form.register('allowsMultipleDays')}
+                  />
                   Permite eventos de varios dias
                 </label>
+              </div>
+
+              <div className="space-y-4 border-t pt-5">
+                <div>
+                  <Label>Como se confirman tus reservas</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Elegi si vas a revisar cada solicitud antes de que el cliente pague, o si
+                    preferis que se confirmen solas para no perder tiempo.
+                  </p>
+                </div>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4"
+                    {...form.register('instantBooking')}
+                  />
+                  <span>
+                    <span className="block font-medium">Reserva inmediata</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Si esta activado, la reserva se confirma automaticamente en cuanto el cliente
+                      elige la fecha, sin que tengas que aprobarla vos primero. Si esta desactivado
+                      (el default), cada solicitud te llega para aprobar o rechazar antes de que el
+                      cliente pueda pagar.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="space-y-4 border-t pt-5">
+                <div>
+                  <Label>Politica de pago</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Elegi si le pedis al cliente un anticipo o el pago completo por adelantado.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {(
+                    [
+                      {
+                        value: 'DEPOSIT_THEN_REMAINING',
+                        label: 'Anticipo + saldo restante',
+                        description:
+                          'El cliente paga un porcentaje al reservar y el resto antes del evento.',
+                      },
+                      {
+                        value: 'FULL_UPFRONT',
+                        label: 'Pago completo por adelantado',
+                        description: 'El cliente paga el 100% en un solo pago al reservar.',
+                      },
+                    ] as {
+                      value: 'DEPOSIT_THEN_REMAINING' | 'FULL_UPFRONT';
+                      label: string;
+                      description: string;
+                    }[]
+                  ).map((option) => (
+                    <label key={option.value} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="radio"
+                        value={option.value}
+                        className="mt-0.5 h-4 w-4"
+                        {...form.register('paymentPolicy')}
+                      />
+                      <span>
+                        <span className="block font-medium">{option.label}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {paymentPolicy === 'DEPOSIT_THEN_REMAINING' ? (
+                  <div className="sf-form-group max-w-[12rem]">
+                    <Label htmlFor="depositPercentage">Porcentaje de anticipo</Label>
+                    <Input
+                      id="depositPercentage"
+                      type="number"
+                      min={10}
+                      max={90}
+                      {...form.register('depositPercentage')}
+                    />
+                    {errors.depositPercentage ? (
+                      <p className="sf-form-error">{errors.depositPercentage.message}</p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -1033,7 +1159,10 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                       {items?.map((amenity) => {
                         const entry = amenities.find((item) => item.amenityId === amenity.id);
                         return (
-                          <div key={amenity.id} className="sf-surface space-y-2 rounded-[var(--radius)] p-2.5">
+                          <div
+                            key={amenity.id}
+                            className="sf-surface space-y-2 rounded-[var(--radius)] p-2.5"
+                          >
                             <label className="sf-filter-option cursor-pointer">
                               <input
                                 type="checkbox"
@@ -1050,7 +1179,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                                 </span>
                                 <Switch
                                   checked={!entry.isIncluded}
-                                  onCheckedChange={(checked) => setAmenityIncluded(amenity.id, !checked)}
+                                  onCheckedChange={(checked) =>
+                                    setAmenityIncluded(amenity.id, !checked)
+                                  }
                                   aria-label={`${amenity.name} con costo extra`}
                                 />
                                 {!entry.isIncluded ? (
@@ -1094,7 +1225,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                     <input
                       type="checkbox"
                       checked={day.isClosed}
-                      onChange={(e) => updateOpeningHour(day.dayOfWeek, { isClosed: e.target.checked })}
+                      onChange={(e) =>
+                        updateOpeningHour(day.dayOfWeek, { isClosed: e.target.checked })
+                      }
                       className="h-4 w-4"
                     />
                     Cerrado
@@ -1104,14 +1237,18 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                       <Input
                         type="time"
                         value={day.opensAt}
-                        onChange={(e) => updateOpeningHour(day.dayOfWeek, { opensAt: e.target.value })}
+                        onChange={(e) =>
+                          updateOpeningHour(day.dayOfWeek, { opensAt: e.target.value })
+                        }
                         className="w-32"
                       />
                       <span className="text-sm text-muted-foreground">a</span>
                       <Input
                         type="time"
                         value={day.closesAt}
-                        onChange={(e) => updateOpeningHour(day.dayOfWeek, { closesAt: e.target.value })}
+                        onChange={(e) =>
+                          updateOpeningHour(day.dayOfWeek, { closesAt: e.target.value })
+                        }
                         className="w-32"
                       />
                     </>

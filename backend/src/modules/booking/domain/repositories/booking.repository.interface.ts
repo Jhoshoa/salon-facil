@@ -75,6 +75,10 @@ export interface CreateBookingData {
   appliedPrice: number;
   totalPrice: number;
   depositAmount: number;
+  /** PENDING for the usual approve/reject flow, or APPROVED directly when the venue has
+   * `instantBooking` on -- the caller (BookingService) always decides explicitly, no implicit
+   * default here. */
+  status: BookingStatus;
   specialRequests?: string;
   selectedExtras?: SelectedExtra[];
   /** One entry per day in [startDate, endDate], used to create the BookingDate rows. */

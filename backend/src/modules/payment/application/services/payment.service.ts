@@ -27,6 +27,12 @@ const PAYABLE_BOOKING_STATUSES = [BookingStatus.APPROVED, BookingStatus.DEPOSIT_
 const ALLOWED_PROOF_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const MAX_PROOF_FILE_SIZE = 5 * 1024 * 1024;
 
+const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  [PaymentType.DEPOSIT]: 'anticipo',
+  [PaymentType.FULL]: 'pago completo',
+  [PaymentType.REMAINING]: 'saldo restante',
+};
+
 @Injectable()
 export class PaymentService {
   constructor(
@@ -63,8 +69,26 @@ export class PaymentService {
       throw new BadRequestException('Esta reserva no admite pagos en su estado actual');
     }
 
-    if (dto.paymentType === PaymentType.DEPOSIT && booking.depositPaid) {
-      throw new BadRequestException('El anticipo de esta reserva ya fue pagado');
+    // Cada tipo de pago solo tiene sentido en un estado exacto de la reserva -- nunca se infiere
+    // del lado del cliente. Sin este chequeo, un REMAINING creado desde APPROVED (sin pasar por
+    // DEPOSIT_PAID primero) cobraria solo el saldo pero, al confirmarse, igual saltaria a
+    // FULLY_PAID (mira solo el paymentType, no cuanto se cobro antes) -- la reserva quedaria
+    // marcada como pagada habiendo cobrado de menos.
+    if (
+      (dto.paymentType === PaymentType.DEPOSIT || dto.paymentType === PaymentType.FULL) &&
+      booking.status !== BookingStatus.APPROVED
+    ) {
+      throw new BadRequestException(
+        'Este tipo de pago solo aplica a una reserva recien aprobada, antes de pagar el anticipo',
+      );
+    }
+    if (
+      dto.paymentType === PaymentType.REMAINING &&
+      booking.status !== BookingStatus.DEPOSIT_PAID
+    ) {
+      throw new BadRequestException(
+        'El saldo restante solo se puede pagar despues de que el anticipo este confirmado',
+      );
     }
 
     if (dto.paymentType === PaymentType.DEPOSIT && dto.amount !== booking.depositAmount) {
@@ -79,10 +103,28 @@ export class PaymentService {
     }
 
     if (dto.paymentType === PaymentType.REMAINING) {
-      const expectedRemaining = booking.totalPrice - booking.depositAmount;
+      // Redondeado antes de comparar: totalPrice y depositAmount ya vienen redondeados a 2
+      // decimales cada uno, pero restarlos en punto flotante puede arrastrar ruido (ej.
+      // 1283.1499999999999 en vez de 1283.15) -- sin redondear de este lado, un monto limpio
+      // enviado por el cliente nunca calzaria con la resta cruda de este lado.
+      const expectedRemaining = this.round(booking.totalPrice - booking.depositAmount);
       if (dto.amount !== expectedRemaining) {
         throw new BadRequestException(`El monto restante esperado es ${expectedRemaining}`);
       }
+    }
+
+    // Evita que dos comprobantes del mismo tipo queden pendientes a la vez para la misma
+    // reserva -- si el propietario confirmara los dos por error (se ven identicos en su panel
+    // salvo por la fecha), el pago quedaria contado dos veces.
+    const existingPayments = await this.paymentRepository.findByBooking(bookingId);
+    const hasPendingSameType = existingPayments.some(
+      (existing) =>
+        existing.paymentType === dto.paymentType && existing.status === PaymentStatus.PENDING,
+    );
+    if (hasPendingSameType) {
+      throw new BadRequestException(
+        'Ya hay un comprobante de este tipo esperando confirmacion del propietario',
+      );
     }
 
     return this.paymentRepository.create({
@@ -132,7 +174,7 @@ export class PaymentService {
           userId: ownerContact.id,
           type: NotificationType.PAYMENT_RECEIVED,
           title: `Comprobante recibido: ${venueName}`,
-          content: `El cliente subio un comprobante de Bs ${payment.amount} para la reserva del ${this.toDateOnly(payment.booking.eventDate)}. Revisalo en tu panel de pagos.`,
+          content: `El cliente subio un comprobante de ${PAYMENT_TYPE_LABELS[payment.paymentType]} por Bs ${payment.amount} para la reserva del ${this.toDateOnly(payment.booking.eventDate)}. Revisalo en tu panel de pagos.`,
           recipientEmail: ownerContact.email,
         });
       }
@@ -197,7 +239,7 @@ export class PaymentService {
         userId: payment.booking.client.id,
         type: NotificationType.PAYMENT_RECEIVED,
         title: `Tu pago en ${venueName} fue confirmado`,
-        content: `Confirmamos tu pago de Bs ${payment.amount}. Gracias por reservar con Mi Evento.`,
+        content: `Confirmamos tu ${PAYMENT_TYPE_LABELS[payment.paymentType]} de Bs ${payment.amount}. Gracias por reservar con Mi Evento.`,
         recipientEmail: payment.booking.client.email,
       });
     }
@@ -226,7 +268,7 @@ export class PaymentService {
         userId: payment.booking.client.id,
         type: NotificationType.PAYMENT_RECEIVED,
         title: `Tu comprobante en ${venueName} fue rechazado`,
-        content: `El propietario rechazo tu comprobante de Bs ${payment.amount}. Motivo: ${reason}. Podes subir uno nuevo desde "Mis reservas".`,
+        content: `El propietario rechazo tu comprobante de ${PAYMENT_TYPE_LABELS[payment.paymentType]} de Bs ${payment.amount}. Motivo: ${reason}. Podes subir uno nuevo desde "Mis reservas".`,
         recipientEmail: payment.booking.client.email,
       });
     }
@@ -264,6 +306,10 @@ export class PaymentService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para gestionar este pago');
     }
+  }
+
+  private round(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 
   private toDateOnly(date: Date): string {

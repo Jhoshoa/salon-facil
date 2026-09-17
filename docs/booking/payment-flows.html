@@ -1,0 +1,465 @@
+<title>Flujos de Pago</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --paper: #ffffff;
+    --paper-2: #efe7d6;
+    --ink: #10202f;
+    --ink-soft: #5b6570;
+    --navy: #1e3a5f;
+    --navy-soft: rgba(30, 58, 95, 0.08);
+    --gold: #c9a227;
+    --gold-deep: #a9861d;
+    --gold-bg: rgba(201, 162, 39, 0.14);
+    --line: rgba(16, 32, 47, 0.14);
+    --ok: #2f7d4f;
+    --ok-bg: #e7f3ec;
+    --warn: #c87f0a;
+    --warn-bg: #fff4e0;
+    --danger: #b3261e;
+    --danger-bg: #fbeceb;
+    --shadow: 0 1px 2px rgba(16, 32, 47, 0.06), 0 8px 24px -12px rgba(16, 32, 47, 0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101b26;
+      --paper-2: #17263699;
+      --ink: #eae6da;
+      --ink-soft: #a9b3bd;
+      --navy: #8fb4e0;
+      --navy-soft: rgba(143, 180, 224, 0.12);
+      --gold: #e0bf60;
+      --gold-deep: #f0d488;
+      --gold-bg: rgba(224, 191, 96, 0.14);
+      --line: rgba(234, 230, 218, 0.16);
+      --ok: #6fcf9a;
+      --ok-bg: rgba(111, 207, 154, 0.12);
+      --warn: #eab05a;
+      --warn-bg: rgba(234, 176, 90, 0.12);
+      --danger: #e4796f;
+      --danger-bg: rgba(228, 121, 111, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #101b26;
+    --paper-2: #17263699;
+    --ink: #eae6da;
+    --ink-soft: #a9b3bd;
+    --navy: #8fb4e0;
+    --navy-soft: rgba(143, 180, 224, 0.12);
+    --gold: #e0bf60;
+    --gold-deep: #f0d488;
+    --gold-bg: rgba(224, 191, 96, 0.14);
+    --line: rgba(234, 230, 218, 0.16);
+    --ok: #6fcf9a;
+    --ok-bg: rgba(111, 207, 154, 0.12);
+    --warn: #eab05a;
+    --warn-bg: rgba(234, 176, 90, 0.12);
+    --danger: #e4796f;
+    --danger-bg: rgba(228, 121, 111, 0.12);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    margin: 0;
+    padding-inline: max(20px, calc((100% - 880px) / 2));
+    padding-block: 56px 88px;
+    line-height: 1.55;
+  }
+
+  .kicker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--gold-deep);
+    margin: 0 0 14px;
+  }
+  .kicker::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+
+  .lede {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    max-width: 68ch;
+    margin: 0 0 8px;
+  }
+
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  .status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 28px 0 8px;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .pill.live { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); background: var(--ok-bg); }
+  .pill.partial { color: var(--gold-deep); border-color: color-mix(in srgb, var(--gold-deep) 40%, var(--line)); background: var(--gold-bg); }
+  .pill.planned { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); background: var(--warn-bg); }
+
+  section.flow {
+    margin-top: 64px;
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+  section.flow:first-of-type { margin-top: 48px; }
+
+  .flow-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+
+  .flow-head .pill { font-size: 0.68rem; padding: 3px 10px; }
+
+  .flow-num {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.4rem;
+    color: var(--gold-deep);
+    flex-shrink: 0;
+  }
+
+  h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 0;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  .flow-desc {
+    color: var(--ink-soft);
+    max-width: 66ch;
+    margin: 10px 0 24px;
+    font-size: 0.97rem;
+  }
+
+  .diagram-frame {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+    overflow-x: auto;
+  }
+  .diagram-frame pre.mermaid { margin: 0; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--line); }
+
+  .note {
+    margin-top: 18px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--warn);
+    background: var(--warn-bg);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.88rem;
+    color: var(--ink);
+  }
+  .note strong { color: var(--warn); }
+
+  .note.fixed {
+    border-left-color: var(--ok);
+    background: var(--ok-bg);
+  }
+  .note.fixed strong { color: var(--ok); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  footer code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--navy-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--navy);
+  }
+</style>
+
+<div class="kicker">Mi Evento &middot; referencia interna</div>
+<h1>Como fluye el pago de una reserva</h1>
+<p class="lede">
+  Todo pago pasa por el mismo esqueleto — <strong>el cliente solicita, el propietario aprueba (o
+  no, si activo reserva inmediata), el cliente paga, el propietario confirma</strong> — pero cada
+  local elige su propia configuracion: si hace falta aprobar cada solicitud a mano, cuanto
+  anticipo pide (o si pide el pago completo de una), y si tiene un precio publicado. La
+  <strong>Fase 1</strong> y la <strong>Fase 2</strong> del plan ya estan en produccion —
+  politica de pago, porcentaje de anticipo, reserva inmediata y la pantalla para pagar el saldo
+  restante son reales, no solo diseño. En el camino corregimos dos bugs reales que encontramos
+  probando: un pago completo quedaba mal etiquetado como &ldquo;anticipo&rdquo; y nunca llegaba a
+  <code>FULLY_PAID</code> (Fase 1), y el saldo restante se podia intentar pagar antes de que el
+  anticipo estuviera confirmado (Fase 2). Lo unico que todavia falta es el modo
+  &ldquo;Cotizar&rdquo; sin precio fijo (diagrama 4).
+</p>
+
+<div class="status-row">
+  <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
+  <span class="pill planned">&#9679; Planeado, sin codigo todavia</span>
+</div>
+
+<section class="flow">
+  <div class="flow-head">
+    <span class="flow-num">Uno</span>
+    <h2>Politica &ldquo;Anticipo + saldo restante&rdquo;</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
+  </div>
+  <p class="flow-desc">
+    La politica por defecto de todo local nuevo (30% de anticipo) y la que usa hoy la mayoria del
+    catalogo. El porcentaje ya es configurable por local (10%&ndash;90%) desde el dashboard del
+    propietario, y tanto el anticipo como el <strong>saldo restante</strong> se calculan, cobran
+    y confirman dentro del sistema &mdash; ya no hay que cobrar nada por fuera.
+  </p>
+  <div class="diagram-frame">
+<pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
+flowchart TD
+    A["Cliente solicita reserva&lt;br/&gt;&lt;b&gt;PENDING&lt;/b&gt;"]:::step --> B{"Propietario&lt;br/&gt;revisa"}:::decision
+    B -->|Rechaza| R1(["CANCELLED_BY_OWNER"]):::danger
+    B -->|Aprueba| C["&lt;b&gt;APPROVED&lt;/b&gt;"]:::step
+    C -->|"Cliente paga el anticipo&lt;br/&gt;% configurado por el local&lt;br/&gt;&#40;30% por defecto&#41;"| D{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
+    D -->|Rechaza| C
+    D -->|Confirma| E["&lt;b&gt;DEPOSIT_PAID&lt;/b&gt;"]:::step
+    E -->|"Cliente paga el saldo restante&lt;br/&gt;&#40;monto exacto, validado&lt;br/&gt;por el backend&#41;"| H{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
+    H -->|Rechaza| E
+    H -->|Confirma| I["&lt;b&gt;FULLY_PAID&lt;/b&gt;"]:::step
+    I --> F["Propietario marca completada&lt;br/&gt;despues del evento"]:::step
+    F --> G(["COMPLETED"]):::success
+
+    classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
+    classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
+    classDef success fill:#e7f3ec,stroke:#2f7d4f,stroke-width:1.5px,color:#1c5233
+    classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
+</pre>
+  </div>
+  <div class="legend">
+    <span><i class="swatch" style="background:#efe7d6;border-color:#a9861d"></i>decision del propietario</span>
+    <span><i class="swatch" style="background:#e7f3ec;border-color:#2f7d4f"></i>estado final exitoso</span>
+    <span><i class="swatch" style="background:#fbeceb;border-color:#b3261e"></i>estado final cancelado</span>
+  </div>
+  <div class="note fixed">
+    <strong>Fase 2, corregido probando:</strong> el backend ahora exige que el saldo restante
+    solo se pueda pagar desde <code>DEPOSIT_PAID</code> (no desde <code>APPROVED</code>, sin
+    anticipo confirmado) y que el anticipo/pago completo solo se pueda pagar desde
+    <code>APPROVED</code> &mdash; antes esto no se validaba por tipo de pago. Tambien se corrigio
+    un desajuste de redondeo de centavos entre lo que calcula el frontend y lo que valida el
+    backend, y se bloqueo la posibilidad de subir dos comprobantes del mismo tipo mientras uno ya
+    esta esperando confirmacion del propietario.
+  </div>
+</section>
+
+<section class="flow">
+  <div class="flow-head">
+    <span class="flow-num">Dos</span>
+    <h2>Politica &ldquo;Pago completo por adelantado&rdquo;</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
+  </div>
+  <p class="flow-desc">
+    Un solo pago cubre el 100%, sin paso de anticipo ni de saldo &mdash; util para locales que
+    prefieren cobrar todo de una vez antes del evento. Probamos el flujo completo en la
+    aplicacion real: la reserva llega a <code>FULLY_PAID</code> apenas el propietario confirma el
+    comprobante.
+  </p>
+  <div class="diagram-frame">
+<pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
+flowchart TD
+    A["Cliente solicita reserva&lt;br/&gt;&lt;b&gt;PENDING&lt;/b&gt;"]:::step --> B{"Propietario&lt;br/&gt;revisa"}:::decision
+    B -->|Rechaza| R1(["CANCELLED_BY_OWNER"]):::danger
+    B -->|Aprueba| C["&lt;b&gt;APPROVED&lt;/b&gt;"]:::step
+    C -->|"Cliente paga el 100%&lt;br/&gt;en un solo pago"| D{"Propietario confirma&lt;br/&gt;el comprobante"}:::decision
+    D -->|Rechaza| C
+    D -->|Confirma| E["&lt;b&gt;FULLY_PAID&lt;/b&gt;&lt;br/&gt;(directo, sin paso de anticipo)"]:::step
+    E --> F["Propietario marca completada&lt;br/&gt;despues del evento"]:::step
+    F --> G(["COMPLETED"]):::success
+
+    classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
+    classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
+    classDef success fill:#e7f3ec,stroke:#2f7d4f,stroke-width:1.5px,color:#1c5233
+    classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
+</pre>
+  </div>
+  <div class="note fixed">
+    <strong>Bug encontrado y corregido:</strong> hasta hace poco, la pantalla de subir
+    comprobante mandaba siempre <code>paymentType: DEPOSIT</code>, sin importar la politica del
+    local. Un local con pago completo por adelantado terminaba con la reserva marcada
+    <code>DEPOSIT_PAID</code> (&ldquo;Anticipo pagado&rdquo;) en vez de <code>FULLY_PAID</code>,
+    aunque el monto cobrado ya era el correcto. Se corrigio: el tipo de pago ahora lo decide
+    quien invoca la pantalla segun el estado de la reserva y la politica del local, nunca es una
+    eleccion libre ni un valor fijo.
+  </div>
+</section>
+
+<section class="flow">
+  <div class="flow-head">
+    <span class="flow-num">Tres</span>
+    <h2>Reserva inmediata &mdash; saltar la aprobacion manual</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
+  </div>
+  <p class="flow-desc">
+    Para locales que manejan su calendario 100% desde la app: si activan &ldquo;Reserva
+    inmediata&rdquo; en su dashboard, la solicitud nace directo en <code>APPROVED</code> en
+    cuanto el cliente elige una fecha libre, sin esperar a que el propietario la revise. La
+    validacion de disponibilidad y el calculo de precio no cambian &mdash; solo se salta el paso
+    de aprobar/rechazar.
+  </p>
+  <div class="diagram-frame">
+<pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
+flowchart TD
+    A["Cliente elige fechas disponibles&lt;br/&gt;y confirma la solicitud"]:::step --> B{"El local tiene&lt;br/&gt;'Reserva inmediata' activada?&lt;br/&gt;&#40;Venue.instantBooking&#41;"}:::decision
+    B -->|"No &mdash; revision manual"| C["&lt;b&gt;PENDING&lt;/b&gt;"]:::step
+    C --> D{"Propietario&lt;br/&gt;revisa"}:::decision
+    D -->|Rechaza| R(["CANCELLED_BY_OWNER"]):::danger
+    D -->|Aprueba| E["&lt;b&gt;APPROVED&lt;/b&gt;"]:::step
+    B -->|"Si &mdash; se salta&lt;br/&gt;la revision"| E2["&lt;b&gt;APPROVED&lt;/b&gt; directo&lt;br/&gt;&#40;sin paso de aprobar/rechazar&#41;"]:::step
+    E --> F["El cliente paga segun la&lt;br/&gt;politica de pago del local&lt;br/&gt;&#40;ver diagramas 1 y 2&#41;"]:::step
+    E2 --> F
+
+    classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
+    classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
+    classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
+</pre>
+  </div>
+</section>
+
+<section class="flow">
+  <div class="flow-head">
+    <span class="flow-num">Cuatro</span>
+    <h2>Modo &ldquo;Cotizar&rdquo; &mdash; locales sin precio fijo</h2>
+    <span class="pill planned">&#9679; Planeado, sin codigo todavia</span>
+  </div>
+  <p class="flow-desc">
+    Idea para una fase futura: locales que cobran &ldquo;segun el evento&rdquo; y no pueden
+    publicar un precio fijo real. En vez de precio + reservar, el detalle del local mostraria
+    &ldquo;Consultar precio&rdquo; y un boton &ldquo;Cotizar&rdquo; que abre el contacto con el
+    propietario. Recien cuando el propietario le pone un precio a esa solicitud puntual se
+    convertiria en una reserva de verdad y entraria al mismo flujo de siempre.
+  </p>
+  <div class="diagram-frame">
+<pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
+flowchart TD
+    A["Local con &lt;b&gt;pricingMode: QUOTE_ONLY&lt;/b&gt;&lt;br/&gt;&#40;sin precio publicado&#41;"]:::step --> B["Cliente ve 'Consultar precio'&lt;br/&gt;y el boton 'Cotizar'"]:::step
+    B --> C["Se crea una solicitud de&lt;br/&gt;cotizacion &#40;fechas, invitados,&lt;br/&gt;mensaje&#41; &mdash; todavia sin precio"]:::step
+    C --> D["Contacto directo con el&lt;br/&gt;propietario &#40;ej. WhatsApp&#41;"]:::gap
+    D -.->|"negociacion de precio,&lt;br/&gt;fuera del sistema"| E{"Propietario le pone&lt;br/&gt;un precio a la solicitud"}:::decision
+    E --> F["Se crea una reserva real&lt;br/&gt;con ese precio"]:::step
+    F --> G["Sigue el flujo normal del local&lt;br/&gt;&#40;diagramas 1&ndash;3, segun su&lt;br/&gt;configuracion&#41;"]:::step
+
+    classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
+    classDef decision fill:#efe7d6,stroke:#a9861d,stroke-width:1.5px,color:#10202f
+    classDef gap fill:#fff4e0,stroke:#c87f0a,stroke-width:1.5px,color:#7a4d06,stroke-dasharray: 4 3
+</pre>
+  </div>
+  <div class="note">
+    <strong>Todavia por definir, no en este diagrama:</strong> si la cotizacion vive como su
+    propia entidad liviana en el dashboard del propietario (separada de las reservas hasta que
+    tenga precio), y si al convertirse en reserva respeta &ldquo;Reserva inmediata&rdquo; o
+    siempre pasa por aprobacion manual una vez definido el precio. Se resuelve cuando se llegue a
+    esta fase &mdash; ver 4.6 del plan.
+  </div>
+</section>
+
+<section class="flow">
+  <div class="flow-head">
+    <span class="flow-num">Cinco</span>
+    <h2>Cuando el flujo no llega a completarse</h2>
+    <span class="pill live">&#9679; Vigente y probado de punta a punta</span>
+  </div>
+  <p class="flow-desc">
+    Estas ramas aplican por igual a cualquiera de las dos politicas de pago &mdash; son las
+    salidas que no terminan en <code>COMPLETED</code>.
+  </p>
+  <div class="diagram-frame">
+<pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff','primaryTextColor':'#10202f','primaryBorderColor':'#1e3a5f','lineColor':'#1e3a5f','fontFamily':'Inter, sans-serif','fontSize':'14px'}}}%%
+flowchart TD
+    A["PENDING"]:::step -->|Propietario rechaza| B(["CANCELLED_BY_OWNER"]):::danger
+    A -->|Cliente cancela| C(["CANCELLED_BY_CLIENT"]):::danger
+    D["APPROVED"]:::step -->|Cliente cancela| C
+    D -->|Nunca paga ni se presenta| E(["NO_SHOW"]):::danger
+    F["Comprobante rechazado&lt;br/&gt;&#40;anticipo o pago completo&#41;"]:::step -->|El cliente puede subir uno nuevo| G["La reserva sigue en el&lt;br/&gt;mismo estado &mdash; no se pierde"]:::step
+
+    classDef step fill:#ffffff,stroke:#1e3a5f,stroke-width:1.5px,color:#10202f
+    classDef danger fill:#fbeceb,stroke:#b3261e,stroke-width:1.5px,color:#7a1a15
+</pre>
+  </div>
+  <div class="note">
+    <strong>De paso, algo que encontramos revisando el codigo:</strong> el cliente solo puede
+    cancelar mientras la reserva esta <code>PENDING</code> o <code>APPROVED</code>. El
+    propietario, hoy, solo puede rechazar mientras esta <code>PENDING</code> (o marcarla
+    <code>NO_SHOW</code> desde <code>APPROVED</code>) &mdash; una vez que el anticipo esta
+    pagado, no hay ningun boton para que el propietario cancele. Existe un metodo
+    <code>canBeCancelledByOwner()</code> en el codigo que ya contempla <code>DEPOSIT_PAID</code>,
+    pero no esta conectado a ningun endpoint todavia.
+  </div>
+</section>
+
+<footer>
+  Diagramas generados a partir del codigo real (<code>booking.service.ts</code>,
+  <code>payment.service.ts</code>, <code>payment-proof-drawer.tsx</code>,
+  <code>booking-detail-client.tsx</code>, <code>venue.entity.ts</code>) y verificados a mano en la
+  aplicacion corriendo, no solo leidos del codigo. Los diagramas 1, 2, 3 y 5 describen la Fase 1 y
+  la Fase 2, ambas ya en produccion (<code>docs/booking/pricing-and-payments.md</code>) &mdash; el
+  diagrama 1 ya incluye la pantalla de saldo restante. El diagrama 4 (&ldquo;Cotizar&rdquo;) sigue
+  siendo solo diseño, sin codigo todavia.
+</footer>

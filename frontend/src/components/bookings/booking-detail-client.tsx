@@ -9,6 +9,7 @@ import { getBookingPayments } from '@/lib/api/payments.api';
 import { deleteReview, getBookingReview } from '@/lib/api/reviews.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
 import { PaymentProofDrawer } from '@/components/payments/payment-proof-drawer';
+import { paymentTypeLabels } from '@/components/payments/payment-labels';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -17,13 +18,55 @@ import { ReviewFormDialog } from '@/components/reviews/review-form-dialog';
 import { StarRating } from '@/components/reviews/star-rating';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Booking, PaymentType } from '@/types/api';
 
 interface BookingDetailClientProps {
   bookingId: string;
 }
 
-const canUploadDeposit = (status: string, depositPaid: boolean) => {
-  return status === 'APPROVED' && !depositPaid;
+interface PayableAction {
+  paymentType: PaymentType;
+  amount: number;
+  buttonLabel: string;
+}
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** The one place that decides what the client can pay right now, and how much -- mirrors the
+ * exact state gates the backend enforces (APPROVED -> DEPOSIT or FULL, DEPOSIT_PAID ->
+ * REMAINING), so the button never offers something the API would reject. */
+const resolvePayableAction = (booking: Booking): PayableAction | null => {
+  const isFullUpfront = booking.venue?.paymentPolicy === 'FULL_UPFRONT';
+
+  if (booking.status === 'APPROVED') {
+    return isFullUpfront
+      ? { paymentType: 'FULL', amount: booking.totalPrice, buttonLabel: 'Pagar el total' }
+      : { paymentType: 'DEPOSIT', amount: booking.depositAmount, buttonLabel: 'Pagar anticipo' };
+  }
+
+  if (booking.status === 'DEPOSIT_PAID') {
+    const remaining = round2(booking.totalPrice - booking.depositAmount);
+    if (remaining <= 0) return null;
+    return { paymentType: 'REMAINING', amount: remaining, buttonLabel: 'Pagar saldo restante' };
+  }
+
+  return null;
+};
+
+/** What the summary tile next to "Total" should show -- the current payable amount while
+ * there's one, "Pagado" once there's nothing left to collect, otherwise a preview of what the
+ * anticipo/total will be once the owner approves. */
+const resolveSummaryTile = (booking: Booking): { label: string; amount: number } => {
+  if (booking.status === 'DEPOSIT_PAID') {
+    return { label: 'Saldo restante', amount: round2(booking.totalPrice - booking.depositAmount) };
+  }
+  if (booking.status === 'FULLY_PAID' || booking.status === 'COMPLETED') {
+    return { label: 'Pagado', amount: booking.totalPrice };
+  }
+  const isFullUpfront = booking.venue?.paymentPolicy === 'FULL_UPFRONT';
+  return isFullUpfront
+    ? { label: 'A pagar', amount: booking.totalPrice }
+    : { label: 'Anticipo', amount: booking.depositAmount };
 };
 
 export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => {
@@ -96,9 +139,21 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
   }
 
   const booking = bookingQuery.data;
-  const showPaymentAction = canUploadDeposit(booking.status, booking.depositPaid);
+  const payableAction = resolvePayableAction(booking);
+  // El cliente ya subio un comprobante de este mismo tipo y sigue esperando que el propietario
+  // lo revise -- no se ofrece un segundo boton mientras tanto (el backend igual lo rechazaria,
+  // pero mostrar dos comprobantes pendientes identicos en el panel del propietario es confuso
+  // por si mismo, ver payment.service.ts).
+  const hasPendingOfSameType = payableAction
+    ? (paymentsQuery.data ?? []).some(
+        (payment) =>
+          payment.paymentType === payableAction.paymentType && payment.status === 'PENDING',
+      )
+    : false;
+  const summaryTile = resolveSummaryTile(booking);
   const showCancelAction = ['PENDING', 'APPROVED'].includes(booking.status);
-  const showReviewAction = booking.status === 'COMPLETED' && !reviewQuery.isLoading && !reviewQuery.data;
+  const showReviewAction =
+    booking.status === 'COMPLETED' && !reviewQuery.isLoading && !reviewQuery.data;
 
   return (
     <div className="space-y-6">
@@ -117,12 +172,17 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
               · {formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {showPaymentAction ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {payableAction && !hasPendingOfSameType ? (
               <Button onClick={() => setPaymentOpen(true)}>
                 <CreditCard className="h-4 w-4" />
-                Pagar anticipo
+                {payableAction.buttonLabel}
               </Button>
+            ) : null}
+            {payableAction && hasPendingOfSameType ? (
+              <p className="rounded-md bg-muted px-3 py-1.5 text-sm text-muted-foreground">
+                Comprobante enviado — esperando confirmacion del propietario
+              </p>
             ) : null}
             {showCancelAction ? (
               <Button variant="outline" onClick={() => setCancelOpen(true)}>
@@ -144,8 +204,8 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             <p className="font-semibold">{formatCurrency(booking.totalPrice)}</p>
           </div>
           <div className="rounded-md bg-muted p-3">
-            <p className="text-xs text-muted-foreground">Anticipo</p>
-            <p className="font-semibold">{formatCurrency(booking.depositAmount)}</p>
+            <p className="text-xs text-muted-foreground">{summaryTile.label}</p>
+            <p className="font-semibold">{formatCurrency(summaryTile.amount)}</p>
           </div>
           <div className="rounded-md bg-muted p-3">
             <p className="text-xs text-muted-foreground">Invitados</p>
@@ -186,18 +246,21 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
               className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {payment.method} · {payment.status}
+                <p className="font-medium">
+                  {paymentTypeLabels[payment.paymentType]} · {formatCurrency(payment.amount)}
                 </p>
+                <p className="text-sm text-muted-foreground">{payment.method}</p>
               </div>
-              {payment.comprobanteUrl ? (
-                <Button asChild size="sm" variant="outline">
-                  <a href={payment.comprobanteUrl} target="_blank" rel="noreferrer">
-                    Ver comprobante
-                  </a>
-                </Button>
-              ) : null}
+              <div className="flex items-center gap-2">
+                <BookingStatusBadge status={payment.status} />
+                {payment.comprobanteUrl ? (
+                  <Button asChild size="sm" variant="outline">
+                    <a href={payment.comprobanteUrl} target="_blank" rel="noreferrer">
+                      Ver comprobante
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
@@ -235,7 +298,15 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
         </section>
       ) : null}
 
-      <PaymentProofDrawer booking={booking} open={paymentOpen} onOpenChange={setPaymentOpen} />
+      {payableAction ? (
+        <PaymentProofDrawer
+          booking={booking}
+          paymentType={payableAction.paymentType}
+          amount={payableAction.amount}
+          open={paymentOpen}
+          onOpenChange={setPaymentOpen}
+        />
+      ) : null}
       <ReviewFormDialog
         bookingId={bookingId}
         venueName={booking.venue?.name}

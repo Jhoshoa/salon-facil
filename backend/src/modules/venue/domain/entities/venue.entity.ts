@@ -1,6 +1,12 @@
 import { VenueServiceEntity } from './venue-service.entity';
 import { VenuePriceEntity } from './venue-price.entity';
-import { AmenityCategory, Departamento, PriceUnit, VenueMediaType } from '@prisma/client';
+import {
+  AmenityCategory,
+  Departamento,
+  PaymentPolicy,
+  PriceUnit,
+  VenueMediaType,
+} from '@prisma/client';
 
 /** Business rule, not an infra/upload concern -- lives in domain so both the controller (single
  * upload batch) and the service (running total across every addMedia call ever made) enforce the
@@ -44,9 +50,12 @@ export class VenueEntity {
   capacityMax!: number;
   spaceTypeId: string | null = null;
   minimumHours: number = 4;
-  priceUnit: PriceUnit = PriceUnit.EVENT;
+  priceUnit: PriceUnit = PriceUnit.DAY;
   instantBooking: boolean = false;
   allowsMultipleDays: boolean = false;
+  paymentPolicy: PaymentPolicy = PaymentPolicy.DEPOSIT_THEN_REMAINING;
+  /** Ignorado cuando paymentPolicy es FULL_UPFRONT. */
+  depositPercentage: number = 30;
   squareMeters: number | null = null;
   photos: string[] = [];
   videoUrl: string | null = null;

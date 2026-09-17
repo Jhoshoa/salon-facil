@@ -28,7 +28,6 @@ const getBasePrice = (venue: Venue) =>
   venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
 
 const priceUnitLabel: Record<NonNullable<Venue['priceUnit']>, string> = {
-  EVENT: 'evento',
   HOUR: 'hora',
   DAY: 'dia',
 };

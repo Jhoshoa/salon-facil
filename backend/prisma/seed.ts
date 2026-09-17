@@ -211,7 +211,7 @@ async function main(): Promise<void> {
       squareMeters: 480,
       spaceTypeId: getSpaceTypeId('EVENT_HALL'),
       minimumHours: 6,
-      priceUnit: PriceUnit.EVENT,
+      priceUnit: PriceUnit.DAY,
       instantBooking: false,
       allowsMultipleDays: false,
       photos: [
@@ -250,7 +250,7 @@ async function main(): Promise<void> {
       squareMeters: 260,
       spaceTypeId: getSpaceTypeId('MULTIPURPOSE'),
       minimumHours: 4,
-      priceUnit: PriceUnit.EVENT,
+      priceUnit: PriceUnit.DAY,
       instantBooking: false,
       allowsMultipleDays: false,
       photos: [
@@ -286,7 +286,7 @@ async function main(): Promise<void> {
       squareMeters: 720,
       spaceTypeId: getSpaceTypeId('GARDEN'),
       minimumHours: 8,
-      priceUnit: PriceUnit.EVENT,
+      priceUnit: PriceUnit.DAY,
       instantBooking: false,
       allowsMultipleDays: true,
       photos: [
