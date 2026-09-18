@@ -6,6 +6,7 @@ import { SiteHeader } from '@/components/shared/site-header';
 import { SiteFooter } from '@/components/shared/site-footer';
 import { PinnedPrint } from '@/components/shared/pinned-print';
 import { LegendMarquee } from '@/components/shared/legend-marquee';
+import { RevealImage } from '@/components/shared/reveal-image';
 import { Button } from '@/components/ui/button';
 
 import verdeManzanaGarden from '@/assets/images/venue-verde-manzana-garden.jpg';
@@ -167,7 +168,7 @@ export default function HomePage() {
                 src={salonVipInterior}
                 alt="Interior El Alto"
                 fill
-                priority
+                loading="eager"
                 className="object-cover"
                 sizes="(min-width: 640px) 230px, 58vw"
               />
@@ -190,7 +191,7 @@ export default function HomePage() {
                 src={megatronFacade}
                 alt="Cholet El Alto"
                 fill
-                priority
+                loading="eager"
                 className="object-cover"
                 sizes="210px"
               />
@@ -234,15 +235,14 @@ export default function HomePage() {
             return (
               <div key={print.name}>
                 <div className={`border border-border bg-card p-2.5 pb-0 shadow-md ${rotate}`}>
-                  <div className="relative h-[230px]">
-                    <Image
-                      src={print.image}
-                      alt={print.name}
-                      fill
-                      className="object-cover"
-                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    />
-                  </div>
+                  <RevealImage
+                    src={print.image}
+                    alt={print.name}
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    wrapperClassName="relative h-[230px]"
+                  />
                 </div>
                 <div className="pt-3">
                   <div className="mb-1 flex items-baseline justify-between">
@@ -302,15 +302,14 @@ export default function HomePage() {
                   index % 2 === 0 ? 'rotate-[-2deg]' : 'rotate-[2deg]'
                 }`}
               >
-                <div className="relative h-[150px]">
-                  <Image
-                    src={entry.image}
-                    alt={entry.title}
-                    fill
-                    className="object-cover"
-                    sizes="200px"
-                  />
-                </div>
+                <RevealImage
+                  src={entry.image}
+                  alt={entry.title}
+                  fill
+                  className="object-cover"
+                  sizes="200px"
+                  wrapperClassName="relative h-[150px]"
+                />
               </div>
               <div>
                 <div className="sf-kicker mb-2 max-w-[160px]">
