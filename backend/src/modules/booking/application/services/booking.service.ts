@@ -23,6 +23,7 @@ import { PriceCalculatorService, RangePriceCalculationResult } from './price-cal
 import { AvailabilityService } from './availability.service';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
 const MAX_BOOKING_RANGE_DAYS = 30;
@@ -212,6 +213,15 @@ export class BookingService {
             ? `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Se confirmo automaticamente porque tenes activada la reserva inmediata.`
             : `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Revisala en tu panel de reservas.`,
         recipientEmail: ownerContact.email,
+        metadata: {
+          kind: 'bookingRequest',
+          venueName: venue.name,
+          eventType: dto.eventType,
+          guestCount: dto.guestCount,
+          startDate: this.toDateOnly(startDate),
+          endDate: this.toDateOnly(endDate),
+          autoConfirmed: initialStatus === BookingStatus.APPROVED,
+        } satisfies NotificationEmailMetadata,
       });
     }
 
@@ -224,6 +234,13 @@ export class BookingService {
         title: `Tu reserva en ${venue.name} fue confirmada`,
         content: `Este local confirma sus reservas al instante. Ya podes subir el comprobante del anticipo desde "Mis reservas".`,
         recipientEmail: booking.client.email,
+        metadata: {
+          kind: 'bookingConfirmed',
+          variant: 'instant',
+          venueName: venue.name,
+          eventDate: this.toDateOnly(startDate),
+          bookingId: booking.id,
+        } satisfies NotificationEmailMetadata,
       });
     }
 
@@ -506,6 +523,13 @@ export class BookingService {
         title: `Tu reserva en ${venue.name} fue aprobada`,
         content: `El propietario aprobo tu solicitud para el ${this.toDateOnly(booking.eventDate)}. Ya podes subir el comprobante del anticipo desde "Mis reservas".`,
         recipientEmail: booking.client.email,
+        metadata: {
+          kind: 'bookingConfirmed',
+          variant: 'approved',
+          venueName: venue.name,
+          eventDate: this.toDateOnly(booking.eventDate),
+          bookingId: booking.id,
+        } satisfies NotificationEmailMetadata,
       });
     }
     return updated;
@@ -546,6 +570,13 @@ export class BookingService {
           ? `El propietario rechazo tu solicitud del ${this.toDateOnly(booking.eventDate)}. Motivo: ${reason}`
           : `El propietario rechazo tu solicitud del ${this.toDateOnly(booking.eventDate)}.`,
         recipientEmail: booking.client.email,
+        metadata: {
+          kind: 'bookingCancelled',
+          variant: 'rejectedByOwner',
+          venueName: venue.name,
+          eventDate: this.toDateOnly(booking.eventDate),
+          reason,
+        } satisfies NotificationEmailMetadata,
       });
     }
     return updated;
@@ -582,6 +613,12 @@ export class BookingService {
         title: `Reserva cancelada en ${venueName}`,
         content: `El cliente cancelo su reserva del ${this.toDateOnly(booking.eventDate)}. Las fechas quedaron liberadas en tu calendario.`,
         recipientEmail: ownerContact.email,
+        metadata: {
+          kind: 'bookingCancelled',
+          variant: 'cancelledByClient',
+          venueName,
+          eventDate: this.toDateOnly(booking.eventDate),
+        } satisfies NotificationEmailMetadata,
       });
     }
     return updated;
@@ -637,6 +674,11 @@ export class BookingService {
         title: `¿Que tal estuvo tu evento en ${venueName}?`,
         content: 'Contanos tu experiencia — tu reseña ayuda a otros a elegir mejor.',
         recipientEmail: booking.client.email,
+        metadata: {
+          kind: 'reviewRequest',
+          venueName,
+          bookingId: booking.id,
+        } satisfies NotificationEmailMetadata,
       });
     }
     return updated;
@@ -794,6 +836,14 @@ export class BookingService {
             title: `Tu evento en ${venueName} es en ${tier.days} dia${tier.days === 1 ? '' : 's'}`,
             content: `Recordatorio: tu reserva "${booking.eventType}" en ${venueName} es el ${this.toDateOnly(booking.eventDate)}. Prepara todo para tu evento.`,
             recipientEmail: booking.client.email,
+            metadata: {
+              kind: 'reminder',
+              venueName,
+              eventType: booking.eventType,
+              eventDate: this.toDateOnly(booking.eventDate),
+              days: tier.days,
+              bookingId: booking.id,
+            } satisfies NotificationEmailMetadata,
           });
         }
 

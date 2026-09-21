@@ -22,6 +22,7 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
@@ -345,6 +346,7 @@ export class AuthService {
         title: 'Restablece tu contrasena en Mi Evento',
         content: `Recibimos una solicitud para restablecer tu contrasena. Este enlace vence en 1 hora: ${resetUrl}. Si no fuiste vos, ignora este mensaje.`,
         recipientEmail: user.email,
+        metadata: { kind: 'passwordReset', resetUrl } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — the response above is generic regardless, so a failed send here
@@ -428,6 +430,11 @@ export class AuthService {
             ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
             : 'Gracias por registrarte. Ya podes buscar y reservar locales para tu proximo evento.',
         recipientEmail: user.email,
+        metadata: {
+          kind: 'welcome',
+          firstName: user.fullName.split(' ')[0],
+          role: user.role === UserRole.OWNER ? 'OWNER' : 'CLIENT',
+        } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see method doc.
@@ -452,6 +459,7 @@ export class AuthService {
         title: 'Verifica tu email en Mi Evento',
         content: `Tu codigo de verificacion es: ${code}. Vence en 15 minutos.`,
         recipientEmail: user.email,
+        metadata: { kind: 'emailVerification', code } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see sendWelcomeNotification.

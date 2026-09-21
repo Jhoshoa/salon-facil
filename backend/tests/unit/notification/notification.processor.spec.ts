@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { NotificationChannel } from '@prisma/client';
+import { NotificationChannel, NotificationType } from '@prisma/client';
 import { NotificationProcessor } from '../../../src/modules/notification/infrastructure/queue/notification.processor';
 import type { INotificationRepository } from '../../../src/modules/notification/domain/repositories/notification.repository.interface';
 import type { EmailService } from '../../../src/modules/notification/infrastructure/channels/email.service';
@@ -16,6 +16,7 @@ describe('NotificationProcessor', () => {
     ({
       data: {
         notificationId: 'notif-1',
+        type: NotificationType.WELCOME,
         channel: NotificationChannel.EMAIL,
         title: 'Titulo',
         content: 'Contenido',
@@ -36,20 +37,29 @@ describe('NotificationProcessor', () => {
     };
     emailService = { send: jest.fn() };
     whatsAppService = { send: jest.fn() };
+    const configService = { get: jest.fn().mockReturnValue('http://localhost:3000') };
 
     processor = new NotificationProcessor(
       repository,
       emailService as unknown as EmailService,
       whatsAppService as unknown as WhatsAppService,
+      configService as never,
     );
   });
 
+  // No `metadata` on the job in these tests -> buildNotificationEmailHtml() short-circuits to
+  // null -> EmailService.send() is called with `html: undefined` (plain-text fallback path).
   it('sends via email and marks the notification as sent on success', async () => {
     emailService.send.mockResolvedValue({ success: true });
 
     await processor.process(makeJob());
 
-    expect(emailService.send).toHaveBeenCalledWith('client@test.com', 'Titulo', 'Contenido');
+    expect(emailService.send).toHaveBeenCalledWith(
+      'client@test.com',
+      'Titulo',
+      'Contenido',
+      undefined,
+    );
     expect(repository.markAsSent).toHaveBeenCalledWith('notif-1');
     expect(repository.markAsFailed).not.toHaveBeenCalled();
   });
