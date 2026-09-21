@@ -14,11 +14,7 @@ export const BRAND = {
   goldDeep: '#A9861D',
   goldPale: '#FBF3DC',
   paper: '#FFFFFF',
-  // Cool, low-saturation blue-gray rather than the site's warm "Bitácora" cream (`--paper-2`) —
-  // that cream reads fine against the site's other cream/paper surfaces, but sitting directly
-  // behind a pure-white card in an inbox it just looked dull. A light navy-tinted neutral is the
-  // standard professional-transactional-email look (Stripe, GitHub, etc. use the same family).
-  paper2: '#EEF2F6',
+  paper2: '#FDFCFA',
   border: '#E1E6EC',
   muted: '#5B6570',
   success: '#1E9E5A',
