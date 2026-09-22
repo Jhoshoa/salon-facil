@@ -1,0 +1,22 @@
+# Normalize every text file to LF line endings on checkout and commit, regardless of each
+# contributor's local Git config. Without this, Windows' `core.autocrlf=true` checks files out
+# as CRLF while the repo's blobs (and ESLint/Prettier, which enforce LF) expect LF -- that
+# mismatch is purely cosmetic (doesn't change how any code runs) but floods `npm run lint` with
+# thousands of "Delete CR" errors across files nobody touched, and can make clean diffs noisy.
+# This doesn't rewrite any existing blob by itself -- they're already LF -- it only fixes how
+# Git checks files out and stages them from here on.
+* text=auto eol=lf
+
+# Known binary types: never touch line endings. `text=auto`'s own detection already skips these,
+# but spelling out the common ones here means it never has to guess.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
