@@ -28,6 +28,8 @@ const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
 const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 segundos
+const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 60 * 60 * 1000; // 1 hora
+const EMAIL_VERIFICATION_MAX_CODES_PER_WINDOW = 3;
 
 /** A Google account has no Bolivian phone to give us — this placeholder satisfies the
  * NOT NULL + UNIQUE `phone` column (unique per Google account since providerId is) without
@@ -241,6 +243,20 @@ export class AuthService {
       if (Date.now() - issuedAt < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) {
         throw new BadRequestException('Espera un momento antes de pedir otro codigo.');
       }
+    }
+
+    // Per-user cap independent of the route's per-IP throttle (@Throttle on the controller) --
+    // that one limits requests/minute from a given IP, this limits how many codes a given
+    // account can rack up in an hour regardless of IP, so someone can't just retry from
+    // different networks to keep flooding the same mailbox.
+    const recentCodeCount = await this.authRepository.countEmailVerificationCodesSince(
+      userId,
+      new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS),
+    );
+    if (recentCodeCount >= EMAIL_VERIFICATION_MAX_CODES_PER_WINDOW) {
+      throw new BadRequestException(
+        'Superaste el limite de reenvios por hora. Intenta de nuevo mas tarde.',
+      );
     }
 
     await this.issueEmailVerificationCode(user);

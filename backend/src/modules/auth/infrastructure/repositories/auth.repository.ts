@@ -368,6 +368,12 @@ export class AuthRepository implements IAuthRepository {
     });
   }
 
+  async countEmailVerificationCodesSince(userId: string, since: Date): Promise<number> {
+    return this.prisma.emailVerificationCode.count({
+      where: { userId, createdAt: { gte: since } },
+    });
+  }
+
   private toEntity(prismaUser: PrismaUser): UserEntity {
     return new UserEntity({
       id: prismaUser.id,

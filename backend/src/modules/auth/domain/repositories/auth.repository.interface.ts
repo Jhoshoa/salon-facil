@@ -101,4 +101,8 @@ export interface IAuthRepository {
   incrementEmailVerificationAttempts(id: string): Promise<void>;
   markEmailVerificationCodeUsed(id: string): Promise<void>;
   invalidateActiveEmailVerificationCodes(userId: string): Promise<void>;
+  /** Counts every code issued for this user since `since`, active or not — codes are never
+   * deleted (see invalidateActiveEmailVerificationCodes), so this doubles as a resend-attempt
+   * counter regardless of whether earlier codes were used, expired, or superseded. */
+  countEmailVerificationCodesSince(userId: string, since: Date): Promise<number>;
 }

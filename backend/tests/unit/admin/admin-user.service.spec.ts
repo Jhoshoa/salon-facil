@@ -60,6 +60,7 @@ describe('AdminUserService', () => {
       incrementEmailVerificationAttempts: jest.fn(),
       markEmailVerificationCodeUsed: jest.fn(),
       invalidateActiveEmailVerificationCodes: jest.fn(),
+      countEmailVerificationCodesSince: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

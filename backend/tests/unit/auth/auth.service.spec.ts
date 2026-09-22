@@ -57,6 +57,7 @@ describe('AuthService', () => {
     incrementEmailVerificationAttempts: jest.Mock;
     markEmailVerificationCodeUsed: jest.Mock;
     invalidateActiveEmailVerificationCodes: jest.Mock;
+    countEmailVerificationCodesSince: jest.Mock;
   };
   let mockTokenService: {
     generateTokens: jest.Mock;
@@ -93,6 +94,7 @@ describe('AuthService', () => {
       incrementEmailVerificationAttempts: jest.fn(),
       markEmailVerificationCodeUsed: jest.fn(),
       invalidateActiveEmailVerificationCodes: jest.fn(),
+      countEmailVerificationCodesSince: jest.fn().mockResolvedValue(0),
     };
 
     mockTokenService = {
@@ -385,6 +387,72 @@ describe('AuthService', () => {
       await expect(
         service.resetPassword({ token: 'expired-token', newPassword: 'NewPassword123!' }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('resendVerificationCode', () => {
+    it('issues a new code when the user has no active code yet', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue(null);
+      mockAuthRepository.countEmailVerificationCodesSince.mockResolvedValue(0);
+
+      const result = await service.resendVerificationCode('user-123');
+
+      expect(result.message).toMatch(/nuevo codigo/i);
+      expect(mockAuthRepository.createEmailVerificationCode).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123' }),
+      );
+    });
+
+    it('short-circuits with a friendly message when the email is already verified', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser({ emailVerifiedAt: new Date() }));
+
+      const result = await service.resendVerificationCode('user-123');
+
+      expect(result.message).toMatch(/ya esta verificado/i);
+      expect(mockAuthRepository.createEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('rejects a resend within the 60-second cooldown of the still-active code', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue({
+        id: 'code-1',
+        codeHash: 'hash',
+        attempts: 0,
+        // Issued 10s ago (expiresAt is issuedAt + 15min) -- well inside the 60s cooldown.
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000 - 10 * 1000),
+        usedAt: null,
+      });
+
+      await expect(service.resendVerificationCode('user-123')).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.createEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('rejects a resend once 3 codes were already issued in the last hour', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue(null);
+      mockAuthRepository.countEmailVerificationCodesSince.mockResolvedValue(3);
+
+      await expect(service.resendVerificationCode('user-123')).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.createEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('allows a resend past the 60-second cooldown, under the hourly cap', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue({
+        id: 'code-1',
+        codeHash: 'hash',
+        attempts: 0,
+        // Issued just over a minute ago -- past the 60s cooldown.
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000 - 65 * 1000),
+        usedAt: null,
+      });
+      mockAuthRepository.countEmailVerificationCodesSince.mockResolvedValue(1);
+
+      const result = await service.resendVerificationCode('user-123');
+
+      expect(result.message).toMatch(/nuevo codigo/i);
+      expect(mockAuthRepository.createEmailVerificationCode).toHaveBeenCalled();
     });
   });
 });
