@@ -130,7 +130,7 @@ export class AuthService {
   async loginOrRegisterWithGoogle(
     profile: GoogleProfile,
     intent?: 'CLIENT' | 'OWNER',
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto & { justLinked?: boolean }> {
     const existingIdentity = await this.authRepository.findIdentity('google', profile.providerId);
     if (existingIdentity) {
       const user = await this.authRepository.findById(existingIdentity.userId);
@@ -167,8 +167,13 @@ export class AuthService {
         await this.authRepository.markEmailVerified(existingByEmail.id);
       }
       await this.authRepository.updateLastLogin(existingByEmail.id);
+      // Linking itself is safe (Google already proved identity, see above) — but it's still a
+      // new way into the account, and until now nothing ever told the account owner it happened.
+      // A security notification on a channel the frontend redirect doesn't control (email) lets
+      // them react fast if this *wasn't* them somehow (e.g. their Google session was compromised).
+      this.sendAccountLinkedNotification(existingByEmail, 'Google');
       const tokens = await this.issueTokens(existingByEmail);
-      return this.buildAuthResponse(existingByEmail, tokens);
+      return { ...this.buildAuthResponse(existingByEmail, tokens), justLinked: true };
     }
 
     const role = intent === UserRole.OWNER ? UserRole.OWNER : UserRole.CLIENT;
@@ -438,6 +443,23 @@ export class AuthService {
       })
       .catch(() => {
         // Best-effort — see method doc.
+      });
+  }
+
+  /** Best-effort — see sendWelcomeNotification. Fires only when Google login auto-links to an
+   * existing password account (see loginOrRegisterWithGoogle), never on routine logins. */
+  private sendAccountLinkedNotification(user: UserEntity, provider: string): void {
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.ACCOUNT_LINKED,
+        title: `Tu cuenta de Mi Evento ahora tambien usa ${provider}`,
+        content: `Vinculamos tu cuenta con ${provider} para iniciar sesion. Si no fuiste vos, cambia tu contrasena de inmediato y contactanos.`,
+        recipientEmail: user.email,
+        metadata: { kind: 'accountLinked', provider } satisfies NotificationEmailMetadata,
+      })
+      .catch(() => {
+        // Best-effort — see sendWelcomeNotification.
       });
   }
 

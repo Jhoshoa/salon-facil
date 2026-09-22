@@ -66,7 +66,8 @@ export type NotificationEmailMetadata =
       reason: string;
       bookingId: string;
     }
-  | { kind: 'reviewResponse'; venueName: string; responseText: string; bookingId: string };
+  | { kind: 'reviewResponse'; venueName: string; responseText: string; bookingId: string }
+  | { kind: 'accountLinked'; provider: string };
 
 const bs = (amount: number) => `Bs ${amount.toLocaleString('es-BO')}`;
 
@@ -258,6 +259,20 @@ export const buildNotificationEmailHtml = (
       return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
     }
 
+    case 'accountLinked': {
+      const bodyHtml = `
+        <p style="margin:0 0 4px;">${badge('Alerta de seguridad', 'neutral')}</p>
+        <p style="margin:16px 0;">
+          Tu cuenta de Mi Evento ahora también se puede usar con ${metadata.provider} para iniciar sesión —
+          detectamos que ya tenías una cuenta con este email y la vinculamos automáticamente.
+        </p>
+        <p style="margin:16px 0; font-size:13px; color:${emailUi.colors.muted};">
+          Si no fuiste vos, cambiá tu contraseña de inmediato y escribinos a soporte.
+        </p>
+        ${button({ label: 'Ir a mi cuenta', url: `${frontendUrl}/dashboard/profile`, variant: 'secondary' })}`;
+      return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
+    }
+
     default:
       return null;
   }
@@ -281,4 +296,5 @@ export const EXPECTED_METADATA_KIND: Record<
   REMINDER_1_DAY: 'reminder',
   PAYMENT_RECEIVED: null, // three metadata.kind variants (paymentUploaded/Confirmed/Rejected) share this one type
   REVIEW_RESPONSE: 'reviewResponse',
+  ACCOUNT_LINKED: 'accountLinked',
 };
