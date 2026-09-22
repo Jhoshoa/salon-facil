@@ -16,6 +16,7 @@ import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 import { CreatePaymentDto } from '../dto/payment.dto';
 import { PaymentEntity, PaymentStatus, PaymentType } from '../../domain/entities/payment.entity';
 import {
@@ -176,6 +177,13 @@ export class PaymentService {
           title: `Comprobante recibido: ${venueName}`,
           content: `El cliente subio un comprobante de ${PAYMENT_TYPE_LABELS[payment.paymentType]} por Bs ${payment.amount} para la reserva del ${this.toDateOnly(payment.booking.eventDate)}. Revisalo en tu panel de pagos.`,
           recipientEmail: ownerContact.email,
+          metadata: {
+            kind: 'paymentUploaded',
+            venueName,
+            paymentTypeLabel: PAYMENT_TYPE_LABELS[payment.paymentType],
+            amount: payment.amount,
+            eventDate: this.toDateOnly(payment.booking.eventDate),
+          } satisfies NotificationEmailMetadata,
         });
       }
     }
@@ -241,6 +249,13 @@ export class PaymentService {
         title: `Tu pago en ${venueName} fue confirmado`,
         content: `Confirmamos tu ${PAYMENT_TYPE_LABELS[payment.paymentType]} de Bs ${payment.amount}. Gracias por reservar con Mi Evento.`,
         recipientEmail: payment.booking.client.email,
+        metadata: {
+          kind: 'paymentConfirmed',
+          venueName,
+          paymentTypeLabel: PAYMENT_TYPE_LABELS[payment.paymentType],
+          amount: payment.amount,
+          bookingId: payment.booking.id,
+        } satisfies NotificationEmailMetadata,
       });
     }
 
@@ -270,6 +285,14 @@ export class PaymentService {
         title: `Tu comprobante en ${venueName} fue rechazado`,
         content: `El propietario rechazo tu comprobante de ${PAYMENT_TYPE_LABELS[payment.paymentType]} de Bs ${payment.amount}. Motivo: ${reason}. Podes subir uno nuevo desde "Mis reservas".`,
         recipientEmail: payment.booking.client.email,
+        metadata: {
+          kind: 'paymentRejected',
+          venueName,
+          paymentTypeLabel: PAYMENT_TYPE_LABELS[payment.paymentType],
+          amount: payment.amount,
+          reason,
+          bookingId: payment.booking.id,
+        } satisfies NotificationEmailMetadata,
       });
     }
 

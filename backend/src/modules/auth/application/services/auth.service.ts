@@ -22,6 +22,7 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
@@ -129,7 +130,7 @@ export class AuthService {
   async loginOrRegisterWithGoogle(
     profile: GoogleProfile,
     intent?: 'CLIENT' | 'OWNER',
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto & { justLinked?: boolean }> {
     const existingIdentity = await this.authRepository.findIdentity('google', profile.providerId);
     if (existingIdentity) {
       const user = await this.authRepository.findById(existingIdentity.userId);
@@ -166,8 +167,13 @@ export class AuthService {
         await this.authRepository.markEmailVerified(existingByEmail.id);
       }
       await this.authRepository.updateLastLogin(existingByEmail.id);
+      // Linking itself is safe (Google already proved identity, see above) — but it's still a
+      // new way into the account, and until now nothing ever told the account owner it happened.
+      // A security notification on a channel the frontend redirect doesn't control (email) lets
+      // them react fast if this *wasn't* them somehow (e.g. their Google session was compromised).
+      this.sendAccountLinkedNotification(existingByEmail, 'Google');
       const tokens = await this.issueTokens(existingByEmail);
-      return this.buildAuthResponse(existingByEmail, tokens);
+      return { ...this.buildAuthResponse(existingByEmail, tokens), justLinked: true };
     }
 
     const role = intent === UserRole.OWNER ? UserRole.OWNER : UserRole.CLIENT;
@@ -345,6 +351,7 @@ export class AuthService {
         title: 'Restablece tu contrasena en Mi Evento',
         content: `Recibimos una solicitud para restablecer tu contrasena. Este enlace vence en 1 hora: ${resetUrl}. Si no fuiste vos, ignora este mensaje.`,
         recipientEmail: user.email,
+        metadata: { kind: 'passwordReset', resetUrl } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — the response above is generic regardless, so a failed send here
@@ -428,9 +435,31 @@ export class AuthService {
             ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
             : 'Gracias por registrarte. Ya podes buscar y reservar locales para tu proximo evento.',
         recipientEmail: user.email,
+        metadata: {
+          kind: 'welcome',
+          firstName: user.fullName.split(' ')[0],
+          role: user.role === UserRole.OWNER ? 'OWNER' : 'CLIENT',
+        } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see method doc.
+      });
+  }
+
+  /** Best-effort — see sendWelcomeNotification. Fires only when Google login auto-links to an
+   * existing password account (see loginOrRegisterWithGoogle), never on routine logins. */
+  private sendAccountLinkedNotification(user: UserEntity, provider: string): void {
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.ACCOUNT_LINKED,
+        title: `Tu cuenta de Mi Evento ahora tambien usa ${provider}`,
+        content: `Vinculamos tu cuenta con ${provider} para iniciar sesion. Si no fuiste vos, cambia tu contrasena de inmediato y contactanos.`,
+        recipientEmail: user.email,
+        metadata: { kind: 'accountLinked', provider } satisfies NotificationEmailMetadata,
+      })
+      .catch(() => {
+        // Best-effort — see sendWelcomeNotification.
       });
   }
 
@@ -452,6 +481,7 @@ export class AuthService {
         title: 'Verifica tu email en Mi Evento',
         content: `Tu codigo de verificacion es: ${code}. Vence en 15 minutos.`,
         recipientEmail: user.email,
+        metadata: { kind: 'emailVerification', code } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see sendWelcomeNotification.

@@ -15,6 +15,7 @@ import { BookingStatus } from '../../../booking/domain/entities/booking.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 import {
   IReviewRepository,
   REVIEW_REPOSITORY,
@@ -143,6 +144,12 @@ export class ReviewService {
       title: `${venue.name} respondio tu reseña`,
       content: dto.response,
       recipientEmail: review.client?.email,
+      metadata: {
+        kind: 'reviewResponse',
+        venueName: venue.name,
+        responseText: dto.response,
+        bookingId: review.bookingId,
+      } satisfies NotificationEmailMetadata,
     });
 
     return updated;

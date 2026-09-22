@@ -32,7 +32,11 @@ export class EmailService implements OnModuleInit {
     }
   }
 
-  async send(to: string, subject: string, text: string): Promise<SendResult> {
+  /** `html` is optional so callers without a matching template (or a future notification type
+   * that hasn't been designed yet) still send a plain-text email instead of nothing. When
+   * present, SES sends a proper multipart message — `text` remains the fallback body for
+   * clients that don't render HTML. */
+  async send(to: string, subject: string, text: string, html?: string): Promise<SendResult> {
     if (!this.client) {
       return { success: false, error: 'AWS SES no esta configurado' };
     }
@@ -45,7 +49,10 @@ export class EmailService implements OnModuleInit {
           Content: {
             Simple: {
               Subject: { Data: subject, Charset: 'UTF-8' },
-              Body: { Text: { Data: text, Charset: 'UTF-8' } },
+              Body: {
+                Text: { Data: text, Charset: 'UTF-8' },
+                ...(html ? { Html: { Data: html, Charset: 'UTF-8' } } : {}),
+              },
             },
           },
         }),

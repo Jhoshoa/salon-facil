@@ -110,6 +110,7 @@ enum NotificationType {
   PASSWORD_RESET
   REVIEW_RESPONSE
   EMAIL_VERIFICATION
+  ACCOUNT_LINKED
 }
 
 enum NotificationChannel {
