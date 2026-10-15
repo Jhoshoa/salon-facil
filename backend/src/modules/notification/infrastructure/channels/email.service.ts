@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import * as nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 
 export interface SendResult {
   success: boolean;
@@ -10,53 +11,59 @@ export interface SendResult {
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
-  private client: SESv2Client | null = null;
+  private transporter: Transporter | null = null;
   private fromAddress = 'noreply@mievento.com.bo';
+  private fromName = 'Mi Evento';
 
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const region = this.configService.get<string>('AWS_REGION');
-    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
-    const fromAddress = this.configService.get<string>('SES_FROM_EMAIL');
+    // EMAIL_ENABLED is a deliberate, explicit kill switch -- independent of whether credentials
+    // happen to be set -- so sending can be turned off in a given environment without having to
+    // unset/rotate the SMTP password.
+    const enabled = this.configService.get<string>('EMAIL_ENABLED') === 'true';
+    const host = this.configService.get<string>('SMTP_HOST');
+    const port = this.configService.get<string>('SMTP_PORT');
+    const username = this.configService.get<string>('SMTP_USERNAME');
+    const password = this.configService.get<string>('SMTP_PASSWORD');
+    const fromAddress = this.configService.get<string>('SMTP_FROM_EMAIL');
+    const fromName = this.configService.get<string>('SMTP_FROM_NAME');
 
-    if (region && accessKeyId && secretAccessKey) {
-      this.client = new SESv2Client({ region, credentials: { accessKeyId, secretAccessKey } });
+    if (enabled && host && port && username && password) {
+      const portNumber = Number(port);
+      this.transporter = nodemailer.createTransport({
+        host,
+        port: portNumber,
+        // 465 is implicit TLS; everything else (587, 25) starts plain and upgrades via
+        // STARTTLS, which nodemailer negotiates on its own once `secure` is false.
+        secure: portNumber === 465,
+        auth: { user: username, pass: password },
+      });
       if (fromAddress) this.fromAddress = fromAddress;
-      this.logger.log('AWS SES configurado correctamente');
+      if (fromName) this.fromName = fromName;
+      this.logger.log('SMTP (Brevo) configurado correctamente');
     } else {
       this.logger.warn(
-        'AWS SES no configurado (faltan AWS_REGION/AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) — los emails no se enviaran',
+        'SMTP no configurado (faltan EMAIL_ENABLED/SMTP_HOST/SMTP_PORT/SMTP_USERNAME/SMTP_PASSWORD) — los emails no se enviaran',
       );
     }
   }
 
   /** `html` is optional so callers without a matching template (or a future notification type
-   * that hasn't been designed yet) still send a plain-text email instead of nothing. When
-   * present, SES sends a proper multipart message — `text` remains the fallback body for
-   * clients that don't render HTML. */
+   * that hasn't been designed yet) still send a plain-text email instead of nothing. */
   async send(to: string, subject: string, text: string, html?: string): Promise<SendResult> {
-    if (!this.client) {
-      return { success: false, error: 'AWS SES no esta configurado' };
+    if (!this.transporter) {
+      return { success: false, error: 'SMTP no esta configurado' };
     }
 
     try {
-      await this.client.send(
-        new SendEmailCommand({
-          FromEmailAddress: this.fromAddress,
-          Destination: { ToAddresses: [to] },
-          Content: {
-            Simple: {
-              Subject: { Data: subject, Charset: 'UTF-8' },
-              Body: {
-                Text: { Data: text, Charset: 'UTF-8' },
-                ...(html ? { Html: { Data: html, Charset: 'UTF-8' } } : {}),
-              },
-            },
-          },
-        }),
-      );
+      await this.transporter.sendMail({
+        from: `"${this.fromName}" <${this.fromAddress}>`,
+        to,
+        subject,
+        text,
+        ...(html ? { html } : {}),
+      });
       return { success: true };
     } catch (error) {
       return {
