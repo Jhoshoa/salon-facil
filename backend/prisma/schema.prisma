@@ -111,6 +111,7 @@ enum NotificationType {
   REVIEW_RESPONSE
   EMAIL_VERIFICATION
   ACCOUNT_LINKED
+  PASSWORD_CHANGED
 }
 
 enum NotificationChannel {

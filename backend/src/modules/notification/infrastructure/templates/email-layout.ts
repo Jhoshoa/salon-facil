@@ -24,24 +24,17 @@ export const BRAND = {
 const SANS = `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`;
 const SERIF = `Georgia, 'Times New Roman', serif`;
 
-/** The `LogoMark` diamond, redrawn as inline SVG — same facet geometry as
- * `frontend/src/components/shared/logo-mark.tsx`, but with the colors baked in as literals
- * (no `hsl(var(--primary))`) since email HTML can't resolve CSS variables. Inline SVG renders
- * in Gmail, Apple Mail and most mobile clients; Outlook desktop drops it silently, which is why
- * the header always pairs it with a text wordmark rather than relying on the mark alone. */
-const logoMarkSvg = (size = 32) =>
-  `
-<svg width="${size}" height="${size}" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
-  <defs><clipPath id="lmClip"><rect x="10" y="10" width="32" height="32" rx="8" transform="rotate(45 26 26)"/></clipPath></defs>
-  <g clip-path="url(#lmClip)" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="0.5">
-    <polygon points="26,4 4,26 26,20" fill="${BRAND.navy}"/>
-    <polygon points="4,26 26,48 26,20" fill="${BRAND.navy}"/>
-    <polygon points="26,4 48,26 26,20" fill="${BRAND.gold}"/>
-    <polygon points="48,26 26,48 26,20" fill="${BRAND.gold}"/>
-  </g>
-  <rect x="10" y="10" width="32" height="32" rx="8" transform="rotate(45 26 26)" fill="none" stroke="#FFFFFF" stroke-opacity="0.75" stroke-width="0.6"/>
-  <circle cx="26" cy="20" r="3" fill="${BRAND.gold}" stroke="#FFFFFF" stroke-width="0.8"/>
-</svg>`.trim();
+/** The `LogoMark` diamond (same facet geometry as
+ * `frontend/src/components/shared/logo-mark.tsx`), pre-rasterized to a transparent PNG and
+ * served from the production frontend. Deliberately NOT inline SVG: Gmail strips SVG entirely,
+ * both inline and referenced via `<img>`, in the web client, the mobile apps, and Workspace mail
+ * — confirmed live (the logo was missing from a real received email). A hosted raster image is
+ * the one approach every mail client renders reliably. Always points at the real production
+ * domain, not `frontendUrl` — a local/staging send still has to render for whoever receives it,
+ * and `http://localhost:3000` isn't reachable from their inbox. */
+const LOGO_URL = 'https://mievento.com.bo/email-logo.png';
+const logoMarkImg = (size = 32) =>
+  `<img src="${LOGO_URL}" width="${size}" height="${size}" alt="Mi Evento" style="display:block; width:${size}px; height:${size}px;">`;
 
 export interface EmailButton {
   label: string;
@@ -141,7 +134,7 @@ export const renderEmailLayout = ({ preheader, heading, bodyHtml }: EmailLayoutP
           <td style="background:${BRAND.navy}; padding:20px 32px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td style="padding-right:10px; vertical-align:middle;">${logoMarkSvg(28)}</td>
+                <td style="padding-right:10px; vertical-align:middle;">${logoMarkImg(28)}</td>
                 <td style="vertical-align:middle;">
                   <span style="font-family:${SERIF}; font-style:italic; font-size:20px; color:#FFFFFF;">Mi Evento</span>
                 </td>

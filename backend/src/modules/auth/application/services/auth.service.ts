@@ -28,6 +28,8 @@ const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
 const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 segundos
+const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 60 * 60 * 1000; // 1 hora
+const EMAIL_VERIFICATION_MAX_CODES_PER_WINDOW = 3;
 
 /** A Google account has no Bolivian phone to give us — this placeholder satisfies the
  * NOT NULL + UNIQUE `phone` column (unique per Google account since providerId is) without
@@ -243,6 +245,20 @@ export class AuthService {
       }
     }
 
+    // Per-user cap independent of the route's per-IP throttle (@Throttle on the controller) --
+    // that one limits requests/minute from a given IP, this limits how many codes a given
+    // account can rack up in an hour regardless of IP, so someone can't just retry from
+    // different networks to keep flooding the same mailbox.
+    const recentCodeCount = await this.authRepository.countEmailVerificationCodesSince(
+      userId,
+      new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS),
+    );
+    if (recentCodeCount >= EMAIL_VERIFICATION_MAX_CODES_PER_WINDOW) {
+      throw new BadRequestException(
+        'Superaste el limite de reenvios por hora. Intenta de nuevo mas tarde.',
+      );
+    }
+
     await this.issueEmailVerificationCode(user);
     return { message: 'Te enviamos un nuevo codigo' };
   }
@@ -334,6 +350,11 @@ export class AuthService {
       return { message };
     }
 
+    // So a user who clicks "forgot password" more than once never has two valid reset links
+    // outstanding — otherwise an earlier link stays usable for up to an hour even after a
+    // newer one was already used to change the password.
+    await this.authRepository.invalidateActivePasswordResetTokens(user.id);
+
     const token = this.tokenService.generatePasswordResetToken();
     await this.authRepository.createPasswordResetToken({
       userId: user.id,
@@ -369,12 +390,27 @@ export class AuthService {
       throw new BadRequestException('El enlace de restablecimiento es invalido o expiro');
     }
 
+    const user = await this.authRepository.findById(storedToken.userId);
+    if (!user) {
+      throw new BadRequestException('El enlace de restablecimiento es invalido o expiro');
+    }
+
+    // `passwordHash` is null for an account that only ever signed in with Google (see
+    // loginOrRegisterWithGoogle) — resetting there is really "set a password for the first
+    // time", so there's nothing to compare against and this reset proceeds like any other.
+    if (user.passwordHash && (await bcrypt.compare(dto.newPassword, user.passwordHash))) {
+      throw new BadRequestException('La nueva contrasena no puede ser igual a la actual');
+    }
+
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);
     await this.authRepository.updatePassword(storedToken.userId, passwordHash);
     await this.authRepository.markPasswordResetTokenUsed(storedToken.id);
     // Invalidate every existing session — a leaked/stale access token shouldn't survive a
     // password reset.
     await this.authRepository.revokeAllRefreshTokens(storedToken.userId);
+    // Best-effort, on a channel an attacker completing this reset wouldn't control — lets the
+    // real account owner notice fast if this wasn't them.
+    this.sendPasswordChangedNotification(user);
 
     return { message: 'Contrasena actualizada exitosamente' };
   }
@@ -457,6 +493,25 @@ export class AuthService {
         content: `Vinculamos tu cuenta con ${provider} para iniciar sesion. Si no fuiste vos, cambia tu contrasena de inmediato y contactanos.`,
         recipientEmail: user.email,
         metadata: { kind: 'accountLinked', provider } satisfies NotificationEmailMetadata,
+      })
+      .catch(() => {
+        // Best-effort — see sendWelcomeNotification.
+      });
+  }
+
+  /** Best-effort — see sendWelcomeNotification. Fires on every successful resetPassword(),
+   * legitimate or not — that's the point: it's the one channel an attacker who just completed
+   * the reset doesn't control. */
+  private sendPasswordChangedNotification(user: UserEntity): void {
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.PASSWORD_CHANGED,
+        title: 'Tu contrasena de Mi Evento fue cambiada',
+        content:
+          'Tu contrasena fue cambiada recien. Si no fuiste vos, restablecela de nuevo de inmediato.',
+        recipientEmail: user.email,
+        metadata: { kind: 'passwordChanged' } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see sendWelcomeNotification.

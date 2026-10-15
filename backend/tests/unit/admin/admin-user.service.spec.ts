@@ -47,6 +47,7 @@ describe('AdminUserService', () => {
       createPasswordResetToken: jest.fn(),
       findActivePasswordResetToken: jest.fn(),
       markPasswordResetTokenUsed: jest.fn(),
+      invalidateActivePasswordResetTokens: jest.fn(),
       findMany: jest.fn(),
       updateStatus: jest.fn(),
       updateRole: jest.fn(),
@@ -60,6 +61,7 @@ describe('AdminUserService', () => {
       incrementEmailVerificationAttempts: jest.fn(),
       markEmailVerificationCodeUsed: jest.fn(),
       invalidateActiveEmailVerificationCodes: jest.fn(),
+      countEmailVerificationCodesSince: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
