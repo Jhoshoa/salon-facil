@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { NotificationChannel } from '@prisma/client';
 import { EmailService } from '../channels/email.service';
@@ -12,6 +13,10 @@ import {
   NOTIFICATIONS_QUEUE,
   type NotificationJobData,
 } from '../../application/services/notification.service';
+import {
+  buildNotificationEmailHtml,
+  type NotificationEmailMetadata,
+} from '../templates/notification-email.templates';
 
 @Processor(NOTIFICATIONS_QUEUE)
 export class NotificationProcessor extends WorkerHost {
@@ -22,12 +27,22 @@ export class NotificationProcessor extends WorkerHost {
     private readonly notificationRepository: INotificationRepository,
     private readonly emailService: EmailService,
     private readonly whatsAppService: WhatsAppService,
+    private readonly config: ConfigService,
   ) {
     super();
   }
 
   async process(job: Job<NotificationJobData>): Promise<void> {
-    const { notificationId, channel, title, content, recipientEmail, recipientPhone } = job.data;
+    const {
+      notificationId,
+      type,
+      channel,
+      title,
+      content,
+      recipientEmail,
+      recipientPhone,
+      metadata,
+    } = job.data;
 
     const result =
       channel === NotificationChannel.WHATSAPP
@@ -35,7 +50,17 @@ export class NotificationProcessor extends WorkerHost {
           ? await this.whatsAppService.send(recipientPhone, `${title}\n\n${content}`)
           : { success: false, error: 'El destinatario no tiene telefono registrado' }
         : recipientEmail
-          ? await this.emailService.send(recipientEmail, title, content)
+          ? await this.emailService.send(
+              recipientEmail,
+              title,
+              content,
+              buildNotificationEmailHtml(
+                type,
+                title,
+                metadata as NotificationEmailMetadata | undefined,
+                this.config.get<string>('FRONTEND_URL', 'http://localhost:3000'),
+              ) ?? undefined,
+            )
           : { success: false, error: 'El destinatario no tiene email registrado' };
 
     if (result.success) {

@@ -173,6 +173,13 @@ export class AuthRepository implements IAuthRepository {
     });
   }
 
+  async invalidateActivePasswordResetTokens(userId: string): Promise<void> {
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+  }
+
   async findMany(params: {
     search?: string;
     role?: UserRole;
@@ -365,6 +372,12 @@ export class AuthRepository implements IAuthRepository {
     await this.prisma.emailVerificationCode.updateMany({
       where: { userId, usedAt: null },
       data: { usedAt: new Date() },
+    });
+  }
+
+  async countEmailVerificationCodesSince(userId: string, since: Date): Promise<number> {
+    return this.prisma.emailVerificationCode.count({
+      where: { userId, createdAt: { gte: since } },
     });
   }
 

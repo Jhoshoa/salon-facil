@@ -63,6 +63,11 @@ export interface IAuthRepository {
     usedAt: Date | null;
   } | null>;
   markPasswordResetTokenUsed(id: string): Promise<void>;
+  /** Marks every still-active (unused, unexpired) token for this user as used, without
+   * requiring their actual value -- called right before issuing a fresh one, so a user who
+   * requests "forgot password" more than once never has two valid reset links outstanding at
+   * the same time. */
+  invalidateActivePasswordResetTokens(userId: string): Promise<void>;
   findMany(params: {
     search?: string;
     role?: UserRole;
@@ -101,4 +106,8 @@ export interface IAuthRepository {
   incrementEmailVerificationAttempts(id: string): Promise<void>;
   markEmailVerificationCodeUsed(id: string): Promise<void>;
   invalidateActiveEmailVerificationCodes(userId: string): Promise<void>;
+  /** Counts every code issued for this user since `since`, active or not — codes are never
+   * deleted (see invalidateActiveEmailVerificationCodes), so this doubles as a resend-attempt
+   * counter regardless of whether earlier codes were used, expired, or superseded. */
+  countEmailVerificationCodesSince(userId: string, since: Date): Promise<number>;
 }

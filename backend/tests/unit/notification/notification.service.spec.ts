@@ -75,11 +75,13 @@ describe('NotificationService', () => {
       });
       expect(queue.add).toHaveBeenCalledWith('send', {
         notificationId: 'notif-1',
+        type: NotificationType.BOOKING_REQUEST,
         channel: NotificationChannel.EMAIL,
         title: 'Nueva solicitud',
         content: 'Detalle',
         recipientEmail: 'client@test.com',
         recipientPhone: undefined,
+        metadata: undefined,
       });
       expect(result.id).toBe('notif-1');
     });

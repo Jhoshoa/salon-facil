@@ -22,11 +22,14 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { NotificationService } from '../../../notification/application/services/notification.service';
+import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
 const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 segundos
+const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 60 * 60 * 1000; // 1 hora
+const EMAIL_VERIFICATION_MAX_CODES_PER_WINDOW = 3;
 
 /** A Google account has no Bolivian phone to give us — this placeholder satisfies the
  * NOT NULL + UNIQUE `phone` column (unique per Google account since providerId is) without
@@ -129,7 +132,7 @@ export class AuthService {
   async loginOrRegisterWithGoogle(
     profile: GoogleProfile,
     intent?: 'CLIENT' | 'OWNER',
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto & { justLinked?: boolean }> {
     const existingIdentity = await this.authRepository.findIdentity('google', profile.providerId);
     if (existingIdentity) {
       const user = await this.authRepository.findById(existingIdentity.userId);
@@ -166,8 +169,13 @@ export class AuthService {
         await this.authRepository.markEmailVerified(existingByEmail.id);
       }
       await this.authRepository.updateLastLogin(existingByEmail.id);
+      // Linking itself is safe (Google already proved identity, see above) — but it's still a
+      // new way into the account, and until now nothing ever told the account owner it happened.
+      // A security notification on a channel the frontend redirect doesn't control (email) lets
+      // them react fast if this *wasn't* them somehow (e.g. their Google session was compromised).
+      this.sendAccountLinkedNotification(existingByEmail, 'Google');
       const tokens = await this.issueTokens(existingByEmail);
-      return this.buildAuthResponse(existingByEmail, tokens);
+      return { ...this.buildAuthResponse(existingByEmail, tokens), justLinked: true };
     }
 
     const role = intent === UserRole.OWNER ? UserRole.OWNER : UserRole.CLIENT;
@@ -235,6 +243,20 @@ export class AuthService {
       if (Date.now() - issuedAt < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) {
         throw new BadRequestException('Espera un momento antes de pedir otro codigo.');
       }
+    }
+
+    // Per-user cap independent of the route's per-IP throttle (@Throttle on the controller) --
+    // that one limits requests/minute from a given IP, this limits how many codes a given
+    // account can rack up in an hour regardless of IP, so someone can't just retry from
+    // different networks to keep flooding the same mailbox.
+    const recentCodeCount = await this.authRepository.countEmailVerificationCodesSince(
+      userId,
+      new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS),
+    );
+    if (recentCodeCount >= EMAIL_VERIFICATION_MAX_CODES_PER_WINDOW) {
+      throw new BadRequestException(
+        'Superaste el limite de reenvios por hora. Intenta de nuevo mas tarde.',
+      );
     }
 
     await this.issueEmailVerificationCode(user);
@@ -328,6 +350,11 @@ export class AuthService {
       return { message };
     }
 
+    // So a user who clicks "forgot password" more than once never has two valid reset links
+    // outstanding — otherwise an earlier link stays usable for up to an hour even after a
+    // newer one was already used to change the password.
+    await this.authRepository.invalidateActivePasswordResetTokens(user.id);
+
     const token = this.tokenService.generatePasswordResetToken();
     await this.authRepository.createPasswordResetToken({
       userId: user.id,
@@ -345,6 +372,7 @@ export class AuthService {
         title: 'Restablece tu contrasena en Mi Evento',
         content: `Recibimos una solicitud para restablecer tu contrasena. Este enlace vence en 1 hora: ${resetUrl}. Si no fuiste vos, ignora este mensaje.`,
         recipientEmail: user.email,
+        metadata: { kind: 'passwordReset', resetUrl } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — the response above is generic regardless, so a failed send here
@@ -362,12 +390,27 @@ export class AuthService {
       throw new BadRequestException('El enlace de restablecimiento es invalido o expiro');
     }
 
+    const user = await this.authRepository.findById(storedToken.userId);
+    if (!user) {
+      throw new BadRequestException('El enlace de restablecimiento es invalido o expiro');
+    }
+
+    // `passwordHash` is null for an account that only ever signed in with Google (see
+    // loginOrRegisterWithGoogle) — resetting there is really "set a password for the first
+    // time", so there's nothing to compare against and this reset proceeds like any other.
+    if (user.passwordHash && (await bcrypt.compare(dto.newPassword, user.passwordHash))) {
+      throw new BadRequestException('La nueva contrasena no puede ser igual a la actual');
+    }
+
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);
     await this.authRepository.updatePassword(storedToken.userId, passwordHash);
     await this.authRepository.markPasswordResetTokenUsed(storedToken.id);
     // Invalidate every existing session — a leaked/stale access token shouldn't survive a
     // password reset.
     await this.authRepository.revokeAllRefreshTokens(storedToken.userId);
+    // Best-effort, on a channel an attacker completing this reset wouldn't control — lets the
+    // real account owner notice fast if this wasn't them.
+    this.sendPasswordChangedNotification(user);
 
     return { message: 'Contrasena actualizada exitosamente' };
   }
@@ -428,9 +471,50 @@ export class AuthService {
             ? 'Gracias por registrarte. Ya podes crear tu primer local y empezar a recibir reservas.'
             : 'Gracias por registrarte. Ya podes buscar y reservar locales para tu proximo evento.',
         recipientEmail: user.email,
+        metadata: {
+          kind: 'welcome',
+          firstName: user.fullName.split(' ')[0],
+          role: user.role === UserRole.OWNER ? 'OWNER' : 'CLIENT',
+        } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see method doc.
+      });
+  }
+
+  /** Best-effort — see sendWelcomeNotification. Fires only when Google login auto-links to an
+   * existing password account (see loginOrRegisterWithGoogle), never on routine logins. */
+  private sendAccountLinkedNotification(user: UserEntity, provider: string): void {
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.ACCOUNT_LINKED,
+        title: `Tu cuenta de Mi Evento ahora tambien usa ${provider}`,
+        content: `Vinculamos tu cuenta con ${provider} para iniciar sesion. Si no fuiste vos, cambia tu contrasena de inmediato y contactanos.`,
+        recipientEmail: user.email,
+        metadata: { kind: 'accountLinked', provider } satisfies NotificationEmailMetadata,
+      })
+      .catch(() => {
+        // Best-effort — see sendWelcomeNotification.
+      });
+  }
+
+  /** Best-effort — see sendWelcomeNotification. Fires on every successful resetPassword(),
+   * legitimate or not — that's the point: it's the one channel an attacker who just completed
+   * the reset doesn't control. */
+  private sendPasswordChangedNotification(user: UserEntity): void {
+    this.notificationService
+      .enqueue({
+        userId: user.id,
+        type: NotificationType.PASSWORD_CHANGED,
+        title: 'Tu contrasena de Mi Evento fue cambiada',
+        content:
+          'Tu contrasena fue cambiada recien. Si no fuiste vos, restablecela de nuevo de inmediato.',
+        recipientEmail: user.email,
+        metadata: { kind: 'passwordChanged' } satisfies NotificationEmailMetadata,
+      })
+      .catch(() => {
+        // Best-effort — see sendWelcomeNotification.
       });
   }
 
@@ -452,6 +536,7 @@ export class AuthService {
         title: 'Verifica tu email en Mi Evento',
         content: `Tu codigo de verificacion es: ${code}. Vence en 15 minutos.`,
         recipientEmail: user.email,
+        metadata: { kind: 'emailVerification', code } satisfies NotificationEmailMetadata,
       })
       .catch(() => {
         // Best-effort — see sendWelcomeNotification.

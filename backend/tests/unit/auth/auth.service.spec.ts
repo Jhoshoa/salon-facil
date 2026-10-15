@@ -49,6 +49,7 @@ describe('AuthService', () => {
     createPasswordResetToken: jest.Mock;
     findActivePasswordResetToken: jest.Mock;
     markPasswordResetTokenUsed: jest.Mock;
+    invalidateActivePasswordResetTokens: jest.Mock;
     findIdentity: jest.Mock;
     createIdentity: jest.Mock;
     markEmailVerified: jest.Mock;
@@ -57,6 +58,7 @@ describe('AuthService', () => {
     incrementEmailVerificationAttempts: jest.Mock;
     markEmailVerificationCodeUsed: jest.Mock;
     invalidateActiveEmailVerificationCodes: jest.Mock;
+    countEmailVerificationCodesSince: jest.Mock;
   };
   let mockTokenService: {
     generateTokens: jest.Mock;
@@ -68,6 +70,7 @@ describe('AuthService', () => {
     signOAuthState: jest.Mock;
     verifyOAuthState: jest.Mock;
   };
+  let mockNotificationService: { enqueue: jest.Mock };
 
   beforeEach(async () => {
     mockAuthRepository = {
@@ -85,6 +88,7 @@ describe('AuthService', () => {
       createPasswordResetToken: jest.fn(),
       findActivePasswordResetToken: jest.fn(),
       markPasswordResetTokenUsed: jest.fn(),
+      invalidateActivePasswordResetTokens: jest.fn(),
       findIdentity: jest.fn(),
       createIdentity: jest.fn(),
       markEmailVerified: jest.fn(),
@@ -93,6 +97,7 @@ describe('AuthService', () => {
       incrementEmailVerificationAttempts: jest.fn(),
       markEmailVerificationCodeUsed: jest.fn(),
       invalidateActiveEmailVerificationCodes: jest.fn(),
+      countEmailVerificationCodesSince: jest.fn().mockResolvedValue(0),
     };
 
     mockTokenService = {
@@ -110,7 +115,7 @@ describe('AuthService', () => {
       verifyOAuthState: jest.fn().mockReturnValue({}),
     };
 
-    const mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
     const mockConfigService = { get: jest.fn().mockReturnValue('http://localhost:3000') };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -331,13 +336,17 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
-    it('should update the password and revoke sessions for a valid token', async () => {
+    it('should update the password, revoke sessions, and notify for a valid token', async () => {
+      const currentPasswordHash = await bcrypt.hash('OldPassword123!', 12);
       mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
         id: 'reset-token-123',
         userId: 'user-123',
         expiresAt: new Date('2030-01-01T00:00:00.000Z'),
         usedAt: null,
       });
+      mockAuthRepository.findById.mockResolvedValue(
+        activeUser({ passwordHash: currentPasswordHash }),
+      );
 
       const result = await service.resetPassword({
         token: 'valid-reset-token',
@@ -351,6 +360,45 @@ describe('AuthService', () => {
       );
       expect(mockAuthRepository.markPasswordResetTokenUsed).toHaveBeenCalledWith('reset-token-123');
       expect(mockAuthRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-123');
+      expect(mockNotificationService.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: { kind: 'passwordChanged' } }),
+      );
+    });
+
+    it('should reject resetting to the same password the account already has', async () => {
+      const currentPasswordHash = await bcrypt.hash('SamePassword123!', 12);
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+      mockAuthRepository.findById.mockResolvedValue(
+        activeUser({ passwordHash: currentPasswordHash }),
+      );
+
+      await expect(
+        service.resetPassword({ token: 'valid-reset-token', newPassword: 'SamePassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('allows setting a password for the first time on a Google-only account (no passwordHash yet)', async () => {
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+      mockAuthRepository.findById.mockResolvedValue(activeUser({ passwordHash: null }));
+
+      const result = await service.resetPassword({
+        token: 'valid-reset-token',
+        newPassword: 'NewPassword123!',
+      });
+
+      expect(result.message).toMatch(/actualizada/i);
+      expect(mockAuthRepository.updatePassword).toHaveBeenCalled();
     });
 
     it('should reject an unknown token', async () => {
@@ -385,6 +433,72 @@ describe('AuthService', () => {
       await expect(
         service.resetPassword({ token: 'expired-token', newPassword: 'NewPassword123!' }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('resendVerificationCode', () => {
+    it('issues a new code when the user has no active code yet', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue(null);
+      mockAuthRepository.countEmailVerificationCodesSince.mockResolvedValue(0);
+
+      const result = await service.resendVerificationCode('user-123');
+
+      expect(result.message).toMatch(/nuevo codigo/i);
+      expect(mockAuthRepository.createEmailVerificationCode).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123' }),
+      );
+    });
+
+    it('short-circuits with a friendly message when the email is already verified', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser({ emailVerifiedAt: new Date() }));
+
+      const result = await service.resendVerificationCode('user-123');
+
+      expect(result.message).toMatch(/ya esta verificado/i);
+      expect(mockAuthRepository.createEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('rejects a resend within the 60-second cooldown of the still-active code', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue({
+        id: 'code-1',
+        codeHash: 'hash',
+        attempts: 0,
+        // Issued 10s ago (expiresAt is issuedAt + 15min) -- well inside the 60s cooldown.
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000 - 10 * 1000),
+        usedAt: null,
+      });
+
+      await expect(service.resendVerificationCode('user-123')).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.createEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('rejects a resend once 3 codes were already issued in the last hour', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue(null);
+      mockAuthRepository.countEmailVerificationCodesSince.mockResolvedValue(3);
+
+      await expect(service.resendVerificationCode('user-123')).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.createEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('allows a resend past the 60-second cooldown, under the hourly cap', async () => {
+      mockAuthRepository.findById.mockResolvedValue(activeUser());
+      mockAuthRepository.findLatestActiveEmailVerificationCode.mockResolvedValue({
+        id: 'code-1',
+        codeHash: 'hash',
+        attempts: 0,
+        // Issued just over a minute ago -- past the 60s cooldown.
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000 - 65 * 1000),
+        usedAt: null,
+      });
+      mockAuthRepository.countEmailVerificationCodesSince.mockResolvedValue(1);
+
+      const result = await service.resendVerificationCode('user-123');
+
+      expect(result.message).toMatch(/nuevo codigo/i);
+      expect(mockAuthRepository.createEmailVerificationCode).toHaveBeenCalled();
     });
   });
 });

@@ -263,6 +263,12 @@ export class AuthController {
     setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
 
     const redirectPath = isSafeNextPath(next) ? next : defaultRedirectForRole(auth.user.role);
-    res.redirect(`${frontendUrl}${redirectPath}`);
+    // `justLinked` only means "the frontend should show the one-time linking toast" — everything
+    // else about the session already happened server-side above, so this is display state, not
+    // auth state, and is safe to pass as a plain (non-sensitive) query param.
+    const linkedParam = auth.justLinked
+      ? (redirectPath.includes('?') ? '&' : '?') + 'linked=google'
+      : '';
+    res.redirect(`${frontendUrl}${redirectPath}${linkedParam}`);
   }
 }

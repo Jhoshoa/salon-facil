@@ -12,11 +12,13 @@ export const NOTIFICATIONS_QUEUE = 'notifications';
 
 export interface NotificationJobData {
   notificationId: string;
+  type: NotificationType;
   channel: NotificationChannel;
   title: string;
   content: string;
   recipientEmail?: string;
   recipientPhone?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface EnqueueNotificationParams {
@@ -60,11 +62,13 @@ export class NotificationService {
     try {
       await this.queue.add('send', {
         notificationId: notification.id,
+        type: params.type,
         channel,
         title: params.title,
         content: params.content,
         recipientEmail: params.recipientEmail,
         recipientPhone: params.recipientPhone,
+        metadata: params.metadata,
       });
     } catch (error) {
       // Queueing failure (e.g. Redis briefly unreachable) shouldn't break the booking/payment

@@ -114,4 +114,4 @@ API base path: `/api/v1`
 - Cloudinary: Image uploads
 - Supabase: Additional auth/storage
 - Twilio: WhatsApp notifications
-- AWS SES: Email notifications
+- Brevo (SMTP relay): Email notifications

@@ -30,13 +30,16 @@ export const validationSchema = Joi.object({
   TWILIO_ACCOUNT_SID: Joi.string().allow('').optional(),
   TWILIO_AUTH_TOKEN: Joi.string().allow('').optional(),
   TWILIO_WHATSAPP_NUMBER: Joi.string().allow('').optional(),
-  // AWS SES — transactional email (verification codes, booking/payment notifications). Reads
-  // AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY itself via the SDK's standard env var convention, so
-  // only the region and sender identity need their own entries here.
-  AWS_REGION: Joi.string().allow('').optional(),
-  AWS_ACCESS_KEY_ID: Joi.string().allow('').optional(),
-  AWS_SECRET_ACCESS_KEY: Joi.string().allow('').optional(),
-  SES_FROM_EMAIL: Joi.string().email().allow('').optional(),
+  // Brevo (SMTP relay) — transactional email (verification codes, booking/payment
+  // notifications). EMAIL_ENABLED is an explicit kill switch independent of whether credentials
+  // are set, matching the same pattern already proven in another project on this account.
+  EMAIL_ENABLED: Joi.string().allow('').optional(),
+  SMTP_HOST: Joi.string().allow('').optional(),
+  SMTP_PORT: Joi.number().allow('').optional(),
+  SMTP_USERNAME: Joi.string().allow('').optional(),
+  SMTP_PASSWORD: Joi.string().allow('').optional(),
+  SMTP_FROM_EMAIL: Joi.string().email().allow('').optional(),
+  SMTP_FROM_NAME: Joi.string().allow('').optional(),
   GOOGLE_MAPS_API_KEY: Joi.string().allow('').optional(),
   // Google OAuth (sign in / sign up with Google) — see
   // docs/auth-improvement/oauth-redirects-verification.md §1. Optional so the app still boots
