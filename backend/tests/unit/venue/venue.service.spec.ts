@@ -207,6 +207,52 @@ describe('VenueService', () => {
     });
   });
 
+  describe('favorites', () => {
+    it('addFavorite saves the favorite when the venue exists', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockRepository.addFavorite = jest.fn().mockResolvedValue(undefined);
+
+      await service.addFavorite('user-1', 'venue-1');
+
+      expect(mockRepository.addFavorite).toHaveBeenCalledWith('user-1', 'venue-1');
+    });
+
+    it('addFavorite throws NotFoundException for a venue that does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+      mockRepository.addFavorite = jest.fn();
+
+      await expect(service.addFavorite('user-1', 'missing-venue')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockRepository.addFavorite).not.toHaveBeenCalled();
+    });
+
+    it('removeFavorite delegates straight to the repository', async () => {
+      mockRepository.removeFavorite = jest.fn().mockResolvedValue(undefined);
+
+      await service.removeFavorite('user-1', 'venue-1');
+
+      expect(mockRepository.removeFavorite).toHaveBeenCalledWith('user-1', 'venue-1');
+    });
+
+    it('getMyFavorites returns the full venues the user favorited', async () => {
+      mockRepository.findFavoritedByUser = jest.fn().mockResolvedValue([mockVenue]);
+
+      const result = await service.getMyFavorites('user-1');
+
+      expect(result).toEqual([mockVenue]);
+      expect(mockRepository.findFavoritedByUser).toHaveBeenCalledWith('user-1');
+    });
+
+    it('getMyFavoriteVenueIds returns just the IDs', async () => {
+      mockRepository.findFavoritedVenueIds = jest.fn().mockResolvedValue(['venue-1', 'venue-2']);
+
+      const result = await service.getMyFavoriteVenueIds('user-1');
+
+      expect(result).toEqual(['venue-1', 'venue-2']);
+    });
+  });
+
   describe('updateVenue', () => {
     it('should update venue if owner', async () => {
       mockRepository.findById.mockResolvedValue(mockVenue);

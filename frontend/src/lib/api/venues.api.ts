@@ -80,7 +80,10 @@ export const getMyVenues = async (): Promise<Venue[]> => {
   return apiRequest<Venue[]>('/venues/my/venues');
 };
 
-export const createVenue = async (payload: VenueFormPayload, files: File[] = []): Promise<Venue> => {
+export const createVenue = async (
+  payload: VenueFormPayload,
+  files: File[] = [],
+): Promise<Venue> => {
   return apiRequest<Venue>('/venues', {
     method: 'POST',
     body: buildVenueFormData(payload, files),
@@ -100,6 +103,24 @@ export const updateVenue = async (
 
 export const deleteVenue = async (id: string): Promise<void> => {
   return apiRequest<void>(`/venues/${id}`, { method: 'DELETE' });
+};
+
+export const getMyFavorites = async (): Promise<Venue[]> => {
+  return apiRequest<Venue[]>('/venues/my/favorites');
+};
+
+/** Lightweight — just the IDs, for lighting up the heart icon on search results/venue cards
+ * without pulling full venue objects for every one. */
+export const getMyFavoriteIds = async (): Promise<string[]> => {
+  return apiRequest<string[]>('/venues/my/favorites/ids');
+};
+
+export const addFavorite = async (venueId: string): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/favorite`, { method: 'POST' });
+};
+
+export const removeFavorite = async (venueId: string): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/favorite`, { method: 'DELETE' });
 };
 
 export const deactivateVenue = async (id: string): Promise<Venue> => {

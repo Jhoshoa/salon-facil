@@ -7,6 +7,7 @@ import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import type { Venue } from '@/types/api';
 import { departamentoLabels } from './venue-filter-labels';
+import { FavoriteButton } from './favorite-button';
 
 interface VenueResultCardProps {
   venue: Venue;
@@ -71,6 +72,7 @@ export const VenueResultCard = ({
             </Badge>
           ) : null}
         </div>
+        <FavoriteButton venueId={venue.id} className="absolute right-3 top-3" />
       </Link>
 
       <div className="space-y-3 py-1">

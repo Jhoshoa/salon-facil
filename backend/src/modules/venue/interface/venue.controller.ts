@@ -99,6 +99,22 @@ export class VenueController {
     return this.venueService.getMyVenues(user.id);
   }
 
+  @Get('my/favorites')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener mis locales favoritos' })
+  @ApiResponse({ status: 200, description: 'Lista de locales guardados como favoritos' })
+  async getMyFavorites(@CurrentUser() user: { id: string }) {
+    return this.venueService.getMyFavorites(user.id);
+  }
+
+  @Get('my/favorites/ids')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener solo los IDs de mis locales favoritos (liviano)' })
+  @ApiResponse({ status: 200, description: 'IDs de locales guardados como favoritos' })
+  async getMyFavoriteIds(@CurrentUser() user: { id: string }) {
+    return this.venueService.getMyFavoriteVenueIds(user.id);
+  }
+
   @Get('catalog/amenities')
   @Public()
   @ApiOperation({ summary: 'Obtener catalogo de comodidades para filtros' })
@@ -218,6 +234,27 @@ export class VenueController {
   @ApiResponse({ status: 403, description: 'No es propietario del local' })
   async delete(@Param('id') id: string, @CurrentUser() user: { id: string; role: UserRole }) {
     await this.venueService.deleteVenue(id, user.id, user.role);
+  }
+
+  // ========== PROTECTED ENDPOINTS (any authenticated role) ==========
+
+  @Post(':id/favorite')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Guardar un local como favorito' })
+  @ApiResponse({ status: 204, description: 'Local guardado en favoritos' })
+  @ApiResponse({ status: 404, description: 'Local no encontrado' })
+  async addFavorite(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.venueService.addFavorite(user.id, id);
+  }
+
+  @Delete(':id/favorite')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Quitar un local de favoritos' })
+  @ApiResponse({ status: 204, description: 'Local quitado de favoritos' })
+  async removeFavorite(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    await this.venueService.removeFavorite(user.id, id);
   }
 
   @Get('by-id/:id')

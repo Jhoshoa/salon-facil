@@ -30,6 +30,8 @@ import type { AmenityCategory, ApiError, Venue } from '@/types/api';
 import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
+import { FavoriteButton } from './favorite-button';
+import { ShareButton } from './share-button';
 
 interface VenueDetailProps {
   /** Public lookup by slug — only resolves ACTIVE + verified venues (see getVenueBySlug). */
@@ -380,13 +382,22 @@ export const VenueDetail = ({
                   ) : null}
                 </p>
               </div>
-              {venue.isVerified ? (
-                <span className="sf-stamp shrink-0">
-                  verificado
-                  <br />
-                  mi evento
-                </span>
-              ) : null}
+              <div className="flex shrink-0 flex-col items-end gap-3">
+                <div className="flex items-center gap-2">
+                  <ShareButton
+                    title={venue.name}
+                    url={typeof window !== 'undefined' ? window.location.href : ''}
+                  />
+                  <FavoriteButton venueId={venue.id} variant="solid" />
+                </div>
+                {venue.isVerified ? (
+                  <span className="sf-stamp">
+                    verificado
+                    <br />
+                    mi evento
+                  </span>
+                ) : null}
+              </div>
             </div>
             {venue.description ? (
               <p className="font-serif text-base italic leading-7 text-foreground/80">
