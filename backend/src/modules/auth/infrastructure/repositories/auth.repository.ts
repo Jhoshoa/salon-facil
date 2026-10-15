@@ -173,6 +173,13 @@ export class AuthRepository implements IAuthRepository {
     });
   }
 
+  async invalidateActivePasswordResetTokens(userId: string): Promise<void> {
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+  }
+
   async findMany(params: {
     search?: string;
     role?: UserRole;

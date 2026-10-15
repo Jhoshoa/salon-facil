@@ -47,6 +47,7 @@ describe('AdminUserService', () => {
       createPasswordResetToken: jest.fn(),
       findActivePasswordResetToken: jest.fn(),
       markPasswordResetTokenUsed: jest.fn(),
+      invalidateActivePasswordResetTokens: jest.fn(),
       findMany: jest.fn(),
       updateStatus: jest.fn(),
       updateRole: jest.fn(),

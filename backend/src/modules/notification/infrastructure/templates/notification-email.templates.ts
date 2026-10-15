@@ -67,7 +67,8 @@ export type NotificationEmailMetadata =
       bookingId: string;
     }
   | { kind: 'reviewResponse'; venueName: string; responseText: string; bookingId: string }
-  | { kind: 'accountLinked'; provider: string };
+  | { kind: 'accountLinked'; provider: string }
+  | { kind: 'passwordChanged' };
 
 const bs = (amount: number) => `Bs ${amount.toLocaleString('es-BO')}`;
 
@@ -273,6 +274,19 @@ export const buildNotificationEmailHtml = (
       return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
     }
 
+    case 'passwordChanged': {
+      const bodyHtml = `
+        <p style="margin:0 0 4px;">${badge('Alerta de seguridad', 'neutral')}</p>
+        <p style="margin:16px 0;">
+          Tu contraseña de Mi Evento fue cambiada recién. Si fuiste vos, no hace falta que hagas nada más.
+        </p>
+        <p style="margin:16px 0; font-size:13px; color:${emailUi.colors.muted};">
+          Si no fuiste vos, alguien más tiene acceso a tu cuenta — restablecé tu contraseña de nuevo ahora mismo.
+        </p>
+        ${button({ label: 'Restablecer mi contraseña', url: `${frontendUrl}/forgot-password`, variant: 'secondary' })}`;
+      return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
+    }
+
     default:
       return null;
   }
@@ -297,4 +311,5 @@ export const EXPECTED_METADATA_KIND: Record<
   PAYMENT_RECEIVED: null, // three metadata.kind variants (paymentUploaded/Confirmed/Rejected) share this one type
   REVIEW_RESPONSE: 'reviewResponse',
   ACCOUNT_LINKED: 'accountLinked',
+  PASSWORD_CHANGED: 'passwordChanged',
 };

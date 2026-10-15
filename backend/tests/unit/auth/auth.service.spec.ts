@@ -49,6 +49,7 @@ describe('AuthService', () => {
     createPasswordResetToken: jest.Mock;
     findActivePasswordResetToken: jest.Mock;
     markPasswordResetTokenUsed: jest.Mock;
+    invalidateActivePasswordResetTokens: jest.Mock;
     findIdentity: jest.Mock;
     createIdentity: jest.Mock;
     markEmailVerified: jest.Mock;
@@ -68,6 +69,7 @@ describe('AuthService', () => {
     signOAuthState: jest.Mock;
     verifyOAuthState: jest.Mock;
   };
+  let mockNotificationService: { enqueue: jest.Mock };
 
   beforeEach(async () => {
     mockAuthRepository = {
@@ -85,6 +87,7 @@ describe('AuthService', () => {
       createPasswordResetToken: jest.fn(),
       findActivePasswordResetToken: jest.fn(),
       markPasswordResetTokenUsed: jest.fn(),
+      invalidateActivePasswordResetTokens: jest.fn(),
       findIdentity: jest.fn(),
       createIdentity: jest.fn(),
       markEmailVerified: jest.fn(),
@@ -110,7 +113,7 @@ describe('AuthService', () => {
       verifyOAuthState: jest.fn().mockReturnValue({}),
     };
 
-    const mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    mockNotificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
     const mockConfigService = { get: jest.fn().mockReturnValue('http://localhost:3000') };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -331,13 +334,17 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
-    it('should update the password and revoke sessions for a valid token', async () => {
+    it('should update the password, revoke sessions, and notify for a valid token', async () => {
+      const currentPasswordHash = await bcrypt.hash('OldPassword123!', 12);
       mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
         id: 'reset-token-123',
         userId: 'user-123',
         expiresAt: new Date('2030-01-01T00:00:00.000Z'),
         usedAt: null,
       });
+      mockAuthRepository.findById.mockResolvedValue(
+        activeUser({ passwordHash: currentPasswordHash }),
+      );
 
       const result = await service.resetPassword({
         token: 'valid-reset-token',
@@ -351,6 +358,45 @@ describe('AuthService', () => {
       );
       expect(mockAuthRepository.markPasswordResetTokenUsed).toHaveBeenCalledWith('reset-token-123');
       expect(mockAuthRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-123');
+      expect(mockNotificationService.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata: { kind: 'passwordChanged' } }),
+      );
+    });
+
+    it('should reject resetting to the same password the account already has', async () => {
+      const currentPasswordHash = await bcrypt.hash('SamePassword123!', 12);
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+      mockAuthRepository.findById.mockResolvedValue(
+        activeUser({ passwordHash: currentPasswordHash }),
+      );
+
+      await expect(
+        service.resetPassword({ token: 'valid-reset-token', newPassword: 'SamePassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('allows setting a password for the first time on a Google-only account (no passwordHash yet)', async () => {
+      mockAuthRepository.findActivePasswordResetToken.mockResolvedValue({
+        id: 'reset-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+      mockAuthRepository.findById.mockResolvedValue(activeUser({ passwordHash: null }));
+
+      const result = await service.resetPassword({
+        token: 'valid-reset-token',
+        newPassword: 'NewPassword123!',
+      });
+
+      expect(result.message).toMatch(/actualizada/i);
+      expect(mockAuthRepository.updatePassword).toHaveBeenCalled();
     });
 
     it('should reject an unknown token', async () => {

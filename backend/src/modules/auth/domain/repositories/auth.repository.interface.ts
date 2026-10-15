@@ -63,6 +63,11 @@ export interface IAuthRepository {
     usedAt: Date | null;
   } | null>;
   markPasswordResetTokenUsed(id: string): Promise<void>;
+  /** Marks every still-active (unused, unexpired) token for this user as used, without
+   * requiring their actual value -- called right before issuing a fresh one, so a user who
+   * requests "forgot password" more than once never has two valid reset links outstanding at
+   * the same time. */
+  invalidateActivePasswordResetTokens(userId: string): Promise<void>;
   findMany(params: {
     search?: string;
     role?: UserRole;
