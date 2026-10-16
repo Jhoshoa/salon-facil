@@ -14,7 +14,7 @@ import { ErrorState } from '@/components/shared/error-state';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { EarningsBreakdownRow, EarningsByMethodRow } from '@/types/api';
+import type { EarningsBreakdownRow } from '@/types/api';
 
 const monthLabel = (isoMonth: string) =>
   new Date(isoMonth).toLocaleDateString('es-BO', { month: 'long', year: 'numeric' });
@@ -100,13 +100,15 @@ export const OwnerEarnings = () => {
       filters: { venueId: row.venueId, month: row.month.slice(0, 7) },
     });
 
-  const openMethodDetail = (
-    venue: { venueId: string; venueName: string },
-    row: EarningsByMethodRow,
-  ) =>
+  const monthsOptionLabel = MONTHS_OPTIONS.find((option) => option.value === months)?.label ?? '';
+
+  /** One button per venue (not per method) -- the per-row totals above already show the split
+   * by method, so the drawer shows every payment for the venue in the selected period instead
+   * of making the owner open a separate drawer per method. */
+  const openVenuePaymentsDetail = (venue: { venueId: string; venueName: string }) =>
     setDrawer({
-      title: `${venue.venueName} · ${paymentMethodLabels[row.method]}`,
-      filters: { venueId: venue.venueId, method: row.method, monthsBack: months },
+      title: `${venue.venueName} · ${monthsOptionLabel}`,
+      filters: { venueId: venue.venueId, monthsBack: months },
     });
 
   return (
@@ -169,11 +171,22 @@ export const OwnerEarnings = () => {
           <div className="space-y-4">
             {methodVenues.map((venue) => (
               <div key={venue.venueId} className="sf-card p-5">
-                {!selectedVenueName ? (
-                  <p className="mb-3 text-sm font-medium text-muted-foreground">
-                    {venue.venueName}
-                  </p>
-                ) : null}
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  {!selectedVenueName ? (
+                    <p className="text-sm font-medium text-muted-foreground">{venue.venueName}</p>
+                  ) : (
+                    <span />
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openVenuePaymentsDetail(venue)}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Detalle
+                  </Button>
+                </div>
                 <div className="space-y-2">
                   {venue.rows.map((row) => (
                     <div
@@ -185,15 +198,6 @@ export const OwnerEarnings = () => {
                       </span>
                       <span className="text-muted-foreground">{row.count} pago(s)</span>
                       <span className="font-medium">{formatCurrency(row.total)}</span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openMethodDetail(venue, row)}
-                      >
-                        <Eye className="h-4 w-4" />
-                        Detalle
-                      </Button>
                     </div>
                   ))}
                 </div>
