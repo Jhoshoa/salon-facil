@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CircleDollarSign, Download, Receipt } from 'lucide-react';
+import { CircleDollarSign, Download, Eye, Receipt } from 'lucide-react';
 import { getOwnerEarnings, type OwnerCompletedPaymentsFilter } from '@/lib/api/payments.api';
 import { getMyVenues } from '@/lib/api/venues.api';
 import { formatCurrency } from '@/lib/formatters';
@@ -176,18 +176,25 @@ export const OwnerEarnings = () => {
                 ) : null}
                 <div className="space-y-2">
                   {venue.rows.map((row) => (
-                    <button
+                    <div
                       key={row.method}
-                      type="button"
-                      onClick={() => openMethodDetail(venue, row)}
-                      className="-mx-1 flex w-full items-center justify-between rounded-sm border-t px-1 pt-2 text-left text-sm transition-colors first:border-t-0 first:pt-0 hover:bg-muted/50"
+                      className="flex items-center justify-between gap-3 border-t pt-2 text-sm first:border-t-0 first:pt-0"
                     >
                       <span className="text-muted-foreground">
                         {paymentMethodLabels[row.method]}
                       </span>
                       <span className="text-muted-foreground">{row.count} pago(s)</span>
                       <span className="font-medium">{formatCurrency(row.total)}</span>
-                    </button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openMethodDetail(venue, row)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Detalle
+                      </Button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -212,18 +219,25 @@ export const OwnerEarnings = () => {
               ) : null}
               <div className="space-y-2">
                 {venue.rows.map((row) => (
-                  <button
+                  <div
                     key={`${row.venueId}-${row.month}`}
-                    type="button"
-                    onClick={() => openMonthDetail(row)}
-                    className="-mx-1 flex w-full items-center justify-between rounded-sm border-t px-1 pt-2 text-left text-sm transition-colors first:border-t-0 first:pt-0 hover:bg-muted/50"
+                    className="flex items-center justify-between gap-3 border-t pt-2 text-sm first:border-t-0 first:pt-0"
                   >
                     <span className="capitalize text-muted-foreground">
                       {monthLabel(row.month)}
                     </span>
                     <span className="text-muted-foreground">{row.count} pago(s)</span>
                     <span className="font-medium">{formatCurrency(row.total)}</span>
-                  </button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openMonthDetail(row)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Detalle
+                    </Button>
+                  </div>
                 ))}
               </div>
             </div>
