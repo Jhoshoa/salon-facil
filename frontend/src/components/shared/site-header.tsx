@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { LayoutDashboard, LogIn, LogOut, MailWarning, Menu, Phone, UserPlus } from 'lucide-react';
+import {
+  Heart,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  MailWarning,
+  Menu,
+  Phone,
+  UserPlus,
+} from 'lucide-react';
 import { useAuthHydrated, useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/use-logout';
 import { Button } from '@/components/ui/button';
@@ -124,17 +133,29 @@ export const SiteHeader = () => {
             {!hydrated ? <span className="h-8 w-20" aria-hidden /> : null}
 
             {showAuthed && !canManageVenues ? (
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="hidden bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
-              >
-                <Link href="/bookings">
-                  <LayoutDashboard className="h-4 w-4" />
-                  Mis reservas
-                </Link>
-              </Button>
+              <>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-sm"
+                  className="hidden text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
+                >
+                  <Link href="/favoritos" aria-label="Mis favoritos">
+                    <Heart className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="hidden border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:inline-flex"
+                >
+                  <Link href="/bookings">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Mis reservas
+                  </Link>
+                </Button>
+              </>
             ) : null}
 
             <Button
@@ -166,9 +187,14 @@ export const SiteHeader = () => {
                 </Link>
               ) : null}
               {showAuthed && !canManageVenues ? (
-                <Link href="/bookings" className={mobileLinkClass} onClick={closeMenu}>
-                  Mis reservas
-                </Link>
+                <>
+                  <Link href="/bookings" className={mobileLinkClass} onClick={closeMenu}>
+                    Mis reservas
+                  </Link>
+                  <Link href="/favoritos" className={mobileLinkClass} onClick={closeMenu}>
+                    Mis favoritos
+                  </Link>
+                </>
               ) : null}
               {showGuest ? (
                 <Link href="/propietarios" className={mobileLinkClass} onClick={closeMenu}>

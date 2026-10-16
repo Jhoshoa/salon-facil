@@ -109,4 +109,10 @@ export interface IVenueRepository {
   findOwnerContact(
     venueId: string,
   ): Promise<{ id: string; email: string; phone: string; fullName: string } | null>;
+
+  // --- Favorites (private per-user bookmarks, see VenueFavorite) ---
+  addFavorite(userId: string, venueId: string): Promise<void>;
+  removeFavorite(userId: string, venueId: string): Promise<void>;
+  findFavoritedByUser(userId: string): Promise<VenueEntity[]>;
+  findFavoritedVenueIds(userId: string): Promise<string[]>;
 }

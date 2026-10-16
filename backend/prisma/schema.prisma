@@ -150,6 +150,7 @@ model User {
   passwordResetTokens    PasswordResetToken[]
   identities             UserIdentity[]
   emailVerificationCodes EmailVerificationCode[]
+  favorites              VenueFavorite[]
 
   @@index([email])
   @@index([phone])
@@ -288,6 +289,7 @@ model Venue {
   bookingDates   BookingDate[]
   reviews        Review[]
   calendarBlocks CalendarBlock[]
+  favoritedBy    VenueFavorite[]
 
   @@index([ownerId])
   @@index([slug])
@@ -300,6 +302,23 @@ model Venue {
   @@index([deletedAt])
   @@index([latitude, longitude])
   @@map("venues")
+}
+
+// A client's private "save for later" bookmark -- deliberately separate from Review (public
+// rating/comment tied to a completed booking). No rating, no comment, no booking required:
+// just "I want to find this again." Only the owning user ever sees their own list.
+model VenueFavorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  venueId   String   @map("venue_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, venueId])
+  @@index([venueId])
+  @@map("venue_favorites")
 }
 
 // Bolivia's 9 departamentos — a closed, constitutionally-fixed set. Stored directly on Venue
