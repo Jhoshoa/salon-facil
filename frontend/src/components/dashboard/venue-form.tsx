@@ -59,6 +59,17 @@ interface SeasonRuleState {
   unit: PriceUnit | '';
 }
 
+type SpecificDateType = 'HOLIDAY' | 'CUSTOM_DATE';
+
+interface SpecificDateRuleState {
+  key: string;
+  priceType: SpecificDateType;
+  name: string;
+  date: string;
+  price: string;
+  unit: PriceUnit | '';
+}
+
 const buildInitialWeekdayRules = (venue?: Venue): WeekdayRuleState[] => {
   const byDay = new Map(
     (venue?.prices ?? [])
@@ -84,6 +95,18 @@ const buildInitialSeasonRules = (venue?: Venue): SeasonRuleState[] =>
       name: p.discountLabel ?? '',
       startDate: p.startDate!.slice(0, 10),
       endDate: p.endDate!.slice(0, 10),
+      price: String(p.price),
+      unit: p.unit ?? '',
+    }));
+
+const buildInitialSpecificDateRules = (venue?: Venue): SpecificDateRuleState[] =>
+  (venue?.prices ?? [])
+    .filter((p) => (p.priceType === 'HOLIDAY' || p.priceType === 'CUSTOM_DATE') && p.specificDate)
+    .map((p) => ({
+      key: p.id,
+      priceType: p.priceType as SpecificDateType,
+      name: p.discountLabel ?? '',
+      date: p.specificDate!.slice(0, 10),
       price: String(p.price),
       unit: p.unit ?? '',
     }));
@@ -216,14 +239,18 @@ const toPayload = (
   depositPercentage: values.depositPercentage,
   rules: values.rules || undefined,
   cancellationPolicy: values.cancellationPolicy || undefined,
-  // BASE + the weekday/season rules edited on this tab (priceRules), plus any rule type not
-  // manageable from this UI yet (HOLIDAY, CUSTOM_DATE, EARLY_BIRD) preserved as-is so saving
-  // this form doesn't wipe them out.
+  // BASE + the weekday/season/specific-date rules edited on this tab (priceRules), plus
+  // EARLY_BIRD -- the one rule type still not manageable from this UI (and not yet applied by
+  // the price calculator at all, see price-calculator.service.ts) -- preserved as-is so saving
+  // this form doesn't wipe it out.
   prices: [
     { priceType: 'BASE', price: values.basePrice },
     ...priceRules,
     ...(existingVenue?.prices ?? [])
-      .filter((price) => !['BASE', 'WEEKEND', 'SEASON_HIGH'].includes(price.priceType))
+      .filter(
+        (price) =>
+          !['BASE', 'WEEKEND', 'SEASON_HIGH', 'HOLIDAY', 'CUSTOM_DATE'].includes(price.priceType),
+      )
       .map((price) => ({
         priceType: price.priceType,
         dayOfWeek: price.dayOfWeek ?? undefined,
@@ -265,6 +292,9 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   );
   const [seasonRules, setSeasonRules] = useState<SeasonRuleState[]>(() =>
     buildInitialSeasonRules(venue),
+  );
+  const [specificDateRules, setSpecificDateRules] = useState<SpecificDateRuleState[]>(() =>
+    buildInitialSpecificDateRules(venue),
   );
 
   const amenitiesQuery = useQuery({
@@ -330,6 +360,30 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     setSeasonRules((prev) => prev.filter((rule) => rule.key !== key));
   };
 
+  const addSpecificDateRule = () => {
+    setSpecificDateRules((prev) => [
+      ...prev,
+      {
+        key: `new-${Date.now()}`,
+        priceType: 'HOLIDAY',
+        name: '',
+        date: '',
+        price: '',
+        unit: '',
+      },
+    ]);
+  };
+
+  const updateSpecificDateRule = (key: string, patch: Partial<SpecificDateRuleState>) => {
+    setSpecificDateRules((prev) =>
+      prev.map((rule) => (rule.key === key ? { ...rule, ...patch } : rule)),
+    );
+  };
+
+  const removeSpecificDateRule = (key: string) => {
+    setSpecificDateRules((prev) => prev.filter((rule) => rule.key !== key));
+  };
+
   const timeToMinutes = (time: string) => {
     const [hour, minute] = time.split(':').map(Number);
     return hour * 60 + minute;
@@ -369,6 +423,15 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     return null;
   };
 
+  const specificDatePricingHint = (rule: SpecificDateRuleState): string | null => {
+    const effectiveUnit = rule.unit || defaultPriceUnit;
+    const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
+    if (!price) return null;
+    if (effectiveUnit === 'HOUR') return `Se cobrara Bs ${price} por cada hora ese dia.`;
+    if (effectiveUnit === 'DAY') return `Se cobrara Bs ${price} por el dia completo.`;
+    return `Se cobrara Bs ${price} una sola vez por todo el evento.`;
+  };
+
   const seasonPricingHint = (rule: SeasonRuleState): string | null => {
     const effectiveUnit = rule.unit || defaultPriceUnit;
     const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
@@ -383,6 +446,12 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   /** Returns an error message if invalid, or null. Runs before submit since these rules
    * live outside react-hook-form (they're a variable-length, mode-dependent structure). */
   const validatePriceRules = (): string | null => {
+    for (const rule of specificDateRules) {
+      const label = rule.name || (rule.priceType === 'HOLIDAY' ? 'feriado' : 'fecha puntual');
+      if (!rule.date) return `Falta la fecha para "${label}"`;
+      if (!rule.price || Number(rule.price) < 0) return `Falta el precio para "${label}"`;
+    }
+
     if (pricingMode === 'single') return null;
 
     const enabledWeekdays = weekdayRules.filter((r) => r.enabled);
@@ -407,16 +476,28 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   };
 
   const buildPriceRulesPayload = (): VenuePriceInput[] => {
-    if (pricingMode === 'single') return [];
+    // Specific-date rules (feriados / fechas puntuales) take priority over everything else in
+    // the price calculator regardless of pricing mode, so they're collected unconditionally.
+    const rules: VenuePriceInput[] = specificDateRules.map((r) => ({
+      priceType: r.priceType,
+      specificDate: r.date,
+      price: Number(r.price),
+      unit: r.unit || undefined,
+      discountLabel: r.name.trim() || undefined,
+    }));
 
-    const rules: VenuePriceInput[] = weekdayRules
-      .filter((r) => r.enabled)
-      .map((r) => ({
-        priceType: 'WEEKEND',
-        dayOfWeek: r.dayOfWeek,
-        price: Number(r.price),
-        unit: r.unit || undefined,
-      }));
+    if (pricingMode === 'single') return rules;
+
+    rules.push(
+      ...weekdayRules
+        .filter((r) => r.enabled)
+        .map((r) => ({
+          priceType: 'WEEKEND' as const,
+          dayOfWeek: r.dayOfWeek,
+          price: Number(r.price),
+          unit: r.unit || undefined,
+        })),
+    );
 
     if (pricingMode === 'weekday_season') {
       rules.push(
@@ -472,7 +553,8 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     (pricingMode !== 'single' &&
       weekdayRules.some((rule) => rule.enabled && (rule.unit || defaultPriceUnit) === 'HOUR')) ||
     (pricingMode === 'weekday_season' &&
-      seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR'));
+      seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR')) ||
+    specificDateRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR');
 
   const toggleAmenity = (id: string) => {
     const exists = amenities.some((item) => item.amenityId === id);
@@ -1015,6 +1097,95 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                   ))}
                 </div>
               ) : null}
+
+              <div className="space-y-3 border-t pt-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Precios para fechas especificas (opcional)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Feriados u otras fechas puntuales (ej. 31 de diciembre). Tienen prioridad
+                      sobre cualquier otro precio configurado arriba, sin importar el modo elegido.
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={addSpecificDateRule}>
+                    Agregar fecha
+                  </Button>
+                </div>
+
+                {specificDateRules.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Sin fechas especificas configuradas todavia.
+                  </p>
+                ) : null}
+
+                {specificDateRules.map((rule) => (
+                  <div key={rule.key} className="space-y-3 rounded-[var(--radius)] border p-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Select
+                        value={rule.priceType}
+                        onChange={(e) =>
+                          updateSpecificDateRule(rule.key, {
+                            priceType: e.target.value as SpecificDateType,
+                          })
+                        }
+                      >
+                        <option value="HOLIDAY">Feriado</option>
+                        <option value="CUSTOM_DATE">Fecha puntual</option>
+                      </Select>
+                      <Input
+                        type="date"
+                        value={rule.date}
+                        onChange={(e) => updateSpecificDateRule(rule.key, { date: e.target.value })}
+                      />
+                      <Input
+                        placeholder="Nombre (opcional, ej. Año Nuevo)"
+                        value={rule.name}
+                        onChange={(e) => updateSpecificDateRule(rule.key, { name: e.target.value })}
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="Precio (Bs)"
+                        value={rule.price}
+                        onChange={(e) =>
+                          updateSpecificDateRule(rule.key, { price: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <Select
+                        className="w-48"
+                        value={rule.unit}
+                        onChange={(e) =>
+                          updateSpecificDateRule(rule.key, {
+                            unit: e.target.value as PriceUnit | '',
+                          })
+                        }
+                      >
+                        <option value="">Hereda unidad del local</option>
+                        {Object.entries(priceUnitLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => removeSpecificDateRule(rule.key)}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                    {specificDatePricingHint(rule) ? (
+                      <p className="text-xs text-muted-foreground">
+                        {specificDatePricingHint(rule)}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
 
               <div
                 className={
