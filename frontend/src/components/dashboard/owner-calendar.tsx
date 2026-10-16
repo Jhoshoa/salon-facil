@@ -98,7 +98,9 @@ export const OwnerCalendar = () => {
   });
 
   const days: DayCellData[] = useMemo(() => {
-    const bookingByDate = new Map(calendarQuery.data?.bookings.map((item) => [item.date, item]) ?? []);
+    const bookingByDate = new Map(
+      calendarQuery.data?.bookings.map((item) => [item.date, item]) ?? [],
+    );
     const blockByDate = new Map(calendarQuery.data?.blocks.map((item) => [item.date, item]) ?? []);
     const monthDate = parse(month, 'yyyy-MM', new Date());
 
@@ -114,14 +116,24 @@ export const OwnerCalendar = () => {
             date: dateKey,
             day,
             variant: 'past' as const,
-            label: booking ? statusLabel[booking.status] : block?.reason ?? undefined,
+            label: booking ? statusLabel[booking.status] : (block?.reason ?? undefined),
           };
         }
         if (booking) {
-          return { date: dateKey, day, variant: 'booked' as const, label: statusLabel[booking.status] };
+          return {
+            date: dateKey,
+            day,
+            variant: 'booked' as const,
+            label: statusLabel[booking.status],
+          };
         }
         if (block) {
-          return { date: dateKey, day, variant: 'blocked' as const, label: block.reason ?? 'Bloqueado' };
+          // A block with a reason (e.g. "Boda" coordinated outside the app) reads to the owner
+          // as an actual reservation, not a mere closure -- give it the same 'booked' styling.
+          // A reason-less block (owner just closing the date) keeps the neutral 'blocked' look.
+          return block.reason
+            ? { date: dateKey, day, variant: 'booked' as const, label: block.reason }
+            : { date: dateKey, day, variant: 'blocked' as const, label: 'Bloqueado' };
         }
         return { date: dateKey, day, variant: 'available' as const };
       },
@@ -181,7 +193,10 @@ export const OwnerCalendar = () => {
 
       <div className="sf-card p-5">
         {calendarQuery.isError ? (
-          <ErrorState title="No se pudo cargar el calendario" onRetry={() => calendarQuery.refetch()} />
+          <ErrorState
+            title="No se pudo cargar el calendario"
+            onRetry={() => calendarQuery.refetch()}
+          />
         ) : (
           <>
             <MonthCalendarGrid
@@ -204,7 +219,9 @@ export const OwnerCalendar = () => {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setBlockToDelete({ id: selectedBlock.id, date: selectedDay.date })}
+                    onClick={() =>
+                      setBlockToDelete({ id: selectedBlock.id, date: selectedDay.date })
+                    }
                   >
                     <Trash2 className="h-4 w-4" />
                     Eliminar bloqueo
