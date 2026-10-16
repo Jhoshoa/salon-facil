@@ -218,6 +218,12 @@ export const VenueDetail = ({
   if (!query.data) return <ErrorState onRetry={() => query.refetch()} />;
 
   const venue = query.data;
+  // The venue's own social links win; the owner's account-level ones (set on their profile)
+  // only fill in when the venue hasn't set its own -- lets an owner with one venue configure it
+  // once, while one with several can still differentiate a venue that wants its own presence.
+  const facebookUrl = venue.facebookUrl || venue.owner?.facebookUrl || null;
+  const instagramUrl = venue.instagramUrl || venue.owner?.instagramUrl || null;
+  const tiktokUrl = venue.tiktokUrl || venue.owner?.tiktokUrl || null;
   const photos = getVenuePhotos(venue);
   // Mobile: a swipeable strip of "prints" -- three is plenty to convey there's more without a
   // grid that would be too cramped on a narrow screen. Desktop/tablet: a mosaic (one big photo +
@@ -404,7 +410,7 @@ export const VenueDetail = ({
                 {venue.description}
               </p>
             ) : null}
-            {venue.contactPhone || venue.facebookUrl || venue.instagramUrl || venue.tiktokUrl ? (
+            {venue.contactPhone || facebookUrl || instagramUrl || tiktokUrl ? (
               <div className="flex flex-wrap gap-1">
                 {venue.contactPhone ? (
                   <a
@@ -419,9 +425,9 @@ export const VenueDetail = ({
                     <WhatsAppIcon className="h-6 w-6" />
                   </a>
                 ) : null}
-                {venue.facebookUrl ? (
+                {facebookUrl ? (
                   <a
-                    href={venue.facebookUrl}
+                    href={facebookUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Facebook"
@@ -432,9 +438,9 @@ export const VenueDetail = ({
                     <FacebookIcon className="h-6 w-6" />
                   </a>
                 ) : null}
-                {venue.instagramUrl ? (
+                {instagramUrl ? (
                   <a
-                    href={venue.instagramUrl}
+                    href={instagramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Instagram"
@@ -445,9 +451,9 @@ export const VenueDetail = ({
                     <InstagramIcon className="h-6 w-6" />
                   </a>
                 ) : null}
-                {venue.tiktokUrl ? (
+                {tiktokUrl ? (
                   <a
-                    href={venue.tiktokUrl}
+                    href={tiktokUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="TikTok"

@@ -235,7 +235,15 @@ export interface Venue {
   amenities?: VenueAmenity[];
   uses?: VenueUse[];
   openingHours?: VenueOpeningHour[];
-  owner?: { id: string; fullName: string; phone?: string; avatarUrl: string | null };
+  owner?: {
+    id: string;
+    fullName: string;
+    phone?: string;
+    avatarUrl: string | null;
+    facebookUrl?: string | null;
+    instagramUrl?: string | null;
+    tiktokUrl?: string | null;
+  };
   reviewCount?: number;
   averageRating?: number;
 }
