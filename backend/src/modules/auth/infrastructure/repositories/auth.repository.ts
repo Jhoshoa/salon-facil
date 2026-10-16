@@ -71,6 +71,9 @@ export class AuthRepository implements IAuthRepository {
       district: string;
       avatarUrl: string;
       whatsappPhone: string;
+      facebookUrl: string;
+      instagramUrl: string;
+      tiktokUrl: string;
       phone: string;
     }>,
   ): Promise<UserEntity> {
@@ -394,6 +397,9 @@ export class AuthRepository implements IAuthRepository {
       city: prismaUser.city ?? null,
       district: prismaUser.district ?? null,
       whatsappPhone: prismaUser.whatsappPhone ?? null,
+      facebookUrl: prismaUser.facebookUrl ?? null,
+      instagramUrl: prismaUser.instagramUrl ?? null,
+      tiktokUrl: prismaUser.tiktokUrl ?? null,
       emailVerifiedAt: prismaUser.emailVerifiedAt ?? null,
       phoneVerifiedAt: prismaUser.phoneVerifiedAt ?? null,
       createdAt: prismaUser.createdAt,

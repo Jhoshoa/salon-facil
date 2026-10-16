@@ -25,6 +25,9 @@ export const OwnerProfileForm = () => {
       city: user?.city ?? '',
       district: user?.district ?? '',
       whatsappPhone: user?.whatsappPhone ?? '',
+      facebookUrl: user?.facebookUrl ?? '',
+      instagramUrl: user?.instagramUrl ?? '',
+      tiktokUrl: user?.tiktokUrl ?? '',
     },
   });
 
@@ -35,6 +38,9 @@ export const OwnerProfileForm = () => {
         city: values.city || undefined,
         district: values.district || undefined,
         whatsappPhone: values.whatsappPhone || undefined,
+        facebookUrl: values.facebookUrl || undefined,
+        instagramUrl: values.instagramUrl || undefined,
+        tiktokUrl: values.tiktokUrl || undefined,
       }),
     onSuccess: (updatedUser) => {
       updateUser(updatedUser);
@@ -77,7 +83,44 @@ export const OwnerProfileForm = () => {
                 form.setValue('whatsappPhone', value, { shouldValidate: true, shouldDirty: true })
               }
             />
-            {errors.whatsappPhone ? <p className="sf-form-error">{errors.whatsappPhone.message}</p> : null}
+            {errors.whatsappPhone ? (
+              <p className="sf-form-error">{errors.whatsappPhone.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-5 border-t pt-5 sm:grid-cols-2">
+            <div className="sf-form-group">
+              <Label htmlFor="facebookUrl">Facebook (opcional)</Label>
+              <Input
+                id="facebookUrl"
+                placeholder="https://facebook.com/tu-perfil"
+                {...form.register('facebookUrl')}
+              />
+              {errors.facebookUrl ? (
+                <p className="sf-form-error">{errors.facebookUrl.message}</p>
+              ) : null}
+            </div>
+            <div className="sf-form-group">
+              <Label htmlFor="instagramUrl">Instagram (opcional)</Label>
+              <Input
+                id="instagramUrl"
+                placeholder="https://instagram.com/tu-perfil"
+                {...form.register('instagramUrl')}
+              />
+              {errors.instagramUrl ? (
+                <p className="sf-form-error">{errors.instagramUrl.message}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="sf-form-group">
+            <Label htmlFor="tiktokUrl">TikTok (opcional)</Label>
+            <Input
+              id="tiktokUrl"
+              placeholder="https://tiktok.com/@tu-perfil"
+              {...form.register('tiktokUrl')}
+            />
+            {errors.tiktokUrl ? <p className="sf-form-error">{errors.tiktokUrl.message}</p> : null}
           </div>
         </CardContent>
       </Card>

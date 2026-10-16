@@ -24,6 +24,9 @@ export interface AuthUser {
   city: string | null;
   district: string | null;
   whatsappPhone: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
   emailVerified: boolean;
 }
 
@@ -33,6 +36,9 @@ export interface UpdateProfilePayload {
   district?: string;
   avatarUrl?: string;
   whatsappPhone?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
   phone?: string;
 }
 
