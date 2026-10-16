@@ -1178,7 +1178,15 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
               <AppDrawer
                 open={specificDateDrawerOpen}
                 onOpenChange={setSpecificDateDrawerOpen}
-                title="Agregar precio para una fecha especifica"
+                title={
+                  // Opts out of the app's default serif dialog-title style (every other
+                  // AppDrawer keeps it) -- this one sits inside a dense pricing form, so a
+                  // heavy display heading read as out of place next to the plain form labels
+                  // around it. Scoped to just this drawer; see app-drawer.tsx.
+                  <span className="font-sans tracking-normal">
+                    Agregar precio para una fecha especifica
+                  </span>
+                }
                 description="Esta fecha tendra prioridad sobre cualquier otro precio configurado, sin importar el modo elegido."
               >
                 <div className="space-y-4">
