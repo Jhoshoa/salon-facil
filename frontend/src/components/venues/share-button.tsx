@@ -4,13 +4,10 @@ import { useState } from 'react';
 import { Check, Link as LinkIcon, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { WhatsAppIcon } from '@/components/shared/brand-icons';
-import { cn } from '@/lib/utils';
 
 interface ShareButtonProps {
   title: string;
-  /** Full absolute URL — the native share sheet and WhatsApp both need a real URL, not a
-   * relative path. */
+  /** Full absolute URL — the native share sheet needs a real URL, not a relative path. */
   url: string;
   className?: string;
 }
@@ -19,11 +16,11 @@ const hasNativeShare = () =>
   typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
 /** No login required — sharing a venue is a public action. On mobile (or any browser that
- * supports the Web Share API), one tap opens the OS share sheet, which already lists WhatsApp,
- * SMS, email, etc. on its own — nothing custom to build there. The fallback (most desktop
- * browsers today) shows two small actions instead: copy link, and a direct WhatsApp Web link,
- * since WhatsApp is the dominant channel here and worth a one-click shortcut rather than making
- * someone copy-paste manually. */
+ * supports the Web Share API), one tap opens the OS share sheet, which already lists every
+ * installed app the user can pick — WhatsApp, SMS, email, etc. — nothing custom to build there.
+ * The fallback (desktop browsers without that API) is plain "copy link": a dedicated WhatsApp
+ * shortcut here would duplicate the owner-contact WhatsApp icon already shown elsewhere on the
+ * venue page for a different purpose, which is confusing (same icon, different action). */
 export const ShareButton = ({ title, url, className }: ShareButtonProps) => {
   const [copied, setCopied] = useState(false);
 
@@ -77,8 +74,6 @@ export const ShareButton = ({ title, url, className }: ShareButtonProps) => {
     }
   };
 
-  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(`${title} — ${url}`)}`;
-
   if (hasNativeShare()) {
     return (
       <Button
@@ -95,27 +90,15 @@ export const ShareButton = ({ title, url, className }: ShareButtonProps) => {
   }
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={handleCopyLink}
-        aria-label="Copiar link"
-      >
-        {copied ? <Check className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        asChild
-        aria-label="Compartir por WhatsApp"
-      >
-        <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
-          <WhatsAppIcon className="h-4 w-4" />
-        </a>
-      </Button>
-    </div>
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      className={className}
+      onClick={handleCopyLink}
+      aria-label="Copiar link"
+    >
+      {copied ? <Check className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+    </Button>
   );
 };
