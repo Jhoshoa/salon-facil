@@ -299,11 +299,11 @@ export class PaymentService {
     return updated;
   }
 
-  async getOwnerEarnings(ownerId: string, monthsBack = 6) {
+  async getOwnerEarnings(ownerId: string, monthsBack = 6, venueId?: string) {
     const [summary, breakdown, byMethod] = await Promise.all([
-      this.paymentRepository.getOwnerEarningsSummary(ownerId),
-      this.paymentRepository.getOwnerEarningsByVenueAndMonth(ownerId, monthsBack),
-      this.paymentRepository.getOwnerEarningsByMethod(ownerId, monthsBack),
+      this.paymentRepository.getOwnerEarningsSummary(ownerId, venueId),
+      this.paymentRepository.getOwnerEarningsByVenueAndMonth(ownerId, monthsBack, venueId),
+      this.paymentRepository.getOwnerEarningsByMethod(ownerId, monthsBack, venueId),
     ]);
 
     return { summary, breakdown, byMethod };

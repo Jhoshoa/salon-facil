@@ -12,14 +12,19 @@ export interface IPaymentRepository {
   uploadProof(id: string, comprobanteUrl: string): Promise<PaymentEntity>;
   confirm(id: string, ownerId: string, notes?: string): Promise<PaymentEntity>;
   reject(id: string, reason: string): Promise<PaymentEntity>;
-  getOwnerEarningsSummary(ownerId: string): Promise<{ totalEarned: number; paymentCount: number }>;
+  getOwnerEarningsSummary(
+    ownerId: string,
+    venueId?: string,
+  ): Promise<{ totalEarned: number; paymentCount: number }>;
   getOwnerEarningsByVenueAndMonth(
     ownerId: string,
     monthsBack: number,
+    venueId?: string,
   ): Promise<{ venueId: string; venueName: string; month: Date; total: number; count: number }[]>;
   getOwnerEarningsByMethod(
     ownerId: string,
     monthsBack: number,
+    venueId?: string,
   ): Promise<{ method: string; total: number; count: number }[]>;
 }
 

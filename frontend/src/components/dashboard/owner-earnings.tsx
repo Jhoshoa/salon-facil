@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleDollarSign, Download, Receipt } from 'lucide-react';
 import { getOwnerEarnings } from '@/lib/api/payments.api';
+import { getMyVenues } from '@/lib/api/venues.api';
 import { formatCurrency } from '@/lib/formatters';
 import { paymentMethodLabels } from '@/components/payments/payment-labels';
+import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { Button } from '@/components/ui/button';
@@ -56,9 +58,11 @@ const downloadBreakdownCsv = (rows: EarningsBreakdownRow[]) => {
 
 export const OwnerEarnings = () => {
   const [months, setMonths] = useState(6);
+  const [venueId, setVenueId] = useState('');
+  const venuesQuery = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
   const query = useQuery({
-    queryKey: ['dashboard', 'earnings', months],
-    queryFn: () => getOwnerEarnings(months),
+    queryKey: ['dashboard', 'earnings', months, venueId],
+    queryFn: () => getOwnerEarnings(months, venueId || undefined),
   });
 
   if (query.isLoading) {
@@ -79,16 +83,29 @@ export const OwnerEarnings = () => {
 
   const { summary, breakdown, byMethod } = query.data;
   const venues = groupByVenue(breakdown);
+  const selectedVenueName = venueId
+    ? (venuesQuery.data?.find((v) => v.id === venueId)?.name ?? null)
+    : null;
+  const scopeLabel = selectedVenueName ?? 'todos tus locales';
 
   return (
     <div className="space-y-6">
+      {venuesQuery.data && venuesQuery.data.length > 1 ? (
+        <OwnerVenueSelect
+          venues={venuesQuery.data}
+          value={venueId}
+          onChange={setVenueId}
+          allowAll
+        />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sf-card flex items-center gap-4 p-5">
           <span className="sf-logo">
             <CircleDollarSign className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm text-muted-foreground">Total ganado (historico)</p>
+            <p className="text-sm text-muted-foreground">Total ganado (historico) · {scopeLabel}</p>
             <p className="text-2xl font-bold">{formatCurrency(summary.totalEarned)}</p>
           </div>
         </div>
@@ -97,7 +114,9 @@ export const OwnerEarnings = () => {
             <Receipt className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm text-muted-foreground">Pagos confirmados (historico)</p>
+            <p className="text-sm text-muted-foreground">
+              Pagos confirmados (historico) · {scopeLabel}
+            </p>
             <p className="text-2xl font-bold">{summary.paymentCount}</p>
           </div>
         </div>
@@ -150,7 +169,11 @@ export const OwnerEarnings = () => {
         <div className="space-y-4">
           {venues.map((venue) => (
             <div key={venue.venueId} className="sf-card p-5">
-              <h3 className="mb-3 font-semibold">{venue.venueName}</h3>
+              {/* Redundant once a single venue is already selected above -- the heading would
+               * just repeat what the selector already says. */}
+              {!selectedVenueName ? (
+                <h3 className="mb-3 font-semibold">{venue.venueName}</h3>
+              ) : null}
               <div className="space-y-2">
                 {venue.rows.map((row) => (
                   <div

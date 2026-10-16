@@ -43,6 +43,8 @@ export const rejectPayment = async (paymentId: string, reason: string): Promise<
   });
 };
 
-export const getOwnerEarnings = async (months = 6): Promise<OwnerEarnings> => {
-  return apiRequest<OwnerEarnings>(`/payments/owner/earnings?months=${months}`);
+export const getOwnerEarnings = async (months = 6, venueId?: string): Promise<OwnerEarnings> => {
+  const search = new URLSearchParams({ months: String(months) });
+  if (venueId) search.set('venueId', venueId);
+  return apiRequest<OwnerEarnings>(`/payments/owner/earnings?${search.toString()}`);
 };

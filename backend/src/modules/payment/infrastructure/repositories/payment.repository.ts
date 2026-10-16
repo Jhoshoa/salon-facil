@@ -174,9 +174,13 @@ export class PaymentRepository implements IPaymentRepository {
 
   async getOwnerEarningsSummary(
     ownerId: string,
+    venueId?: string,
   ): Promise<{ totalEarned: number; paymentCount: number }> {
     const result = await this.prisma.payment.aggregate({
-      where: { status: PaymentStatus.COMPLETED, booking: { venue: { ownerId } } },
+      where: {
+        status: PaymentStatus.COMPLETED,
+        booking: { venue: { ownerId, ...(venueId ? { id: venueId } : {}) } },
+      },
       _sum: { amount: true },
       _count: { _all: true },
     });
@@ -190,6 +194,7 @@ export class PaymentRepository implements IPaymentRepository {
   async getOwnerEarningsByVenueAndMonth(
     ownerId: string,
     monthsBack: number,
+    venueId?: string,
   ): Promise<{ venueId: string; venueName: string; month: Date; total: number; count: number }[]> {
     const since = new Date();
     since.setMonth(since.getMonth() - monthsBack);
@@ -207,6 +212,7 @@ export class PaymentRepository implements IPaymentRepository {
       JOIN venues v ON v.id = b.venue_id
       WHERE p.status = 'COMPLETED' AND v.owner_id = ${ownerId}
         AND p.paid_at >= ${since}
+        ${venueId ? Prisma.sql`AND v.id = ${venueId}` : Prisma.empty}
       GROUP BY v.id, v.name, month
       ORDER BY month DESC, v.name ASC
     `);
@@ -223,6 +229,7 @@ export class PaymentRepository implements IPaymentRepository {
   async getOwnerEarningsByMethod(
     ownerId: string,
     monthsBack: number,
+    venueId?: string,
   ): Promise<{ method: string; total: number; count: number }[]> {
     const since = new Date();
     since.setMonth(since.getMonth() - monthsBack);
@@ -233,7 +240,7 @@ export class PaymentRepository implements IPaymentRepository {
       by: ['method'],
       where: {
         status: PaymentStatus.COMPLETED,
-        booking: { venue: { ownerId } },
+        booking: { venue: { ownerId, ...(venueId ? { id: venueId } : {}) } },
         paidAt: { gte: since },
       },
       _sum: { amount: true },

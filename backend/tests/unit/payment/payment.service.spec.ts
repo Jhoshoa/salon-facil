@@ -486,9 +486,17 @@ describe('PaymentService', () => {
       expect(result.summary).toEqual({ totalEarned: 4500, paymentCount: 3 });
       expect(result.breakdown).toHaveLength(1);
       expect(result.byMethod).toEqual([{ method: 'QR_BANK', total: 4500, count: 3 }]);
-      expect(paymentRepository.getOwnerEarningsSummary).toHaveBeenCalledWith('owner-1');
-      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith('owner-1', 6);
-      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith('owner-1', 6);
+      expect(paymentRepository.getOwnerEarningsSummary).toHaveBeenCalledWith('owner-1', undefined);
+      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith(
+        'owner-1',
+        6,
+        undefined,
+      );
+      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith(
+        'owner-1',
+        6,
+        undefined,
+      );
     });
 
     it('defaults to a 6-month lookback', async () => {
@@ -501,8 +509,39 @@ describe('PaymentService', () => {
 
       await service.getOwnerEarnings('owner-1');
 
-      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith('owner-1', 6);
-      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith('owner-1', 6);
+      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith(
+        'owner-1',
+        6,
+        undefined,
+      );
+      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith(
+        'owner-1',
+        6,
+        undefined,
+      );
+    });
+
+    it('passes a venueId through to every repository call when filtering to one venue', async () => {
+      paymentRepository.getOwnerEarningsSummary.mockResolvedValue({
+        totalEarned: 540,
+        paymentCount: 1,
+      });
+      paymentRepository.getOwnerEarningsByVenueAndMonth.mockResolvedValue([]);
+      paymentRepository.getOwnerEarningsByMethod.mockResolvedValue([]);
+
+      await service.getOwnerEarnings('owner-1', 3, 'venue-2');
+
+      expect(paymentRepository.getOwnerEarningsSummary).toHaveBeenCalledWith('owner-1', 'venue-2');
+      expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith(
+        'owner-1',
+        3,
+        'venue-2',
+      );
+      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith(
+        'owner-1',
+        3,
+        'venue-2',
+      );
     });
   });
 });

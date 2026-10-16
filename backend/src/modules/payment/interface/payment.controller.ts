@@ -91,8 +91,12 @@ export class PaymentController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Resumen de ganancias del propietario, agregado por todos sus locales' })
   @ApiResponse({ status: 200, description: 'Resumen y desglose de ganancias' })
-  async getOwnerEarnings(@CurrentUser() user: { id: string }, @Query('months') months?: string) {
-    return this.paymentService.getOwnerEarnings(user.id, months ? Number(months) : 6);
+  async getOwnerEarnings(
+    @CurrentUser() user: { id: string },
+    @Query('months') months?: string,
+    @Query('venueId') venueId?: string,
+  ) {
+    return this.paymentService.getOwnerEarnings(user.id, months ? Number(months) : 6, venueId);
   }
 
   @Put(':paymentId/confirm')
