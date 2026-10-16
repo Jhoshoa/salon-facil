@@ -1178,7 +1178,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
               <AppDrawer
                 open={specificDateDrawerOpen}
                 onOpenChange={setSpecificDateDrawerOpen}
-                title="Agregar fecha especifica"
+                title="Agregar precio para una fecha especifica"
                 description="Esta fecha tendra prioridad sobre cualquier otro precio configurado, sin importar el modo elegido."
               >
                 <div className="space-y-4">
