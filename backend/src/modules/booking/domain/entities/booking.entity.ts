@@ -90,6 +90,12 @@ export class BookingEntity {
     return [BookingStatus.DEPOSIT_PAID, BookingStatus.FULLY_PAID].includes(this.status);
   }
 
+  canBeMarkedNoShow(): boolean {
+    return [BookingStatus.APPROVED, BookingStatus.DEPOSIT_PAID, BookingStatus.FULLY_PAID].includes(
+      this.status,
+    );
+  }
+
   daysUntilEvent(): number {
     const now = new Date();
     const event = new Date(this.eventDate);

@@ -10,6 +10,7 @@ import {
   Mail,
   Phone,
   PartyPopper,
+  UserX,
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -18,6 +19,7 @@ import {
   approveBooking,
   getVenueBookings,
   markBookingCompleted,
+  markBookingNoShow,
   rejectBooking,
 } from '@/lib/api/bookings.api';
 import { getMyVenues } from '@/lib/api/venues.api';
@@ -115,22 +117,27 @@ const OwnerBookingRow = ({
   onApprove,
   onReject,
   onComplete,
+  onNoShow,
   onViewDetails,
   approving,
   completing,
+  markingNoShow,
 }: {
   booking: Booking;
   onApprove: (booking: Booking) => void;
   onReject: (booking: Booking) => void;
   onComplete: (booking: Booking) => void;
+  onNoShow: (booking: Booking) => void;
   onViewDetails: (booking: Booking) => void;
   approving: boolean;
   completing: boolean;
+  markingNoShow: boolean;
 }) => {
-  const hasActions =
-    booking.status === 'PENDING' ||
+  const canMarkNoShow =
+    booking.status === 'APPROVED' ||
     booking.status === 'DEPOSIT_PAID' ||
     booking.status === 'FULLY_PAID';
+  const hasActions = booking.status === 'PENDING' || canMarkNoShow;
 
   return (
     <div className="sf-card space-y-3 p-4">
@@ -195,6 +202,17 @@ const OwnerBookingRow = ({
               Marcar como completada
             </Button>
           ) : null}
+          {canMarkNoShow ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onNoShow(booking)}
+              disabled={markingNoShow}
+            >
+              <UserX className="h-4 w-4" />
+              No asistio
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -208,8 +226,10 @@ const BookingDetailModal = ({
   onApprove,
   onReject,
   onComplete,
+  onNoShow,
   approving,
   completing,
+  markingNoShow,
 }: {
   booking: Booking | null;
   isFullUpfront: boolean;
@@ -217,8 +237,10 @@ const BookingDetailModal = ({
   onApprove: (booking: Booking) => void;
   onReject: (booking: Booking) => void;
   onComplete: (booking: Booking) => void;
+  onNoShow: (booking: Booking) => void;
   approving: boolean;
   completing: boolean;
+  markingNoShow: boolean;
 }) => (
   <Dialog open={Boolean(booking)} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
@@ -362,6 +384,7 @@ const BookingDetailModal = ({
           </div>
 
           {booking.status === 'PENDING' ||
+          booking.status === 'APPROVED' ||
           booking.status === 'DEPOSIT_PAID' ||
           booking.status === 'FULLY_PAID' ? (
             <DialogFooter>
@@ -376,6 +399,18 @@ const BookingDetailModal = ({
                     Aprobar
                   </Button>
                 </>
+              ) : null}
+              {booking.status === 'APPROVED' ||
+              booking.status === 'DEPOSIT_PAID' ||
+              booking.status === 'FULLY_PAID' ? (
+                <Button
+                  variant="outline"
+                  onClick={() => onNoShow(booking)}
+                  disabled={markingNoShow}
+                >
+                  <UserX className="h-4 w-4" />
+                  No asistio
+                </Button>
               ) : null}
               {booking.status === 'DEPOSIT_PAID' || booking.status === 'FULLY_PAID' ? (
                 <Button onClick={() => onComplete(booking)} disabled={completing}>
@@ -484,6 +519,17 @@ export const OwnerBookingManagement = () => {
     },
     onError: (error: { message?: string }) =>
       toast.error('No se pudo completar', { description: error.message }),
+  });
+
+  const noShowMutation = useMutation({
+    mutationFn: markBookingNoShow,
+    onSuccess: async () => {
+      toast.success('Reserva marcada como no show');
+      setBookingDetail(null);
+      await queryClient.invalidateQueries({ queryKey: ['owner-bookings', venueId] });
+    },
+    onError: (error: { message?: string }) =>
+      toast.error('No se pudo marcar como no show', { description: error.message }),
   });
 
   const rejectMutation = useMutation({
@@ -609,9 +655,11 @@ export const OwnerBookingManagement = () => {
             booking={booking}
             approving={approveMutation.isPending}
             completing={completeMutation.isPending}
+            markingNoShow={noShowMutation.isPending}
             onApprove={setBookingToApprove}
             onReject={(item) => setRejectState({ id: item.id, type: 'booking' })}
             onComplete={(item) => completeMutation.mutate(item.id)}
+            onNoShow={(item) => noShowMutation.mutate(item.id)}
             onViewDetails={setBookingDetail}
           />
         ))}
@@ -678,8 +726,10 @@ export const OwnerBookingManagement = () => {
           setRejectState({ id: item.id, type: 'booking' });
         }}
         onComplete={(item) => completeMutation.mutate(item.id)}
+        onNoShow={(item) => noShowMutation.mutate(item.id)}
         approving={approveMutation.isPending}
         completing={completeMutation.isPending}
+        markingNoShow={noShowMutation.isPending}
       />
 
       <ConfirmDialog

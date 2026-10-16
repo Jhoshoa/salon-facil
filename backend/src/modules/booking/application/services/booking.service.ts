@@ -694,8 +694,10 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (booking.status !== BookingStatus.APPROVED) {
-      throw new BadRequestException('Solo se puede marcar como no show reservas aprobadas');
+    if (!booking.canBeMarkedNoShow()) {
+      throw new BadRequestException(
+        'Solo se puede marcar como no show reservas aprobadas o con pago registrado',
+      );
     }
 
     const venue = await this.venueService.getVenueById(booking.venueId);
