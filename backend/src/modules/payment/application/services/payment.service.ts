@@ -300,12 +300,13 @@ export class PaymentService {
   }
 
   async getOwnerEarnings(ownerId: string, monthsBack = 6) {
-    const [summary, breakdown] = await Promise.all([
+    const [summary, breakdown, byMethod] = await Promise.all([
       this.paymentRepository.getOwnerEarningsSummary(ownerId),
       this.paymentRepository.getOwnerEarningsByVenueAndMonth(ownerId, monthsBack),
+      this.paymentRepository.getOwnerEarningsByMethod(ownerId, monthsBack),
     ]);
 
-    return { summary, breakdown };
+    return { summary, breakdown, byMethod };
   }
 
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentEntity> {

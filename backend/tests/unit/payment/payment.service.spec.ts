@@ -119,6 +119,7 @@ describe('PaymentService', () => {
       reject: jest.fn(),
       getOwnerEarningsSummary: jest.fn(),
       getOwnerEarningsByVenueAndMonth: jest.fn(),
+      getOwnerEarningsByMethod: jest.fn(),
     };
 
     bookingRepository = {
@@ -476,13 +477,18 @@ describe('PaymentService', () => {
           count: 3,
         },
       ]);
+      paymentRepository.getOwnerEarningsByMethod.mockResolvedValue([
+        { method: 'QR_BANK', total: 4500, count: 3 },
+      ]);
 
       const result = await service.getOwnerEarnings('owner-1', 6);
 
       expect(result.summary).toEqual({ totalEarned: 4500, paymentCount: 3 });
       expect(result.breakdown).toHaveLength(1);
+      expect(result.byMethod).toEqual([{ method: 'QR_BANK', total: 4500, count: 3 }]);
       expect(paymentRepository.getOwnerEarningsSummary).toHaveBeenCalledWith('owner-1');
       expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith('owner-1', 6);
+      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith('owner-1', 6);
     });
 
     it('defaults to a 6-month lookback', async () => {
@@ -491,10 +497,12 @@ describe('PaymentService', () => {
         paymentCount: 0,
       });
       paymentRepository.getOwnerEarningsByVenueAndMonth.mockResolvedValue([]);
+      paymentRepository.getOwnerEarningsByMethod.mockResolvedValue([]);
 
       await service.getOwnerEarnings('owner-1');
 
       expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith('owner-1', 6);
+      expect(paymentRepository.getOwnerEarningsByMethod).toHaveBeenCalledWith('owner-1', 6);
     });
   });
 });

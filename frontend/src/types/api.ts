@@ -575,9 +575,16 @@ export interface EarningsBreakdownRow {
   count: number;
 }
 
+export interface EarningsByMethodRow {
+  method: PaymentMethod;
+  total: number;
+  count: number;
+}
+
 export interface OwnerEarnings {
   summary: { totalEarned: number; paymentCount: number };
   breakdown: EarningsBreakdownRow[];
+  byMethod: EarningsByMethodRow[];
 }
 
 export interface CreatePaymentPayload {

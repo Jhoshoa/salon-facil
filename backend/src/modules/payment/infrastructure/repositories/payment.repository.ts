@@ -220,6 +220,33 @@ export class PaymentRepository implements IPaymentRepository {
     }));
   }
 
+  async getOwnerEarningsByMethod(
+    ownerId: string,
+    monthsBack: number,
+  ): Promise<{ method: string; total: number; count: number }[]> {
+    const since = new Date();
+    since.setMonth(since.getMonth() - monthsBack);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
+    const rows = await this.prisma.payment.groupBy({
+      by: ['method'],
+      where: {
+        status: PaymentStatus.COMPLETED,
+        booking: { venue: { ownerId } },
+        paidAt: { gte: since },
+      },
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+
+    return rows.map((row) => ({
+      method: row.method,
+      total: Number(row._sum.amount ?? 0),
+      count: row._count._all,
+    }));
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private toEntity(raw: any): PaymentEntity {
     return new PaymentEntity({
