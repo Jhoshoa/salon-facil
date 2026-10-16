@@ -616,3 +616,14 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
+
+export type NotificationChannel = 'EMAIL' | 'WHATSAPP';
+
+/** Only ever covers the "controllable" subset of NotificationType -- security/account types
+ * (PASSWORD_RESET, WELCOME, etc.) never appear here, see CONTROLLABLE_NOTIFICATION_TYPES on
+ * the backend. */
+export interface NotificationPreference {
+  type: NotificationType;
+  channel: NotificationChannel;
+  enabled: boolean;
+}

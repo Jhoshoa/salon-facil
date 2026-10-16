@@ -149,6 +149,7 @@ model User {
   reviews                Review[]                @relation("ClientReviews")
   confirmedPayments      Payment[]               @relation("PaymentConfirmedBy")
   notifications          Notification[]
+  notificationPreferences NotificationPreference[]
   refreshTokens          RefreshToken[]
   passwordResetTokens    PasswordResetToken[]
   identities             UserIdentity[]
@@ -659,4 +660,22 @@ model Notification {
   @@index([type])
   @@index([isRead])
   @@map("notifications")
+}
+
+// Opt-out model: a missing row means "enabled" (the default for every existing user before this
+// table existed). Only covers notification types that are safe to silence -- security/account
+// types (PASSWORD_RESET, EMAIL_VERIFICATION, ACCOUNT_LINKED, PASSWORD_CHANGED, WELCOME) are never
+// looked up here; NotificationService always sends those regardless of what's in this table.
+model NotificationPreference {
+  id        String              @id @default(uuid())
+  userId    String              @map("user_id")
+  type      NotificationType
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, channel])
+  @@map("notification_preferences")
 }

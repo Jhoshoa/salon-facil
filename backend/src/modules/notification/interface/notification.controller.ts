@@ -1,7 +1,16 @@
-import { Controller, ForbiddenException, Get, NotFoundException, Param, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Put,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { NotificationService } from '../application/services/notification.service';
+import { UpdateNotificationPreferenceDto } from '../application/dto/update-notification-preference.dto';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -23,6 +32,25 @@ export class NotificationController {
   async unreadCount(@CurrentUser() user: { id: string }) {
     const count = await this.notificationService.countUnread(user.id);
     return { count };
+  }
+
+  @Get('preferences')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar mis preferencias de notificacion (tipo x canal)' })
+  @ApiResponse({ status: 200, description: 'Preferencias de notificacion del usuario' })
+  async getPreferences(@CurrentUser() user: { id: string }) {
+    return this.notificationService.getPreferences(user.id);
+  }
+
+  @Put('preferences')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Activar o desactivar un tipo de notificacion para un canal' })
+  @ApiResponse({ status: 200, description: 'Preferencia actualizada' })
+  async setPreference(
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateNotificationPreferenceDto,
+  ) {
+    return this.notificationService.setPreference(user.id, dto.type, dto.channel, dto.enabled);
   }
 
   @Put(':id/read')

@@ -38,6 +38,9 @@ describe('NotificationService', () => {
       markAsRead: jest.fn(),
       markAsSent: jest.fn(),
       markAsFailed: jest.fn(),
+      findPreferencesForUser: jest.fn(),
+      isChannelEnabled: jest.fn().mockResolvedValue(true),
+      setPreference: jest.fn(),
     };
 
     queue = { add: jest.fn().mockResolvedValue(undefined) };
@@ -137,6 +140,100 @@ describe('NotificationService', () => {
 
       expect(repository.markAsFailed).toHaveBeenCalledWith('notif-1', 'Redis unreachable');
       expect(result.id).toBe('notif-1');
+    });
+
+    it('still creates the in-app notification but skips queueing when the user opted out of this type/channel', async () => {
+      repository.create.mockResolvedValue(makeNotification());
+      repository.isChannelEnabled.mockResolvedValue(false);
+
+      const result = await service.enqueue({
+        userId: 'user-1',
+        type: NotificationType.BOOKING_REQUEST,
+        title: 'Nueva solicitud',
+        content: 'Detalle',
+        recipientEmail: 'client@test.com',
+      });
+
+      expect(repository.isChannelEnabled).toHaveBeenCalledWith(
+        'user-1',
+        NotificationType.BOOKING_REQUEST,
+        NotificationChannel.EMAIL,
+      );
+      expect(repository.create).toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+      expect(result.id).toBe('notif-1');
+    });
+
+    it('never checks preferences for a non-controllable (security/account) type', async () => {
+      repository.create.mockResolvedValue(makeNotification({ type: NotificationType.WELCOME }));
+
+      await service.enqueue({
+        userId: 'user-1',
+        type: NotificationType.WELCOME,
+        title: 'Bienvenido',
+        content: 'Contenido',
+      });
+
+      expect(repository.isChannelEnabled).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalled();
+    });
+  });
+
+  describe('getPreferences', () => {
+    it('fills in every controllable type/channel pair, defaulting to enabled when no row exists', async () => {
+      repository.findPreferencesForUser.mockResolvedValue([]);
+
+      const result = await service.getPreferences('user-1');
+
+      expect(result.length).toBeGreaterThan(0);
+      expect(result.every((p) => p.enabled)).toBe(true);
+      expect(
+        result.some(
+          (p) =>
+            p.type === NotificationType.BOOKING_REQUEST &&
+            p.channel === NotificationChannel.WHATSAPP,
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe('setPreference', () => {
+    it('delegates to the repository for a controllable type', async () => {
+      repository.setPreference.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'user-1',
+        type: NotificationType.BOOKING_REQUEST,
+        channel: NotificationChannel.EMAIL,
+        enabled: false,
+        updatedAt: new Date(),
+      });
+
+      const result = await service.setPreference(
+        'user-1',
+        NotificationType.BOOKING_REQUEST,
+        NotificationChannel.EMAIL,
+        false,
+      );
+
+      expect(result.enabled).toBe(false);
+      expect(repository.setPreference).toHaveBeenCalledWith(
+        'user-1',
+        NotificationType.BOOKING_REQUEST,
+        NotificationChannel.EMAIL,
+        false,
+      );
+    });
+
+    it('rejects a non-controllable type (no silencing PASSWORD_RESET etc.)', async () => {
+      await expect(
+        service.setPreference(
+          'user-1',
+          NotificationType.PASSWORD_RESET,
+          NotificationChannel.EMAIL,
+          false,
+        ),
+      ).rejects.toThrow();
+      expect(repository.setPreference).not.toHaveBeenCalled();
     });
   });
 
