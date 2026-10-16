@@ -120,6 +120,7 @@ describe('PaymentService', () => {
       getOwnerEarningsSummary: jest.fn(),
       getOwnerEarningsByVenueAndMonth: jest.fn(),
       getOwnerEarningsByMethod: jest.fn(),
+      findCompletedByOwner: jest.fn(),
     };
 
     bookingRepository = {
@@ -478,14 +479,16 @@ describe('PaymentService', () => {
         },
       ]);
       paymentRepository.getOwnerEarningsByMethod.mockResolvedValue([
-        { method: 'QR_BANK', total: 4500, count: 3 },
+        { venueId: 'venue-1', venueName: 'Salon Test', method: 'QR_BANK', total: 4500, count: 3 },
       ]);
 
       const result = await service.getOwnerEarnings('owner-1', 6);
 
       expect(result.summary).toEqual({ totalEarned: 4500, paymentCount: 3 });
       expect(result.breakdown).toHaveLength(1);
-      expect(result.byMethod).toEqual([{ method: 'QR_BANK', total: 4500, count: 3 }]);
+      expect(result.byMethod).toEqual([
+        { venueId: 'venue-1', venueName: 'Salon Test', method: 'QR_BANK', total: 4500, count: 3 },
+      ]);
       expect(paymentRepository.getOwnerEarningsSummary).toHaveBeenCalledWith('owner-1', undefined);
       expect(paymentRepository.getOwnerEarningsByVenueAndMonth).toHaveBeenCalledWith(
         'owner-1',
@@ -542,6 +545,26 @@ describe('PaymentService', () => {
         3,
         'venue-2',
       );
+    });
+  });
+
+  describe('getOwnerCompletedPayments', () => {
+    it('delegates the filters as-is to the repository', async () => {
+      const payment = new PaymentEntity({
+        id: 'payment-1',
+        bookingId: 'booking-1',
+        amount: 540,
+        paymentType: PaymentType.FULL,
+        method: 'BANK_TRANSFER' as never,
+        status: PaymentStatus.COMPLETED,
+      });
+      paymentRepository.findCompletedByOwner.mockResolvedValue([payment]);
+
+      const filters = { venueId: 'venue-2', method: 'BANK_TRANSFER', monthsBack: 3 };
+      const result = await service.getOwnerCompletedPayments('owner-1', filters);
+
+      expect(result).toEqual([payment]);
+      expect(paymentRepository.findCompletedByOwner).toHaveBeenCalledWith('owner-1', filters);
     });
   });
 });

@@ -3,23 +3,24 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleDollarSign, Download, Receipt } from 'lucide-react';
-import { getOwnerEarnings } from '@/lib/api/payments.api';
+import { getOwnerEarnings, type OwnerCompletedPaymentsFilter } from '@/lib/api/payments.api';
 import { getMyVenues } from '@/lib/api/venues.api';
 import { formatCurrency } from '@/lib/formatters';
 import { paymentMethodLabels } from '@/components/payments/payment-labels';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
+import { EarningsPaymentDrawer } from '@/components/dashboard/earnings-payment-drawer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { EarningsBreakdownRow } from '@/types/api';
+import type { EarningsBreakdownRow, EarningsByMethodRow } from '@/types/api';
 
 const monthLabel = (isoMonth: string) =>
   new Date(isoMonth).toLocaleDateString('es-BO', { month: 'long', year: 'numeric' });
 
-const groupByVenue = (rows: EarningsBreakdownRow[]) => {
-  const map = new Map<string, { venueName: string; rows: EarningsBreakdownRow[] }>();
+const groupByVenue = <T extends { venueId: string; venueName: string }>(rows: T[]) => {
+  const map = new Map<string, { venueName: string; rows: T[] }>();
   for (const row of rows) {
     const entry = map.get(row.venueId);
     if (entry) {
@@ -59,6 +60,10 @@ const downloadBreakdownCsv = (rows: EarningsBreakdownRow[]) => {
 export const OwnerEarnings = () => {
   const [months, setMonths] = useState(6);
   const [venueId, setVenueId] = useState('');
+  const [drawer, setDrawer] = useState<{
+    title: string;
+    filters: OwnerCompletedPaymentsFilter;
+  } | null>(null);
   const venuesQuery = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
   const query = useQuery({
     queryKey: ['dashboard', 'earnings', months, venueId],
@@ -83,10 +88,26 @@ export const OwnerEarnings = () => {
 
   const { summary, breakdown, byMethod } = query.data;
   const venues = groupByVenue(breakdown);
+  const methodVenues = groupByVenue(byMethod);
   const selectedVenueName = venueId
     ? (venuesQuery.data?.find((v) => v.id === venueId)?.name ?? null)
     : null;
   const scopeLabel = selectedVenueName ?? 'todos tus locales';
+
+  const openMonthDetail = (row: EarningsBreakdownRow) =>
+    setDrawer({
+      title: `${row.venueName} · ${monthLabel(row.month)}`,
+      filters: { venueId: row.venueId, month: row.month.slice(0, 7) },
+    });
+
+  const openMethodDetail = (
+    venue: { venueId: string; venueName: string },
+    row: EarningsByMethodRow,
+  ) =>
+    setDrawer({
+      title: `${venue.venueName} · ${paymentMethodLabels[row.method]}`,
+      filters: { venueId: venue.venueId, method: row.method, monthsBack: months },
+    });
 
   return (
     <div className="space-y-6">
@@ -143,17 +164,32 @@ export const OwnerEarnings = () => {
       </div>
 
       {byMethod.length > 0 ? (
-        <div className="sf-card p-5">
-          <h3 className="mb-3 font-semibold">Por metodo de pago</h3>
-          <div className="space-y-2">
-            {byMethod.map((row) => (
-              <div
-                key={row.method}
-                className="flex items-center justify-between border-t pt-2 text-sm first:border-t-0 first:pt-0"
-              >
-                <span className="text-muted-foreground">{paymentMethodLabels[row.method]}</span>
-                <span className="text-muted-foreground">{row.count} pago(s)</span>
-                <span className="font-medium">{formatCurrency(row.total)}</span>
+        <div className="space-y-3">
+          <h3 className="font-semibold">Por metodo de pago</h3>
+          <div className="space-y-4">
+            {methodVenues.map((venue) => (
+              <div key={venue.venueId} className="sf-card p-5">
+                {!selectedVenueName ? (
+                  <p className="mb-3 text-sm font-medium text-muted-foreground">
+                    {venue.venueName}
+                  </p>
+                ) : null}
+                <div className="space-y-2">
+                  {venue.rows.map((row) => (
+                    <button
+                      key={row.method}
+                      type="button"
+                      onClick={() => openMethodDetail(venue, row)}
+                      className="-mx-1 flex w-full items-center justify-between rounded-sm border-t px-1 pt-2 text-left text-sm transition-colors first:border-t-0 first:pt-0 hover:bg-muted/50"
+                    >
+                      <span className="text-muted-foreground">
+                        {paymentMethodLabels[row.method]}
+                      </span>
+                      <span className="text-muted-foreground">{row.count} pago(s)</span>
+                      <span className="font-medium">{formatCurrency(row.total)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -176,22 +212,32 @@ export const OwnerEarnings = () => {
               ) : null}
               <div className="space-y-2">
                 {venue.rows.map((row) => (
-                  <div
+                  <button
                     key={`${row.venueId}-${row.month}`}
-                    className="flex items-center justify-between border-t pt-2 text-sm first:border-t-0 first:pt-0"
+                    type="button"
+                    onClick={() => openMonthDetail(row)}
+                    className="-mx-1 flex w-full items-center justify-between rounded-sm border-t px-1 pt-2 text-left text-sm transition-colors first:border-t-0 first:pt-0 hover:bg-muted/50"
                   >
                     <span className="capitalize text-muted-foreground">
                       {monthLabel(row.month)}
                     </span>
                     <span className="text-muted-foreground">{row.count} pago(s)</span>
                     <span className="font-medium">{formatCurrency(row.total)}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <EarningsPaymentDrawer
+        title={drawer?.title ?? ''}
+        filters={drawer?.filters ?? null}
+        onOpenChange={(open) => {
+          if (!open) setDrawer(null);
+        }}
+      />
     </div>
   );
 };

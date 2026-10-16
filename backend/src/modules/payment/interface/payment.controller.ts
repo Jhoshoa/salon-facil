@@ -99,6 +99,25 @@ export class PaymentController {
     return this.paymentService.getOwnerEarnings(user.id, months ? Number(months) : 6, venueId);
   }
 
+  @Get('owner/earnings/payments')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Detalle de pagos completados detras de una fila de ganancias' })
+  @ApiResponse({ status: 200, description: 'Pagos completados que calzan con el filtro' })
+  async getOwnerEarningsPayments(
+    @CurrentUser() user: { id: string },
+    @Query('venueId') venueId?: string,
+    @Query('method') method?: string,
+    @Query('month') month?: string,
+    @Query('monthsBack') monthsBack?: string,
+  ) {
+    return this.paymentService.getOwnerCompletedPayments(user.id, {
+      venueId,
+      method,
+      month,
+      monthsBack: monthsBack ? Number(monthsBack) : undefined,
+    });
+  }
+
   @Put(':paymentId/confirm')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Confirmar pago' })

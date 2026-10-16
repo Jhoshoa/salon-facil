@@ -576,6 +576,8 @@ export interface EarningsBreakdownRow {
 }
 
 export interface EarningsByMethodRow {
+  venueId: string;
+  venueName: string;
   method: PaymentMethod;
   total: number;
   count: number;

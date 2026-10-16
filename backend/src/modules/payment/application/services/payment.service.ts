@@ -309,6 +309,15 @@ export class PaymentService {
     return { summary, breakdown, byMethod };
   }
 
+  /** The individual payments behind one row of the earnings breakdown -- what the "ver detalle"
+   * drawer shows. */
+  async getOwnerCompletedPayments(
+    ownerId: string,
+    filters: { venueId?: string; method?: string; month?: string; monthsBack?: number },
+  ): Promise<PaymentEntity[]> {
+    return this.paymentRepository.findCompletedByOwner(ownerId, filters);
+  }
+
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentEntity> {
     const payment = await this.paymentRepository.findById(paymentId);
     if (!payment) {

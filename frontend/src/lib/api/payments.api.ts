@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { CreatePaymentPayload, OwnerEarnings, Payment } from '@/types/api';
+import type { CreatePaymentPayload, OwnerEarnings, Payment, PaymentMethod } from '@/types/api';
 
 export const createPayment = async (
   bookingId: string,
@@ -47,4 +47,23 @@ export const getOwnerEarnings = async (months = 6, venueId?: string): Promise<Ow
   const search = new URLSearchParams({ months: String(months) });
   if (venueId) search.set('venueId', venueId);
   return apiRequest<OwnerEarnings>(`/payments/owner/earnings?${search.toString()}`);
+};
+
+export interface OwnerCompletedPaymentsFilter {
+  venueId?: string;
+  method?: PaymentMethod;
+  /** 'YYYY-MM' -- wins over `monthsBack` when both are set. */
+  month?: string;
+  monthsBack?: number;
+}
+
+export const getOwnerCompletedPayments = async (
+  filters: OwnerCompletedPaymentsFilter,
+): Promise<Payment[]> => {
+  const search = new URLSearchParams();
+  if (filters.venueId) search.set('venueId', filters.venueId);
+  if (filters.method) search.set('method', filters.method);
+  if (filters.month) search.set('month', filters.month);
+  if (filters.monthsBack) search.set('monthsBack', String(filters.monthsBack));
+  return apiRequest<Payment[]>(`/payments/owner/earnings/payments?${search.toString()}`);
 };

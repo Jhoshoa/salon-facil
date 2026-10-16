@@ -25,7 +25,17 @@ export interface IPaymentRepository {
     ownerId: string,
     monthsBack: number,
     venueId?: string,
-  ): Promise<{ method: string; total: number; count: number }[]>;
+  ): Promise<
+    { venueId: string; venueName: string; method: string; total: number; count: number }[]
+  >;
+  /** Backs the earnings-detail drawer: the underlying COMPLETED payments for a venue/month/method
+   * breakdown row the owner clicked. `month` ('YYYY-MM') wins over `monthsBack` when both are
+   * given -- a monthly-breakdown row passes `month`, a by-method row passes `monthsBack` (the
+   * same lookback window the parent earnings view is scoped to). */
+  findCompletedByOwner(
+    ownerId: string,
+    filters: { venueId?: string; method?: string; month?: string; monthsBack?: number },
+  ): Promise<PaymentEntity[]>;
 }
 
 export interface CreatePaymentData {
