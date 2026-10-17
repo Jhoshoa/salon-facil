@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
+import { MapPin, Trash2 } from 'lucide-react';
 import {
   createVenue,
   getAmenitiesCatalog,
@@ -32,6 +32,7 @@ import { SubmitButton } from '@/components/shared/submit-button';
 import { PhoneInput } from '@/components/shared/phone-input';
 import { Button } from '@/components/ui/button';
 import { AppDrawer } from '@/components/shared/app-drawer';
+import { VenueLocationPickerDialog } from '@/components/venues/venue-location-picker-dialog';
 import type { PriceUnit, Venue, VenueFormPayload, VenuePriceInput } from '@/types/api';
 
 interface VenueFormProps {
@@ -318,6 +319,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   const [specificDateDraft, setSpecificDateDraft] =
     useState<SpecificDateDraft>(emptySpecificDateDraft);
   const [specificDateDraftError, setSpecificDateDraftError] = useState<string | null>(null);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
 
   const amenitiesQuery = useQuery({
     queryKey: ['venue-catalog', 'amenities'],
@@ -608,6 +610,11 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     );
   };
 
+  const handleLocationConfirm = (latitude: number, longitude: number) => {
+    form.setValue('latitude', latitude.toFixed(6), { shouldValidate: true, shouldDirty: true });
+    form.setValue('longitude', longitude.toFixed(6), { shouldValidate: true, shouldDirty: true });
+  };
+
   const toggleUseType = (value: string) => {
     const next = useTypes.includes(value)
       ? useTypes.filter((item) => item !== value)
@@ -851,20 +858,46 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                 ) : null}
               </div>
 
+              <div className="flex items-center justify-between gap-3">
+                <Label>Ubicacion en el mapa (opcional)</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLocationPickerOpen(true)}
+                >
+                  <MapPin className="h-4 w-4" />
+                  Seleccionar en el mapa
+                </Button>
+              </div>
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="sf-form-group">
                   <Label htmlFor="latitude">Latitud (opcional)</Label>
                   <Input id="latitude" placeholder="-16.518391" {...form.register('latitude')} />
+                  {errors.latitude ? (
+                    <p className="sf-form-error">{errors.latitude.message}</p>
+                  ) : null}
                 </div>
                 <div className="sf-form-group">
                   <Label htmlFor="longitude">Longitud (opcional)</Label>
                   <Input id="longitude" placeholder="-68.167649" {...form.register('longitude')} />
+                  {errors.longitude ? (
+                    <p className="sf-form-error">{errors.longitude.message}</p>
+                  ) : null}
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Puedes obtener la latitud y longitud buscando tu direccion en Google Maps y copiando
-                las coordenadas.
+                Usa el boton de arriba para marcarla en el mapa (o tu ubicacion actual), o pegala a
+                mano si ya la tenes copiada de Google Maps.
               </p>
+
+              <VenueLocationPickerDialog
+                open={locationPickerOpen}
+                onOpenChange={setLocationPickerOpen}
+                initialLatitude={form.watch('latitude')}
+                initialLongitude={form.watch('longitude')}
+                onConfirm={handleLocationConfirm}
+              />
             </div>
           ) : null}
 
