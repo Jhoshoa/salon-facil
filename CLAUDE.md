@@ -20,7 +20,21 @@ make studio          # Open Prisma Studio
 make seed            # Seed database -- DESTRUCTIVE, wipes every user/venue/booking with no
                      # filter, real accounts included. Requires CONFIRM_RESEED=yes to actually
                      # run; never invoke without the user's explicit go-ahead for this run.
+make rebuild-frontend  # Rebuild the frontend image with its .next cache volume cleared
+make rebuild-backend   # Rebuild the backend image with its dist cache volume cleared
+make rebuild            # Both of the above
 ```
+
+`.next` (frontend) and `dist` (backend) are separate Docker volumes from the image (see
+`docker-compose.yml`) -- they survive a plain `docker compose up --build`, which only replaces
+the image. If dependencies or the Dockerfile change and the image is rebuilt without also
+clearing these, the stale incremental build cache can desync from the fresh code: on the
+frontend this has caused a silent `next/font` hash mismatch (the page falls back to a generic
+system font instead of the real one, changing text size/wrapping with no visible error); on the
+backend it has caused a phantom TypeScript error from a previous compile. Use `make
+rebuild-frontend`/`rebuild-backend` (or `docker compose rm -f -v <service>` before `up -d
+--build`) instead of a plain rebuild whenever `package.json` or either Dockerfile changes. A
+plain container restart (no image rebuild) is unaffected and doesn't need this.
 
 ### Backend (cd backend)
 ```bash
