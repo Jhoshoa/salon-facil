@@ -119,13 +119,15 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
             Galeria
           </Button>
           {/* Camera capture only makes sense on a device that has one -- `capture` is a no-op on
-           * desktop browsers, so this is hidden past the mobile breakpoint instead of cluttering
-           * the header with a button that would do nothing useful there. */}
+           * desktop browsers. Shown via the `touch` variant (coarse pointer, see
+           * tailwind.config.ts) rather than a width breakpoint, so it stays correct on a
+           * landscape phone or a tablet -- both can be wider than a `sm:hidden` cutoff would
+           * allow, despite still being touch devices with a camera. */}
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="sm:hidden"
+            className="hidden touch:inline-flex"
             onClick={() => cameraInputRef.current?.click()}
             disabled={uploadMutation.isPending || atLimit}
             title={atLimit ? `Ya llegaste al maximo de ${MAX_VENUE_PHOTOS} fotos` : undefined}
