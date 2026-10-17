@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
 
 const config: Config = {
   darkMode: ['class'],
@@ -76,7 +77,17 @@ const config: Config = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    // `touch:` -- true on phones AND tablets (any orientation) since it checks for a coarse
+    // (finger) pointer rather than a viewport-width breakpoint, which a landscape phone or a
+    // tablet in portrait can both exceed. Also stays true on a hybrid laptop that has a
+    // touchscreen alongside its trackpad/mouse (`any-pointer`, not just `pointer`, the primary
+    // one), so a capability like "open the camera" stays offered wherever it could actually work.
+    plugin(({ addVariant }) => {
+      addVariant('touch', '@media (any-pointer: coarse)');
+    }),
+  ],
 };
 
 export default config;
