@@ -131,6 +131,29 @@ export class VenueService {
     return this.venueRepository.findByOwner(ownerId);
   }
 
+  /** Favoriting a venue that doesn't exist (or no longer does) fails loudly rather than
+   * silently saving a dangling reference — the client only ever calls this from a page that
+   * already has a real venue loaded, so a 404 here means something's actually wrong. */
+  async addFavorite(userId: string, venueId: string): Promise<void> {
+    const venue = await this.venueRepository.findById(venueId);
+    if (!venue) {
+      throw new NotFoundException(`Local con ID '${venueId}' no encontrado`);
+    }
+    await this.venueRepository.addFavorite(userId, venueId);
+  }
+
+  async removeFavorite(userId: string, venueId: string): Promise<void> {
+    await this.venueRepository.removeFavorite(userId, venueId);
+  }
+
+  async getMyFavorites(userId: string): Promise<VenueEntity[]> {
+    return this.venueRepository.findFavoritedByUser(userId);
+  }
+
+  async getMyFavoriteVenueIds(userId: string): Promise<string[]> {
+    return this.venueRepository.findFavoritedVenueIds(userId);
+  }
+
   /** Internal use only (notifications) — see findOwnerContact on the repository interface. */
   async getOwnerContact(
     venueId: string,

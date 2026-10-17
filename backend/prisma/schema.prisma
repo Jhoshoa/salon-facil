@@ -134,6 +134,9 @@ model User {
   city            String?
   district        String?
   whatsappPhone   String?    @map("whatsapp_phone")
+  facebookUrl     String?    @map("facebook_url")
+  instagramUrl    String?    @map("instagram_url")
+  tiktokUrl       String?    @map("tiktok_url")
   emailVerifiedAt DateTime?  @map("email_verified_at")
   phoneVerifiedAt DateTime?  @map("phone_verified_at")
   createdAt       DateTime   @default(now()) @map("created_at")
@@ -146,10 +149,12 @@ model User {
   reviews                Review[]                @relation("ClientReviews")
   confirmedPayments      Payment[]               @relation("PaymentConfirmedBy")
   notifications          Notification[]
+  notificationPreferences NotificationPreference[]
   refreshTokens          RefreshToken[]
   passwordResetTokens    PasswordResetToken[]
   identities             UserIdentity[]
   emailVerificationCodes EmailVerificationCode[]
+  favorites              VenueFavorite[]
 
   @@index([email])
   @@index([phone])
@@ -288,6 +293,7 @@ model Venue {
   bookingDates   BookingDate[]
   reviews        Review[]
   calendarBlocks CalendarBlock[]
+  favoritedBy    VenueFavorite[]
 
   @@index([ownerId])
   @@index([slug])
@@ -300,6 +306,23 @@ model Venue {
   @@index([deletedAt])
   @@index([latitude, longitude])
   @@map("venues")
+}
+
+// A client's private "save for later" bookmark -- deliberately separate from Review (public
+// rating/comment tied to a completed booking). No rating, no comment, no booking required:
+// just "I want to find this again." Only the owning user ever sees their own list.
+model VenueFavorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  venueId   String   @map("venue_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, venueId])
+  @@index([venueId])
+  @@map("venue_favorites")
 }
 
 // Bolivia's 9 departamentos — a closed, constitutionally-fixed set. Stored directly on Venue
@@ -637,4 +660,22 @@ model Notification {
   @@index([type])
   @@index([isRead])
   @@map("notifications")
+}
+
+// Opt-out model: a missing row means "enabled" (the default for every existing user before this
+// table existed). Only covers notification types that are safe to silence -- security/account
+// types (PASSWORD_RESET, EMAIL_VERIFICATION, ACCOUNT_LINKED, PASSWORD_CHANGED, WELCOME) are never
+// looked up here; NotificationService always sends those regardless of what's in this table.
+model NotificationPreference {
+  id        String              @id @default(uuid())
+  userId    String              @map("user_id")
+  type      NotificationType
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, channel])
+  @@map("notification_preferences")
 }

@@ -89,6 +89,10 @@ export const markBookingCompleted = async (id: string): Promise<Booking> => {
   return apiRequest<Booking>(`/bookings/${id}/complete`, { method: 'PUT' });
 };
 
+export const markBookingNoShow = async (id: string): Promise<Booking> => {
+  return apiRequest<Booking>(`/bookings/${id}/no-show`, { method: 'PUT' });
+};
+
 export const getPendingOwnerBookingsCount = async (): Promise<number> => {
   const result = await apiRequest<{ count: number }>('/bookings/owner/pending-count');
   return result.count;

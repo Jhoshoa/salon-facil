@@ -24,6 +24,9 @@ export interface AuthUser {
   city: string | null;
   district: string | null;
   whatsappPhone: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
   emailVerified: boolean;
 }
 
@@ -33,6 +36,9 @@ export interface UpdateProfilePayload {
   district?: string;
   avatarUrl?: string;
   whatsappPhone?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
   phone?: string;
 }
 
@@ -229,7 +235,15 @@ export interface Venue {
   amenities?: VenueAmenity[];
   uses?: VenueUse[];
   openingHours?: VenueOpeningHour[];
-  owner?: { id: string; fullName: string; phone?: string; avatarUrl: string | null };
+  owner?: {
+    id: string;
+    fullName: string;
+    phone?: string;
+    avatarUrl: string | null;
+    facebookUrl?: string | null;
+    instagramUrl?: string | null;
+    tiktokUrl?: string | null;
+  };
   reviewCount?: number;
   averageRating?: number;
 }
@@ -569,9 +583,18 @@ export interface EarningsBreakdownRow {
   count: number;
 }
 
+export interface EarningsByMethodRow {
+  venueId: string;
+  venueName: string;
+  method: PaymentMethod;
+  total: number;
+  count: number;
+}
+
 export interface OwnerEarnings {
   summary: { totalEarned: number; paymentCount: number };
   breakdown: EarningsBreakdownRow[];
+  byMethod: EarningsByMethodRow[];
 }
 
 export interface CreatePaymentPayload {
@@ -602,4 +625,15 @@ export interface Notification {
   content: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export type NotificationChannel = 'EMAIL' | 'WHATSAPP';
+
+/** Only ever covers the "controllable" subset of NotificationType -- security/account types
+ * (PASSWORD_RESET, WELCOME, etc.) never appear here, see CONTROLLABLE_NOTIFICATION_TYPES on
+ * the backend. */
+export interface NotificationPreference {
+  type: NotificationType;
+  channel: NotificationChannel;
+  enabled: boolean;
 }

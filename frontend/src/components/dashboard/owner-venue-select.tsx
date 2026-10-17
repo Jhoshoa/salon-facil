@@ -7,9 +7,13 @@ interface OwnerVenueSelectProps {
   venues: Venue[];
   value: string;
   onChange: (venueId: string) => void;
+  /** Adds a leading "Todos los locales" option (value `''`) -- used where a combined view
+   * across every venue makes sense (e.g. ganancias), unlike the single-venue-only screens
+   * (calendario, reservas) where this defaults to omitted. */
+  allowAll?: boolean;
 }
 
-export const OwnerVenueSelect = ({ venues, value, onChange }: OwnerVenueSelectProps) => {
+export const OwnerVenueSelect = ({ venues, value, onChange, allowAll }: OwnerVenueSelectProps) => {
   return (
     <div className="space-y-2">
       <Label htmlFor="venueId">Salon</Label>
@@ -19,6 +23,7 @@ export const OwnerVenueSelect = ({ venues, value, onChange }: OwnerVenueSelectPr
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
+        {allowAll ? <option value="">Todos los locales</option> : null}
         {venues.map((venue) => (
           <option key={venue.id} value={venue.id}>
             {venue.name}

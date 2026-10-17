@@ -91,6 +91,9 @@ export class VenueRepository implements IVenueRepository {
         fullName: true,
         phone: true,
         avatarUrl: true,
+        facebookUrl: true,
+        instagramUrl: true,
+        tiktokUrl: true,
       },
     },
     _count: { select: { reviews: true } },
@@ -984,6 +987,37 @@ export class VenueRepository implements IVenueRepository {
       select: { id: true },
     });
     return venue !== null;
+  }
+
+  async addFavorite(userId: string, venueId: string): Promise<void> {
+    // Idempotent: re-favoriting something already saved is a no-op, not an error -- the
+    // frontend doesn't need to track local state perfectly before calling this.
+    await this.prisma.venueFavorite.upsert({
+      where: { userId_venueId: { userId, venueId } },
+      create: { userId, venueId },
+      update: {},
+    });
+  }
+
+  async removeFavorite(userId: string, venueId: string): Promise<void> {
+    await this.prisma.venueFavorite.deleteMany({ where: { userId, venueId } });
+  }
+
+  async findFavoritedByUser(userId: string): Promise<VenueEntity[]> {
+    const favorites = await this.prisma.venueFavorite.findMany({
+      where: { userId },
+      include: { venue: { include: this.venueInclude } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return favorites.map((f) => this.toEntity(f.venue));
+  }
+
+  async findFavoritedVenueIds(userId: string): Promise<string[]> {
+    const favorites = await this.prisma.venueFavorite.findMany({
+      where: { userId },
+      select: { venueId: true },
+    });
+    return favorites.map((f) => f.venueId);
   }
 
   private applyPostSort(

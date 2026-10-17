@@ -1,19 +1,9 @@
 'use client';
 
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import { Marker, Popup, TileLayer } from 'react-leaflet';
 import { StableMapContainer } from './stable-map-container';
-
-const markerIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+import { leafletMarkerIcon } from '@/lib/leaflet-marker-icon';
 
 interface VenueLocationMapProps {
   latitude: number;
@@ -33,7 +23,7 @@ export const VenueLocationMap = ({ latitude, longitude, name }: VenueLocationMap
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <Marker position={[latitude, longitude]} icon={markerIcon}>
+      <Marker position={[latitude, longitude]} icon={leafletMarkerIcon}>
         <Popup>{name}</Popup>
       </Marker>
     </StableMapContainer>

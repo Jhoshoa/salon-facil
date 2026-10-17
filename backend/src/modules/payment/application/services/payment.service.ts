@@ -299,13 +299,23 @@ export class PaymentService {
     return updated;
   }
 
-  async getOwnerEarnings(ownerId: string, monthsBack = 6) {
-    const [summary, breakdown] = await Promise.all([
-      this.paymentRepository.getOwnerEarningsSummary(ownerId),
-      this.paymentRepository.getOwnerEarningsByVenueAndMonth(ownerId, monthsBack),
+  async getOwnerEarnings(ownerId: string, monthsBack = 6, venueId?: string) {
+    const [summary, breakdown, byMethod] = await Promise.all([
+      this.paymentRepository.getOwnerEarningsSummary(ownerId, venueId),
+      this.paymentRepository.getOwnerEarningsByVenueAndMonth(ownerId, monthsBack, venueId),
+      this.paymentRepository.getOwnerEarningsByMethod(ownerId, monthsBack, venueId),
     ]);
 
-    return { summary, breakdown };
+    return { summary, breakdown, byMethod };
+  }
+
+  /** The individual payments behind one row of the earnings breakdown -- what the "ver detalle"
+   * drawer shows. */
+  async getOwnerCompletedPayments(
+    ownerId: string,
+    filters: { venueId?: string; method?: string; month?: string; monthsBack?: number },
+  ): Promise<PaymentEntity[]> {
+    return this.paymentRepository.findCompletedByOwner(ownerId, filters);
   }
 
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentEntity> {

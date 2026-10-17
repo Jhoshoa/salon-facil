@@ -52,6 +52,9 @@ const toProfileDto = (user: UserEntity) => ({
   city: user.city,
   district: user.district,
   whatsappPhone: user.whatsappPhone,
+  facebookUrl: user.facebookUrl,
+  instagramUrl: user.instagramUrl,
+  tiktokUrl: user.tiktokUrl,
   emailVerified: user.isVerified(),
 });
 

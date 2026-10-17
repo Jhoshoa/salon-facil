@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { NotificationEntity } from '../../domain/entities/notification.entity';
+import { NotificationPreferenceEntity } from '../../domain/entities/notification-preference.entity';
 import {
   CreateNotificationData,
   INotificationRepository,
@@ -65,6 +66,48 @@ export class NotificationRepository implements INotificationRepository {
       data: { failedAt: new Date(), errorMessage: errorMessage.slice(0, 500) },
     });
     return this.toEntity(updated);
+  }
+
+  async findPreferencesForUser(userId: string): Promise<NotificationPreferenceEntity[]> {
+    const rows = await this.prisma.notificationPreference.findMany({ where: { userId } });
+    return rows.map((row) => this.toPreferenceEntity(row));
+  }
+
+  async isChannelEnabled(
+    userId: string,
+    type: NotificationType,
+    channel: NotificationChannel,
+  ): Promise<boolean> {
+    const row = await this.prisma.notificationPreference.findUnique({
+      where: { userId_type_channel: { userId, type, channel } },
+    });
+    return row?.enabled ?? true;
+  }
+
+  async setPreference(
+    userId: string,
+    type: NotificationType,
+    channel: NotificationChannel,
+    enabled: boolean,
+  ): Promise<NotificationPreferenceEntity> {
+    const row = await this.prisma.notificationPreference.upsert({
+      where: { userId_type_channel: { userId, type, channel } },
+      create: { userId, type, channel, enabled },
+      update: { enabled },
+    });
+    return this.toPreferenceEntity(row);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private toPreferenceEntity(raw: any): NotificationPreferenceEntity {
+    return new NotificationPreferenceEntity({
+      id: raw.id,
+      userId: raw.userId,
+      type: raw.type,
+      channel: raw.channel,
+      enabled: raw.enabled,
+      updatedAt: raw.updatedAt,
+    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

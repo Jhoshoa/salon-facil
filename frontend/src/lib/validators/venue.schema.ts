@@ -8,6 +8,20 @@ const optionalUrl = z
   .optional()
   .or(z.literal(''));
 
+// Kept as a string (not z.coerce.number()) since the field is empty-string by default and the
+// form only converts to Number right before submit -- same convention as the rest of this
+// schema's optional numeric-ish fields.
+const optionalCoordinate = (min: number, max: number) =>
+  z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .refine(
+      (value) =>
+        !value || (!Number.isNaN(Number(value)) && Number(value) >= min && Number(value) <= max),
+      { message: `Debe ser un numero entre ${min} y ${max}` },
+    );
+
 export const departamentoValues = [
   'LA_PAZ',
   'SANTA_CRUZ',
@@ -54,8 +68,8 @@ export const venueFormSchema = z.object({
   facebookUrl: optionalUrl,
   instagramUrl: optionalUrl,
   tiktokUrl: optionalUrl,
-  latitude: z.string().optional().or(z.literal('')),
-  longitude: z.string().optional().or(z.literal('')),
+  latitude: optionalCoordinate(-90, 90),
+  longitude: optionalCoordinate(-180, 180),
   capacityMin: z.coerce.number().min(0).default(0),
   capacityMax: z.coerce
     .number({ invalid_type_error: 'La capacidad maxima es requerida' })

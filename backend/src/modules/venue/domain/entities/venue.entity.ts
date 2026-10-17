@@ -80,7 +80,15 @@ export class VenueEntity {
   spaceType?: CatalogItemEntity | null;
   openingHours?: VenueOpeningHourEntity[];
   media?: VenueMediaEntity[];
-  owner?: { id: string; fullName: string; phone: string; avatarUrl: string | null };
+  owner?: {
+    id: string;
+    fullName: string;
+    phone: string;
+    avatarUrl: string | null;
+    facebookUrl: string | null;
+    instagramUrl: string | null;
+    tiktokUrl: string | null;
+  };
   reviewCount?: number;
   averageRating?: number;
 
