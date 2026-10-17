@@ -27,6 +27,18 @@ export class UpdateProfileDto {
   })
   whatsappPhone?: string;
 
+  @IsOptional()
+  @IsUrl({}, { message: 'facebookUrl debe ser una URL valida' })
+  facebookUrl?: string;
+
+  @IsOptional()
+  @IsUrl({}, { message: 'instagramUrl debe ser una URL valida' })
+  instagramUrl?: string;
+
+  @IsOptional()
+  @IsUrl({}, { message: 'tiktokUrl debe ser una URL valida' })
+  tiktokUrl?: string;
+
   // Only meaningful for Google-signup accounts still carrying the `pending:<id>` placeholder
   // phone — lets the "completa tu perfil" step set a real one. See
   // docs/auth-improvement/oauth-redirects-verification.md §1.

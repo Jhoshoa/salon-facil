@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { Trash2 } from 'lucide-react';
 import {
   createVenue,
   getAmenitiesCatalog,
@@ -21,6 +22,7 @@ import {
   type VenueFormValues,
 } from '@/lib/validators/venue.schema';
 import { departamentoLabels, priceUnitLabels } from '@/components/venues/venue-filter-labels';
+import { formatDate } from '@/lib/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -29,6 +31,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { PhoneInput } from '@/components/shared/phone-input';
 import { Button } from '@/components/ui/button';
+import { AppDrawer } from '@/components/shared/app-drawer';
 import type { PriceUnit, Venue, VenueFormPayload, VenuePriceInput } from '@/types/api';
 
 interface VenueFormProps {
@@ -59,6 +62,32 @@ interface SeasonRuleState {
   unit: PriceUnit | '';
 }
 
+type SpecificDateType = 'HOLIDAY' | 'CUSTOM_DATE';
+
+const specificDateTypeLabels: Record<SpecificDateType, string> = {
+  HOLIDAY: 'Feriado',
+  CUSTOM_DATE: 'Fecha puntual',
+};
+
+interface SpecificDateRuleState {
+  key: string;
+  priceType: SpecificDateType;
+  name: string;
+  date: string;
+  price: string;
+  unit: PriceUnit | '';
+}
+
+type SpecificDateDraft = Omit<SpecificDateRuleState, 'key'>;
+
+const emptySpecificDateDraft: SpecificDateDraft = {
+  priceType: 'HOLIDAY',
+  name: '',
+  date: '',
+  price: '',
+  unit: '',
+};
+
 const buildInitialWeekdayRules = (venue?: Venue): WeekdayRuleState[] => {
   const byDay = new Map(
     (venue?.prices ?? [])
@@ -84,6 +113,18 @@ const buildInitialSeasonRules = (venue?: Venue): SeasonRuleState[] =>
       name: p.discountLabel ?? '',
       startDate: p.startDate!.slice(0, 10),
       endDate: p.endDate!.slice(0, 10),
+      price: String(p.price),
+      unit: p.unit ?? '',
+    }));
+
+const buildInitialSpecificDateRules = (venue?: Venue): SpecificDateRuleState[] =>
+  (venue?.prices ?? [])
+    .filter((p) => (p.priceType === 'HOLIDAY' || p.priceType === 'CUSTOM_DATE') && p.specificDate)
+    .map((p) => ({
+      key: p.id,
+      priceType: p.priceType as SpecificDateType,
+      name: p.discountLabel ?? '',
+      date: p.specificDate!.slice(0, 10),
       price: String(p.price),
       unit: p.unit ?? '',
     }));
@@ -216,14 +257,18 @@ const toPayload = (
   depositPercentage: values.depositPercentage,
   rules: values.rules || undefined,
   cancellationPolicy: values.cancellationPolicy || undefined,
-  // BASE + the weekday/season rules edited on this tab (priceRules), plus any rule type not
-  // manageable from this UI yet (HOLIDAY, CUSTOM_DATE, EARLY_BIRD) preserved as-is so saving
-  // this form doesn't wipe them out.
+  // BASE + the weekday/season/specific-date rules edited on this tab (priceRules), plus
+  // EARLY_BIRD -- the one rule type still not manageable from this UI (and not yet applied by
+  // the price calculator at all, see price-calculator.service.ts) -- preserved as-is so saving
+  // this form doesn't wipe it out.
   prices: [
     { priceType: 'BASE', price: values.basePrice },
     ...priceRules,
     ...(existingVenue?.prices ?? [])
-      .filter((price) => !['BASE', 'WEEKEND', 'SEASON_HIGH'].includes(price.priceType))
+      .filter(
+        (price) =>
+          !['BASE', 'WEEKEND', 'SEASON_HIGH', 'HOLIDAY', 'CUSTOM_DATE'].includes(price.priceType),
+      )
       .map((price) => ({
         priceType: price.priceType,
         dayOfWeek: price.dayOfWeek ?? undefined,
@@ -266,6 +311,13 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   const [seasonRules, setSeasonRules] = useState<SeasonRuleState[]>(() =>
     buildInitialSeasonRules(venue),
   );
+  const [specificDateRules, setSpecificDateRules] = useState<SpecificDateRuleState[]>(() =>
+    buildInitialSpecificDateRules(venue),
+  );
+  const [specificDateDrawerOpen, setSpecificDateDrawerOpen] = useState(false);
+  const [specificDateDraft, setSpecificDateDraft] =
+    useState<SpecificDateDraft>(emptySpecificDateDraft);
+  const [specificDateDraftError, setSpecificDateDraftError] = useState<string | null>(null);
 
   const amenitiesQuery = useQuery({
     queryKey: ['venue-catalog', 'amenities'],
@@ -330,6 +382,29 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     setSeasonRules((prev) => prev.filter((rule) => rule.key !== key));
   };
 
+  const openSpecificDateDrawer = () => {
+    setSpecificDateDraft(emptySpecificDateDraft);
+    setSpecificDateDraftError(null);
+    setSpecificDateDrawerOpen(true);
+  };
+
+  const confirmSpecificDateRule = () => {
+    if (!specificDateDraft.date) {
+      setSpecificDateDraftError('Elegi una fecha.');
+      return;
+    }
+    if (!specificDateDraft.price || Number(specificDateDraft.price) < 0) {
+      setSpecificDateDraftError('Ingresa un precio.');
+      return;
+    }
+    setSpecificDateRules((prev) => [...prev, { key: `new-${Date.now()}`, ...specificDateDraft }]);
+    setSpecificDateDrawerOpen(false);
+  };
+
+  const removeSpecificDateRule = (key: string) => {
+    setSpecificDateRules((prev) => prev.filter((rule) => rule.key !== key));
+  };
+
   const timeToMinutes = (time: string) => {
     const [hour, minute] = time.split(':').map(Number);
     return hour * 60 + minute;
@@ -369,6 +444,18 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     return null;
   };
 
+  const specificDatePricingHint = (rule: {
+    unit: PriceUnit | '';
+    price: string;
+  }): string | null => {
+    const effectiveUnit = rule.unit || defaultPriceUnit;
+    const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
+    if (!price) return null;
+    if (effectiveUnit === 'HOUR') return `Se cobrara Bs ${price} por cada hora ese dia.`;
+    if (effectiveUnit === 'DAY') return `Se cobrara Bs ${price} por el dia completo.`;
+    return `Se cobrara Bs ${price} una sola vez por todo el evento.`;
+  };
+
   const seasonPricingHint = (rule: SeasonRuleState): string | null => {
     const effectiveUnit = rule.unit || defaultPriceUnit;
     const price = rule.price !== '' ? Number(rule.price) : Number(defaultBasePrice) || 0;
@@ -383,6 +470,12 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   /** Returns an error message if invalid, or null. Runs before submit since these rules
    * live outside react-hook-form (they're a variable-length, mode-dependent structure). */
   const validatePriceRules = (): string | null => {
+    for (const rule of specificDateRules) {
+      const label = rule.name || (rule.priceType === 'HOLIDAY' ? 'feriado' : 'fecha puntual');
+      if (!rule.date) return `Falta la fecha para "${label}"`;
+      if (!rule.price || Number(rule.price) < 0) return `Falta el precio para "${label}"`;
+    }
+
     if (pricingMode === 'single') return null;
 
     const enabledWeekdays = weekdayRules.filter((r) => r.enabled);
@@ -407,16 +500,28 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   };
 
   const buildPriceRulesPayload = (): VenuePriceInput[] => {
-    if (pricingMode === 'single') return [];
+    // Specific-date rules (feriados / fechas puntuales) take priority over everything else in
+    // the price calculator regardless of pricing mode, so they're collected unconditionally.
+    const rules: VenuePriceInput[] = specificDateRules.map((r) => ({
+      priceType: r.priceType,
+      specificDate: r.date,
+      price: Number(r.price),
+      unit: r.unit || undefined,
+      discountLabel: r.name.trim() || undefined,
+    }));
 
-    const rules: VenuePriceInput[] = weekdayRules
-      .filter((r) => r.enabled)
-      .map((r) => ({
-        priceType: 'WEEKEND',
-        dayOfWeek: r.dayOfWeek,
-        price: Number(r.price),
-        unit: r.unit || undefined,
-      }));
+    if (pricingMode === 'single') return rules;
+
+    rules.push(
+      ...weekdayRules
+        .filter((r) => r.enabled)
+        .map((r) => ({
+          priceType: 'WEEKEND' as const,
+          dayOfWeek: r.dayOfWeek,
+          price: Number(r.price),
+          unit: r.unit || undefined,
+        })),
+    );
 
     if (pricingMode === 'weekday_season') {
       rules.push(
@@ -472,7 +577,8 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     (pricingMode !== 'single' &&
       weekdayRules.some((rule) => rule.enabled && (rule.unit || defaultPriceUnit) === 'HOUR')) ||
     (pricingMode === 'weekday_season' &&
-      seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR'));
+      seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR')) ||
+    specificDateRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR');
 
   const toggleAmenity = (id: string) => {
     const exists = amenities.some((item) => item.amenityId === id);
@@ -1015,6 +1121,150 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                   ))}
                 </div>
               ) : null}
+
+              <div className="space-y-3 border-t pt-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Precios para fechas especificas (opcional)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Feriados u otras fechas puntuales (ej. 31 de diciembre). Tienen prioridad
+                      sobre cualquier otro precio configurado arriba, sin importar el modo elegido.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={openSpecificDateDrawer}
+                  >
+                    Agregar fecha
+                  </Button>
+                </div>
+
+                {specificDateRules.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Sin fechas especificas configuradas todavia.
+                  </p>
+                ) : null}
+
+                {specificDateRules.map((rule) => (
+                  <div
+                    key={rule.key}
+                    className="flex items-center justify-between gap-3 rounded-[var(--radius)] border p-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">
+                        {rule.name || specificDateTypeLabels[rule.priceType]}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {specificDateTypeLabels[rule.priceType]} · {formatDate(rule.date)} · Bs{' '}
+                        {rule.price}
+                        {rule.unit ? ` / ${priceUnitLabels[rule.unit]}` : ''}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => removeSpecificDateRule(rule.key)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <AppDrawer
+                open={specificDateDrawerOpen}
+                onOpenChange={setSpecificDateDrawerOpen}
+                title="Agregar precio para una fecha especifica"
+                description="Esta fecha tendra prioridad sobre cualquier otro precio configurado, sin importar el modo elegido."
+              >
+                <div className="space-y-4">
+                  <div className="sf-form-group">
+                    <Label htmlFor="specificDateType">Tipo</Label>
+                    <Select
+                      id="specificDateType"
+                      value={specificDateDraft.priceType}
+                      onChange={(e) =>
+                        setSpecificDateDraft((prev) => ({
+                          ...prev,
+                          priceType: e.target.value as SpecificDateType,
+                        }))
+                      }
+                    >
+                      <option value="HOLIDAY">Feriado</option>
+                      <option value="CUSTOM_DATE">Fecha puntual</option>
+                    </Select>
+                  </div>
+                  <div className="sf-form-group">
+                    <Label htmlFor="specificDateDate">Fecha</Label>
+                    <Input
+                      id="specificDateDate"
+                      type="date"
+                      value={specificDateDraft.date}
+                      onChange={(e) =>
+                        setSpecificDateDraft((prev) => ({ ...prev, date: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="sf-form-group">
+                    <Label htmlFor="specificDateName">Nombre (opcional)</Label>
+                    <Input
+                      id="specificDateName"
+                      placeholder="Ej. Año Nuevo"
+                      value={specificDateDraft.name}
+                      onChange={(e) =>
+                        setSpecificDateDraft((prev) => ({ ...prev, name: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="sf-form-group">
+                    <Label htmlFor="specificDatePrice">Precio (Bs)</Label>
+                    <Input
+                      id="specificDatePrice"
+                      type="number"
+                      min={0}
+                      value={specificDateDraft.price}
+                      onChange={(e) =>
+                        setSpecificDateDraft((prev) => ({ ...prev, price: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="sf-form-group">
+                    <Label htmlFor="specificDateUnit">Unidad</Label>
+                    <Select
+                      id="specificDateUnit"
+                      value={specificDateDraft.unit}
+                      onChange={(e) =>
+                        setSpecificDateDraft((prev) => ({
+                          ...prev,
+                          unit: e.target.value as PriceUnit | '',
+                        }))
+                      }
+                    >
+                      <option value="">Hereda unidad del local</option>
+                      {Object.entries(priceUnitLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  {specificDatePricingHint(specificDateDraft) ? (
+                    <p className="text-xs text-muted-foreground">
+                      {specificDatePricingHint(specificDateDraft)}
+                    </p>
+                  ) : null}
+                  {specificDateDraftError ? (
+                    <p className="sf-form-error">{specificDateDraftError}</p>
+                  ) : null}
+                  <Button type="button" className="w-full" onClick={confirmSpecificDateRule}>
+                    Agregar regla
+                  </Button>
+                </div>
+              </AppDrawer>
 
               <div
                 className={

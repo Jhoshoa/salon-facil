@@ -34,6 +34,9 @@ describe('NotificationProcessor', () => {
       markAsRead: jest.fn(),
       markAsSent: jest.fn(),
       markAsFailed: jest.fn(),
+      findPreferencesForUser: jest.fn(),
+      isChannelEnabled: jest.fn(),
+      setPreference: jest.fn(),
     };
     emailService = { send: jest.fn() };
     whatsAppService = { send: jest.fn() };

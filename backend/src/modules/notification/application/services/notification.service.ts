@@ -1,8 +1,12 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { NotificationChannel, NotificationType } from '@prisma/client';
 import { NotificationEntity } from '../../domain/entities/notification.entity';
+import {
+  CONTROLLABLE_NOTIFICATION_TYPES,
+  NotificationPreferenceEntity,
+} from '../../domain/entities/notification-preference.entity';
 import {
   INotificationRepository,
   NOTIFICATION_REPOSITORY,
@@ -59,6 +63,23 @@ export class NotificationService {
       metadata: params.metadata,
     });
 
+    // The in-app row above is created unconditionally (it's never spam — it's the user's own
+    // history), but an opt-out skips the actual email/WhatsApp send. Only "controllable" types
+    // are ever looked up here; security/account notifications always dispatch.
+    if (CONTROLLABLE_NOTIFICATION_TYPES.includes(params.type)) {
+      const channelEnabled = await this.notificationRepository.isChannelEnabled(
+        params.userId,
+        params.type,
+        channel,
+      );
+      if (!channelEnabled) {
+        this.logger.debug(
+          `Notification ${notification.id} (${params.type}/${channel}) skipped: user opted out`,
+        );
+        return notification;
+      }
+    }
+
     try {
       await this.queue.add('send', {
         notificationId: notification.id,
@@ -96,5 +117,40 @@ export class NotificationService {
 
   async markAsRead(id: string): Promise<NotificationEntity> {
     return this.notificationRepository.markAsRead(id);
+  }
+
+  /** Every controllable (type, channel) pair, each resolved to its effective enabled state --
+   * true unless the user has an explicit opt-out row for it. Lets the settings UI render a
+   * complete toggle grid without the frontend needing to know the opt-out-by-default model. */
+  async getPreferences(userId: string): Promise<NotificationPreferenceEntity[]> {
+    const existing = await this.notificationRepository.findPreferencesForUser(userId);
+    const byKey = new Map(existing.map((p) => [`${p.type}:${p.channel}`, p]));
+
+    return CONTROLLABLE_NOTIFICATION_TYPES.flatMap((type) =>
+      [NotificationChannel.EMAIL, NotificationChannel.WHATSAPP].map(
+        (channel) =>
+          byKey.get(`${type}:${channel}`) ??
+          new NotificationPreferenceEntity({
+            id: `${userId}:${type}:${channel}`,
+            userId,
+            type,
+            channel,
+            enabled: true,
+            updatedAt: new Date(0),
+          }),
+      ),
+    );
+  }
+
+  async setPreference(
+    userId: string,
+    type: NotificationType,
+    channel: NotificationChannel,
+    enabled: boolean,
+  ): Promise<NotificationPreferenceEntity> {
+    if (!CONTROLLABLE_NOTIFICATION_TYPES.includes(type)) {
+      throw new BadRequestException(`'${type}' no es un tipo de notificacion controlable`);
+    }
+    return this.notificationRepository.setPreference(userId, type, channel, enabled);
   }
 }

@@ -789,6 +789,21 @@ describe('BookingService', () => {
       expect(result.status).toBe(BookingStatus.NO_SHOW);
     });
 
+    it.each([BookingStatus.DEPOSIT_PAID, BookingStatus.FULLY_PAID])(
+      'should mark a %s booking as no show (client paid but never showed up)',
+      async (status) => {
+        mockBookingRepository.findById.mockResolvedValue(makeBooking({ status }));
+        mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+        mockBookingRepository.updateStatus.mockResolvedValue(
+          makeBooking({ status: BookingStatus.NO_SHOW }),
+        );
+
+        const result = await service.markAsNoShow('booking-1', 'owner-1', UserRole.OWNER);
+
+        expect(result.status).toBe(BookingStatus.NO_SHOW);
+      },
+    );
+
     it('should throw BadRequestException when booking is not approved', async () => {
       mockBookingRepository.findById.mockResolvedValue(
         makeBooking({ status: BookingStatus.PENDING }),

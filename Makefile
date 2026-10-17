@@ -1,4 +1,4 @@
-.PHONY: help up down down-v restart logs logs-backend logs-frontend backend-shell frontend-shell db-shell redis-cli test-backend test-frontend migrate studio seed prod-up prod-down prod-logs prod-migrate prod-build
+.PHONY: help up down down-v restart logs logs-backend logs-frontend backend-shell frontend-shell db-shell redis-cli test-backend test-frontend migrate studio seed rebuild-frontend rebuild-backend rebuild prod-up prod-down prod-logs prod-migrate prod-build
 
 help: ## Mostrar ayuda
 	@echo "Comandos disponibles:"
@@ -50,6 +50,27 @@ studio: ## Abrir Prisma Studio
 
 seed: ## Ejecutar seed de datos -- requiere CONFIRM_RESEED=yes, borra TODA la data (ver mensaje)
 	docker compose exec backend npx prisma db seed
+
+# --- Rebuild con cache limpio ---
+# `.next` (frontend) y `dist` (backend) son volumenes separados de la imagen -- sobreviven a un
+# `docker compose up --build` normal. Si se reconstruye la imagen (cambio en package.json,
+# Dockerfile, etc.) sin limpiarlos, el cache incremental viejo puede quedar desincronizado con el
+# codigo/dependencias nuevas: en el frontend esto causa un mismatch de hash en las fuentes de
+# next/font (texto que calla a una tipografia de respaldo distinta sin ningun error visible); en
+# el backend, un error de TypeScript fantasma de una compilacion anterior. Usar estos targets en
+# vez de `up -d --build` directo cuando cambien dependencias.
+
+rebuild-frontend: ## Reconstruir el frontend con el cache de Next.js (.next) limpio
+	docker compose stop frontend
+	docker compose rm -f -v frontend
+	docker compose up -d --build frontend
+
+rebuild-backend: ## Reconstruir el backend con el cache de compilacion (dist) limpio
+	docker compose stop backend
+	docker compose rm -f -v backend
+	docker compose up -d --build backend
+
+rebuild: rebuild-backend rebuild-frontend ## Reconstruir frontend y backend con cache limpio
 
 # --- Produccion (ver docs/deploy/hostinger-vps.md) ---
 
