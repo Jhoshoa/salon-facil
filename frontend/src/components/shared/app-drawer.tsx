@@ -11,11 +11,7 @@ import {
 
 interface AppDrawerProps {
   open: boolean;
-  /** Usually plain text (gets the app's standard serif dialog-title style via the global h1-h6
-   * rule in globals.css). Pass a styled node instead when a specific drawer needs to opt out of
-   * that -- see the "fecha especifica" drawer in venue-form.tsx for an example that overrides
-   * just itself with `font-sans`, without touching this component or any other drawer. */
-  title: ReactNode;
+  title: string;
   description?: string;
   children: ReactNode;
   onOpenChange: (open: boolean) => void;
