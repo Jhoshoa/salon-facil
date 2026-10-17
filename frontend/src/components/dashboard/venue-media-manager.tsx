@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, ImagePlus, Loader2, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, ImagePlus, Loader2, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { addVenueMedia, deleteVenueMedia, reorderVenueMedia } from '@/lib/api/venues.api';
@@ -24,6 +24,7 @@ interface VenueMediaManagerProps {
 export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const media = [...(venue.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   const remainingSlots = MAX_VENUE_PHOTOS - media.length;
   const atLimit = remainingSlots <= 0;
@@ -63,7 +64,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
     },
   });
 
-  const handleFilesSelected = (files: FileList | null) => {
+  const handleFilesSelected = (files: FileList | null, inputEl: HTMLInputElement | null) => {
     if (!files || files.length === 0) return;
     const selected = Array.from(files);
 
@@ -71,12 +72,12 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
       toast.error('Demasiadas fotos', {
         description: `Puedes subir ${remainingSlots} foto${remainingSlots === 1 ? '' : 's'} mas como maximo (elegiste ${selected.length}).`,
       });
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (inputEl) inputEl.value = '';
       return;
     }
 
     uploadMutation.mutate(selected);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (inputEl) inputEl.value = '';
   };
 
   const move = (index: number, direction: -1 | 1) => {
@@ -101,28 +102,55 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
             {media.length}/{MAX_VENUE_PHOTOS} fotos — maximo {MAX_VENUE_PHOTOS} por local
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploadMutation.isPending || atLimit}
-          title={atLimit ? `Ya llegaste al maximo de ${MAX_VENUE_PHOTOS} fotos` : undefined}
-        >
-          {uploadMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <ImagePlus className="h-4 w-4" />
-          )}
-          Agregar fotos
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadMutation.isPending || atLimit}
+            title={atLimit ? `Ya llegaste al maximo de ${MAX_VENUE_PHOTOS} fotos` : undefined}
+          >
+            {uploadMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ImagePlus className="h-4 w-4" />
+            )}
+            Galeria
+          </Button>
+          {/* Camera capture only makes sense on a device that has one -- `capture` is a no-op on
+           * desktop browsers. Shown via the `touch` variant (coarse pointer, see
+           * tailwind.config.ts) rather than a width breakpoint, so it stays correct on a
+           * landscape phone or a tablet -- both can be wider than a `sm:hidden` cutoff would
+           * allow, despite still being touch devices with a camera. */}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="hidden touch:inline-flex"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={uploadMutation.isPending || atLimit}
+            title={atLimit ? `Ya llegaste al maximo de ${MAX_VENUE_PHOTOS} fotos` : undefined}
+          >
+            <Camera className="h-4 w-4" />
+            Camara
+          </Button>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
           multiple
           hidden
-          onChange={(event) => handleFilesSelected(event.target.files)}
+          onChange={(event) => handleFilesSelected(event.target.files, fileInputRef.current)}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          hidden
+          onChange={(event) => handleFilesSelected(event.target.files, cameraInputRef.current)}
         />
       </CardHeader>
       <CardContent>
