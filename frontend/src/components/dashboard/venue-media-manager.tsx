@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Camera, ImagePlus, Loader2, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { addVenueMedia, deleteVenueMedia, reorderVenueMedia } from '@/lib/api/ve
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { Venue } from '@/types/api';
 
 // Matches MAX_PHOTOS in backend/src/modules/venue/interface/venue.controller.ts -- keep both in
@@ -25,6 +26,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const media = [...(venue.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   const remainingSlots = MAX_VENUE_PHOTOS - media.length;
   const atLimit = remainingSlots <= 0;
@@ -48,6 +50,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
     mutationFn: (mediaId: string) => deleteVenueMedia(venue.id, mediaId),
     onSuccess: () => {
       toast.success('Foto eliminada');
+      setPhotoToDelete(null);
       invalidate();
     },
     onError: (error: { message?: string }) => {
@@ -203,20 +206,24 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
                     {!item.isCover ? (
                       <Button
                         type="button"
-                        size="sm"
+                        size="icon-sm"
                         variant="ghost"
                         onClick={() => setCover(item.id)}
                         disabled={reorderMutation.isPending}
+                        title="Usar como portada"
+                        aria-label="Usar como portada"
                       >
-                        Usar como portada
+                        <Star className="h-4 w-4" />
                       </Button>
                     ) : null}
                     <Button
                       type="button"
                       size="icon-sm"
                       variant="ghost"
-                      onClick={() => deleteMutation.mutate(item.id)}
+                      onClick={() => setPhotoToDelete(item.id)}
                       disabled={deleteMutation.isPending}
+                      title="Eliminar foto"
+                      aria-label="Eliminar foto"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -227,6 +234,19 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
           </div>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={photoToDelete !== null}
+        title="Eliminar foto"
+        description="Esta accion no se puede deshacer. La foto se eliminara del local."
+        confirmLabel="Eliminar"
+        isLoading={deleteMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setPhotoToDelete(null);
+        }}
+        onConfirm={() => {
+          if (photoToDelete) deleteMutation.mutate(photoToDelete);
+        }}
+      />
     </Card>
   );
 };
