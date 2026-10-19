@@ -469,12 +469,17 @@ export class VenueService {
     return { score, missing, canPublish };
   }
 
-  async verifyVenue(id: string, adminId: string, approve: boolean): Promise<VenueEntity> {
+  async verifyVenue(
+    id: string,
+    adminId: string,
+    approve: boolean,
+    rejectionReason?: string,
+  ): Promise<VenueEntity> {
     this.logger.log(`Admin ${adminId} ${approve ? 'approved' : 'rejected'} venue ${id}`);
     if (approve) {
       return this.venueRepository.updateStatus(id, VenueStatus.ACTIVE, adminId);
     }
-    return this.venueRepository.updateStatus(id, VenueStatus.REJECTED);
+    return this.venueRepository.updateStatus(id, VenueStatus.REJECTED, undefined, rejectionReason);
   }
 
   private validateSearchFilters(filters: VenueFilterDto): void {

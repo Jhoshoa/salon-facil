@@ -65,6 +65,7 @@ export class VenueEntity {
   isVerified: boolean = false;
   verifiedAt: Date | null = null;
   verifiedById: string | null = null;
+  rejectionReason: string | null = null;
   isFeatured: boolean = false;
   featuredUntil: Date | null = null;
   viewCount: number = 0;
