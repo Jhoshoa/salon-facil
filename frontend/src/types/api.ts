@@ -227,6 +227,7 @@ export interface Venue {
   rules: string | null;
   cancellationPolicy: string | null;
   status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+  rejectionReason: string | null;
   isVerified: boolean;
   viewCount: number;
   bookingCount: number;

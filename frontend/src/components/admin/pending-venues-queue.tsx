@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import Link from 'next/link';
@@ -8,26 +9,53 @@ import { Check, Eye, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPendingVenues, verifyVenue } from '@/lib/api/venues.api';
 import { departamentoLabels } from '@/components/venues/venue-filter-labels';
+import { AppDrawer } from '@/components/shared/app-drawer';
+import { SubmitButton } from '@/components/shared/submit-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import type { Venue } from '@/types/api';
 
 export const PendingVenuesQueue = () => {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ['admin', 'pending-venues'], queryFn: getPendingVenues });
+  const [venueToReject, setVenueToReject] = useState<Venue | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
-  const verifyMutation = useMutation({
-    mutationFn: ({ id, approve }: { id: string; approve: boolean }) => verifyVenue(id, approve),
-    onSuccess: (_venue, variables) => {
-      toast.success(variables.approve ? 'Local aprobado' : 'Local rechazado');
-      queryClient.invalidateQueries({ queryKey: ['admin', 'pending-venues'] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'pending-venues'] });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => verifyVenue(id, true),
+    onSuccess: () => {
+      toast.success('Local aprobado');
+      invalidate();
     },
     onError: (error: { message?: string }) => {
-      toast.error('No se pudo actualizar el local', { description: error.message });
+      toast.error('No se pudo aprobar el local', { description: error.message });
     },
   });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => verifyVenue(id, false, reason),
+    onSuccess: () => {
+      toast.success('Local rechazado');
+      setVenueToReject(null);
+      setRejectionReason('');
+      invalidate();
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo rechazar el local', { description: error.message });
+    },
+  });
+
+  const submitReject = () => {
+    if (!venueToReject || rejectionReason.trim().length < 3) return;
+    rejectMutation.mutate({ id: venueToReject.id, reason: rejectionReason.trim() });
+  };
 
   if (query.isLoading) {
     return (
@@ -106,8 +134,8 @@ export const PendingVenuesQueue = () => {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => verifyMutation.mutate({ id: venue.id, approve: true })}
-                  disabled={verifyMutation.isPending}
+                  onClick={() => approveMutation.mutate(venue.id)}
+                  disabled={approveMutation.isPending}
                 >
                   <Check className="h-4 w-4" />
                   Aprobar
@@ -115,8 +143,8 @@ export const PendingVenuesQueue = () => {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => verifyMutation.mutate({ id: venue.id, approve: false })}
-                  disabled={verifyMutation.isPending}
+                  onClick={() => setVenueToReject(venue)}
+                  disabled={approveMutation.isPending}
                 >
                   <X className="h-4 w-4" />
                   Rechazar
@@ -126,6 +154,41 @@ export const PendingVenuesQueue = () => {
           </article>
         );
       })}
+
+      <AppDrawer
+        open={Boolean(venueToReject)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVenueToReject(null);
+            setRejectionReason('');
+          }
+        }}
+        title="Motivo de rechazo"
+        description={`Por que se rechaza "${venueToReject?.name}"? Este texto queda registrado y es lo que va a ver el propietario.`}
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="rejection-reason">Motivo</Label>
+            <Input
+              id="rejection-reason"
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+            />
+            {rejectionReason && rejectionReason.trim().length < 3 ? (
+              <p className="text-sm text-destructive">Minimo 3 caracteres.</p>
+            ) : null}
+          </div>
+          <SubmitButton
+            className="w-full"
+            variant="destructive"
+            disabled={rejectionReason.trim().length < 3}
+            isLoading={rejectMutation.isPending}
+            onClick={submitReject}
+          >
+            Rechazar
+          </SubmitButton>
+        </div>
+      </AppDrawer>
     </div>
   );
 };
