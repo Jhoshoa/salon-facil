@@ -6,12 +6,15 @@ import { CloudinaryService } from '../../../src/modules/upload/cloudinary.servic
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
+import { AuditLogService } from '../../../src/modules/audit-log/audit-log.service';
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../src/modules/audit-log/audit-log-actions';
 
 describe('VenueService', () => {
   let service: VenueService;
   let mockRepository: Record<string, jest.Mock>;
   let mockSlugService: Record<string, jest.Mock>;
   let mockCloudinaryService: Record<string, jest.Mock>;
+  let mockAuditLogService: Record<string, jest.Mock>;
 
   const mockVenue = {
     id: 'venue-1',
@@ -63,12 +66,17 @@ describe('VenueService', () => {
       deleteImage: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockAuditLogService = {
+      record: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VenueService,
         { provide: VENUE_REPOSITORY, useValue: mockRepository },
         { provide: SlugService, useValue: mockSlugService },
         { provide: CloudinaryService, useValue: mockCloudinaryService },
+        { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
 
@@ -613,6 +621,14 @@ describe('VenueService', () => {
         VenueStatus.ACTIVE,
         'admin-1',
       );
+      expect(mockAuditLogService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminId: 'admin-1',
+          action: AUDIT_ACTION.VENUE_APPROVED,
+          targetType: AUDIT_TARGET_TYPE.VENUE,
+          targetId: 'venue-1',
+        }),
+      );
     });
 
     it('should reject venue', async () => {
@@ -624,6 +640,14 @@ describe('VenueService', () => {
       await service.verifyVenue('venue-1', 'admin-1', false);
 
       expect(mockRepository.updateStatus).toHaveBeenCalledWith('venue-1', VenueStatus.REJECTED);
+      expect(mockAuditLogService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminId: 'admin-1',
+          action: AUDIT_ACTION.VENUE_REJECTED,
+          targetType: AUDIT_TARGET_TYPE.VENUE,
+          targetId: 'venue-1',
+        }),
+      );
     });
   });
 });

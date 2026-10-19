@@ -155,6 +155,7 @@ model User {
   identities             UserIdentity[]
   emailVerificationCodes EmailVerificationCode[]
   favorites              VenueFavorite[]
+  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogActor")
 
   @@index([email])
   @@index([phone])
@@ -637,6 +638,27 @@ model Review {
   @@index([clientId])
   @@index([bookingId])
   @@map("reviews")
+}
+
+// Append-only trail of actions an ADMIN took against another user's data -- a status change, a
+// venue rejection, a review deletion, a payment refund, etc. `action`/`targetType` are free-form
+// strings rather than enums (see backend/src/modules/admin/application/audit-log-actions.ts for
+// the known values in use) so a new admin capability can log a new action without a migration.
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String?  @map("admin_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User? @relation("AdminAuditLogActor", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
 }
 
 model Notification {

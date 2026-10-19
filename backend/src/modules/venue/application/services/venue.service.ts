@@ -19,6 +19,8 @@ import { AdminVenueStatusCountsQueryDto } from '../dto/admin-venue-status-counts
 import { MAX_VENUE_PHOTOS, VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
+import { AuditLogService } from '../../../audit-log/audit-log.service';
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../audit-log/audit-log-actions';
 
 export interface VenueCompletion {
   score: number;
@@ -35,6 +37,7 @@ export class VenueService {
     private readonly venueRepository: IVenueRepository,
     private readonly slugService: SlugService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async createVenue(dto: CreateVenueDto, ownerId: string): Promise<VenueEntity> {
@@ -471,10 +474,17 @@ export class VenueService {
 
   async verifyVenue(id: string, adminId: string, approve: boolean): Promise<VenueEntity> {
     this.logger.log(`Admin ${adminId} ${approve ? 'approved' : 'rejected'} venue ${id}`);
-    if (approve) {
-      return this.venueRepository.updateStatus(id, VenueStatus.ACTIVE, adminId);
-    }
-    return this.venueRepository.updateStatus(id, VenueStatus.REJECTED);
+    const venue = approve
+      ? await this.venueRepository.updateStatus(id, VenueStatus.ACTIVE, adminId)
+      : await this.venueRepository.updateStatus(id, VenueStatus.REJECTED);
+    this.auditLogService.record({
+      adminId,
+      action: approve ? AUDIT_ACTION.VENUE_APPROVED : AUDIT_ACTION.VENUE_REJECTED,
+      targetType: AUDIT_TARGET_TYPE.VENUE,
+      targetId: id,
+      metadata: { venueName: venue.name },
+    });
+    return venue;
   }
 
   private validateSearchFilters(filters: VenueFilterDto): void {
