@@ -27,6 +27,16 @@ export interface IBookingRepository {
   /** Date-only (YYYY-MM-DD) strings, for dates within the range that already have an active booking. */
   findBookedDatesInRange(venueId: string, startDate: Date, endDate: Date): Promise<string[]>;
   findByVenueAndStatus(venueId: string, status: BookingStatus): Promise<BookingEntity[]>;
+  /** Platform-wide, paginated and filtered -- backs the admin bookings list. */
+  findAllForAdmin(params: {
+    search?: string;
+    status?: BookingStatus;
+    venueId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    page: number;
+    limit: number;
+  }): Promise<{ items: BookingEntity[]; total: number }>;
   create(data: CreateBookingData): Promise<BookingEntity>;
   updateStatus(id: string, status: BookingStatus): Promise<BookingEntity>;
   markDepositPaid(id: string): Promise<BookingEntity>;
