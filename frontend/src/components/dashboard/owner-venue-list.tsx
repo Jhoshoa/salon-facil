@@ -149,6 +149,11 @@ export const OwnerVenueList = () => {
                     <p className="text-sm text-muted-foreground">
                       {venue.district}, {departamentoLabels[venue.departamento]}
                     </p>
+                    {venue.status === 'REJECTED' && venue.rejectionReason ? (
+                      <p className="mt-1 text-sm text-destructive">
+                        Motivo: {venue.rejectionReason}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button asChild size="sm" variant="outline" className="flex-1">

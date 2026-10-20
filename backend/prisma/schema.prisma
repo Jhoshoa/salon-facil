@@ -267,6 +267,10 @@ model Venue {
   isVerified         Boolean       @default(false) @map("is_verified")
   verifiedAt         DateTime?     @map("verified_at")
   verifiedById       String?       @map("verified_by_id")
+  // Set when an ADMIN rejects the venue (status -> REJECTED); cleared back to null on the next
+  // approval, so a venue that was rejected, resubmitted and later approved doesn't carry a stale
+  // reason around.
+  rejectionReason    String?       @map("rejection_reason") @db.Text
   isFeatured         Boolean       @default(false) @map("is_featured")
   featuredUntil      DateTime?     @map("featured_until")
   viewCount          Int           @default(0) @map("view_count")
