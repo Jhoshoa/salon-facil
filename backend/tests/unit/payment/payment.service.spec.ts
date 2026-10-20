@@ -24,6 +24,7 @@ import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/enti
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../src/modules/upload/cloudinary.service';
 import { NotificationService } from '../../../src/modules/notification/application/services/notification.service';
+import { PAYMENT_GATEWAY } from '../../../src/modules/payment/domain/gateways/payment-gateway.interface';
 
 const makeBooking = (overrides: Partial<BookingEntity> = {}) =>
   new BookingEntity({
@@ -105,6 +106,7 @@ describe('PaymentService', () => {
   let venueService: { getVenueById: jest.Mock; getOwnerContact: jest.Mock };
   let cloudinaryService: { uploadImage: jest.Mock };
   let notificationService: { enqueue: jest.Mock };
+  let paymentGateway: { refund: jest.Mock };
 
   beforeEach(async () => {
     paymentRepository = {
@@ -117,6 +119,8 @@ describe('PaymentService', () => {
       uploadProof: jest.fn(),
       confirm: jest.fn(),
       reject: jest.fn(),
+      refund: jest.fn(),
+      findAllForAdmin: jest.fn(),
       getOwnerEarningsSummary: jest.fn(),
       getOwnerEarningsByVenueAndMonth: jest.fn(),
       getOwnerEarningsByMethod: jest.fn(),
@@ -161,6 +165,10 @@ describe('PaymentService', () => {
       enqueue: jest.fn().mockResolvedValue(undefined),
     };
 
+    paymentGateway = {
+      refund: jest.fn().mockResolvedValue({ success: false }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
@@ -169,6 +177,7 @@ describe('PaymentService', () => {
         { provide: VenueService, useValue: venueService },
         { provide: CloudinaryService, useValue: cloudinaryService },
         { provide: NotificationService, useValue: notificationService },
+        { provide: PAYMENT_GATEWAY, useValue: paymentGateway },
       ],
     }).compile();
 
@@ -460,6 +469,98 @@ describe('PaymentService', () => {
 
       expect(paymentRepository.findAllPending).toHaveBeenCalled();
       expect(paymentRepository.findPendingByOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('refundPayment', () => {
+    it('refunds a confirmed payment and notifies both the client and the owner', async () => {
+      paymentRepository.findById.mockResolvedValue(
+        makePayment({
+          status: PaymentStatus.COMPLETED,
+          booking: {
+            id: 'booking-1',
+            venueId: 'venue-1',
+            clientId: 'client-1',
+            eventType: 'Boda',
+            eventDate: new Date('2026-09-15'),
+            totalPrice: 5000,
+            depositAmount: 1500,
+            depositPaid: false,
+            status: BookingStatus.APPROVED,
+            venue: { id: 'venue-1', name: 'Salon Test', slug: 'salon-test', ownerId: 'owner-1' },
+            client: { id: 'client-1', fullName: 'Client Test', email: 'client@email.com' },
+          },
+        }),
+      );
+      paymentRepository.refund.mockResolvedValue(
+        makePayment({ status: PaymentStatus.REFUNDED, refundReason: 'Cliente cancelo el evento' }),
+      );
+      venueService.getOwnerContact.mockResolvedValue({
+        id: 'owner-1',
+        email: 'owner@email.com',
+        phone: '+59171234567',
+        fullName: 'Owner Test',
+      });
+
+      const result = await service.refundPayment(
+        'payment-1',
+        'admin-1',
+        'Cliente cancelo el evento',
+      );
+
+      expect(result.status).toBe(PaymentStatus.REFUNDED);
+      expect(paymentGateway.refund).toHaveBeenCalledWith('payment-1', 1500);
+      expect(paymentRepository.refund).toHaveBeenCalledWith(
+        'payment-1',
+        'admin-1',
+        'Cliente cancelo el evento',
+      );
+      expect(notificationService.enqueue).toHaveBeenCalledTimes(2);
+      expect(notificationService.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'client-1' }),
+      );
+      expect(notificationService.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'owner-1' }),
+      );
+    });
+
+    it('rejects refunding a payment that is not confirmed', async () => {
+      paymentRepository.findById.mockResolvedValue(makePayment({ status: PaymentStatus.PENDING }));
+
+      await expect(service.refundPayment('payment-1', 'admin-1', 'motivo')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(paymentRepository.refund).not.toHaveBeenCalled();
+    });
+
+    it('rejects refunding a payment that was already refunded', async () => {
+      paymentRepository.findById.mockResolvedValue(makePayment({ status: PaymentStatus.REFUNDED }));
+
+      await expect(service.refundPayment('payment-1', 'admin-1', 'motivo')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('listPaymentsForAdmin', () => {
+    it('returns a paginated result built from the repository', async () => {
+      paymentRepository.findAllForAdmin.mockResolvedValue({
+        items: [makePayment()],
+        total: 1,
+      });
+
+      const result = await service.listPaymentsForAdmin({ page: 1, limit: 20 });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.totalPages).toBe(1);
+      expect(paymentRepository.findAllForAdmin).toHaveBeenCalledWith({
+        search: undefined,
+        status: undefined,
+        venueId: undefined,
+        page: 1,
+        limit: 20,
+      });
     });
   });
 

@@ -172,6 +172,56 @@ export class PaymentRepository implements IPaymentRepository {
     return this.toEntity(payment);
   }
 
+  async refund(id: string, adminId: string, reason: string): Promise<PaymentEntity> {
+    const payment = await this.prisma.payment.update({
+      where: { id },
+      data: {
+        status: PaymentStatus.REFUNDED,
+        refundedAt: new Date(),
+        refundReason: reason,
+        refundedById: adminId,
+      },
+      include: paymentInclude,
+    });
+    return this.toEntity(payment);
+  }
+
+  async findAllForAdmin(params: {
+    search?: string;
+    status?: PaymentStatus;
+    venueId?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ items: PaymentEntity[]; total: number }> {
+    const bookingWhere: Prisma.BookingWhereInput = {
+      ...(params.venueId && { venueId: params.venueId }),
+      ...(params.search && {
+        OR: [
+          { venue: { name: { contains: params.search, mode: 'insensitive' } } },
+          { client: { fullName: { contains: params.search, mode: 'insensitive' } } },
+        ],
+      }),
+    };
+
+    const where: Prisma.PaymentWhereInput = {
+      ...(params.status && { status: params.status }),
+      ...(Object.keys(bookingWhere).length > 0 && { booking: bookingWhere }),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        include: paymentInclude,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return { items: items.map((payment) => this.toEntity(payment)), total };
+  }
+
   async getOwnerEarningsSummary(
     ownerId: string,
     venueId?: string,
@@ -317,6 +367,9 @@ export class PaymentRepository implements IPaymentRepository {
       stripeChargeId: raw.stripeChargeId,
       transactionReference: raw.transactionReference,
       paidAt: raw.paidAt,
+      refundedAt: raw.refundedAt,
+      refundReason: raw.refundReason,
+      refundedById: raw.refundedById,
       createdAt: raw.createdAt,
       booking: raw.booking
         ? {

@@ -19,6 +19,7 @@ import { UserRole } from '../../auth/domain/entities/user.entity';
 import {
   ConfirmPaymentDto,
   CreatePaymentDto,
+  RefundPaymentDto,
   RejectPaymentDto,
 } from '../application/dto/payment.dto';
 import { PaymentService } from '../application/services/payment.service';
@@ -140,5 +141,18 @@ export class PaymentController {
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
     return this.paymentService.rejectPayment(paymentId, user.id, user.role, dto.reason);
+  }
+
+  @Put(':paymentId/refund')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Reembolsar un pago confirmado (ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Pago reembolsado' })
+  @ApiResponse({ status: 400, description: 'El pago no esta confirmado' })
+  async refundPayment(
+    @Param('paymentId') paymentId: string,
+    @Body() dto: RefundPaymentDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.paymentService.refundPayment(paymentId, user.id, dto.reason);
   }
 }
