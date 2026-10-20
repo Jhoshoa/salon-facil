@@ -25,6 +25,7 @@ import { UpdateVenueDto } from '../application/dto/update-venue.dto';
 import { VenueFilterDto } from '../application/dto/venue-filter.dto';
 import { AdminVenueQueryDto } from '../application/dto/admin-venue-query.dto';
 import { AdminVenueStatusCountsQueryDto } from '../application/dto/admin-venue-status-counts-query.dto';
+import { VerifyVenueDto } from '../application/dto/verify-venue.dto';
 import {
   CreateAmenityDto,
   CreateCatalogItemDto,
@@ -388,10 +389,10 @@ export class VenueController {
   @ApiResponse({ status: 403, description: 'No es administrador' })
   async verify(
     @Param('id') id: string,
-    @Body('approve') approve: boolean,
+    @Body() dto: VerifyVenueDto,
     @CurrentUser() user: { id: string },
   ) {
-    return this.venueService.verifyVenue(id, user.id, approve);
+    return this.venueService.verifyVenue(id, user.id, dto.approve, dto.rejectionReason);
   }
 
   @Get('admin/pending')

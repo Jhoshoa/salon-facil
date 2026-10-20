@@ -17,6 +17,8 @@ import {
   BookingEntity,
   BookingStatus,
 } from '../../../src/modules/booking/domain/entities/booking.entity';
+import { AuditLogService } from '../../../src/modules/audit-log/audit-log.service';
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../src/modules/audit-log/audit-log-actions';
 
 const makeUser = (overrides: Partial<UserEntity> = {}) =>
   new UserEntity({
@@ -74,10 +76,12 @@ describe('AdminUserService', () => {
   let authRepository: jest.Mocked<IAuthRepository>;
   let venueRepository: Record<string, jest.Mock>;
   let bookingRepository: Record<string, jest.Mock>;
+  let auditLogService: jest.Mocked<AuditLogService>;
 
   beforeEach(async () => {
     venueRepository = { findByOwner: jest.fn() };
     bookingRepository = { findByClient: jest.fn() };
+    auditLogService = { record: jest.fn() } as unknown as jest.Mocked<AuditLogService>;
 
     authRepository = {
       findById: jest.fn(),
@@ -119,6 +123,7 @@ describe('AdminUserService', () => {
         { provide: AUTH_REPOSITORY, useValue: authRepository },
         { provide: VENUE_REPOSITORY, useValue: venueRepository },
         { provide: BOOKING_REPOSITORY, useValue: bookingRepository },
+        { provide: AuditLogService, useValue: auditLogService },
       ],
     }).compile();
 
@@ -155,6 +160,14 @@ describe('AdminUserService', () => {
 
       expect(result.status).toBe(UserStatus.SUSPENDED);
       expect(authRepository.updateStatus).toHaveBeenCalledWith('user-1', UserStatus.SUSPENDED);
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminId: 'admin-1',
+          action: AUDIT_ACTION.USER_STATUS_CHANGED,
+          targetType: AUDIT_TARGET_TYPE.USER,
+          targetId: 'user-1',
+        }),
+      );
     });
 
     it('throws NotFoundException for a missing user', async () => {
@@ -181,6 +194,14 @@ describe('AdminUserService', () => {
 
       expect(result.role).toBe(UserRole.OWNER);
       expect(authRepository.updateRole).toHaveBeenCalledWith('user-1', UserRole.OWNER);
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminId: 'admin-1',
+          action: AUDIT_ACTION.USER_ROLE_CHANGED,
+          targetType: AUDIT_TARGET_TYPE.USER,
+          targetId: 'user-1',
+        }),
+      );
     });
 
     it('throws NotFoundException for a missing user', async () => {

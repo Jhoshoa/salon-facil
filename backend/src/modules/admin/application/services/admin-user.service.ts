@@ -14,6 +14,8 @@ import {
   IBookingRepository,
 } from '../../../booking/domain/repositories/booking.repository.interface';
 import { BookingEntity } from '../../../booking/domain/entities/booking.entity';
+import { AuditLogService } from '../../../audit-log/audit-log.service';
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../audit-log/audit-log-actions';
 import { ListUsersDto } from '../dto/list-users.dto';
 import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
 import { UpdateUserRoleDto } from '../dto/update-user-role.dto';
@@ -40,6 +42,7 @@ export class AdminUserService {
     private readonly venueRepository: IVenueRepository,
     @Inject(BOOKING_REPOSITORY)
     private readonly bookingRepository: IBookingRepository,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listUsers(dto: ListUsersDto) {
@@ -75,7 +78,15 @@ export class AdminUserService {
     }
 
     this.logger.log(`Admin ${adminId} set user ${userId} status to ${dto.status}`);
-    return this.authRepository.updateStatus(userId, dto.status);
+    const updated = await this.authRepository.updateStatus(userId, dto.status);
+    this.auditLogService.record({
+      adminId,
+      action: AUDIT_ACTION.USER_STATUS_CHANGED,
+      targetType: AUDIT_TARGET_TYPE.USER,
+      targetId: userId,
+      metadata: { previousStatus: user.status, newStatus: dto.status },
+    });
+    return updated;
   }
 
   async updateUserRole(
@@ -93,7 +104,15 @@ export class AdminUserService {
     }
 
     this.logger.log(`Admin ${adminId} set user ${userId} role to ${dto.role}`);
-    return this.authRepository.updateRole(userId, dto.role);
+    const updated = await this.authRepository.updateRole(userId, dto.role);
+    this.auditLogService.record({
+      adminId,
+      action: AUDIT_ACTION.USER_ROLE_CHANGED,
+      targetType: AUDIT_TARGET_TYPE.USER,
+      targetId: userId,
+      metadata: { previousRole: user.role, newRole: dto.role },
+    });
+    return updated;
   }
 
   async getUserDetail(userId: string): Promise<AdminUserDetail> {

@@ -4,6 +4,7 @@ import type {
   AdminUser,
   AdminUserCounts,
   AdminUserDetail,
+  AuditLogEntry,
   PaginatedResponse,
 } from '@/types/api';
 
@@ -50,4 +51,20 @@ export const getAdminUserCounts = async (
   params: { search?: string; role?: string; status?: string } = {},
 ): Promise<AdminUserCounts> => {
   return apiRequest<AdminUserCounts>(`/admin/users/counts${buildQueryString(params)}`);
+};
+
+export interface AuditLogParams {
+  adminId?: string;
+  targetType?: string;
+  action?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const getAuditLog = async (
+  params: AuditLogParams = {},
+): Promise<PaginatedResponse<AuditLogEntry>> => {
+  return apiRequest<PaginatedResponse<AuditLogEntry>>(
+    `/admin/audit-log${buildQueryString(params)}`,
+  );
 };
