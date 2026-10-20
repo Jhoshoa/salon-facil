@@ -3,6 +3,7 @@ import type {
   AdminAnalyticsDashboard,
   AdminUser,
   AdminUserCounts,
+  AdminUserDetail,
   AuditLogEntry,
   PaginatedResponse,
 } from '@/types/api';
@@ -40,6 +41,10 @@ export const updateAdminUserRole = async (
     method: 'PUT',
     body: JSON.stringify({ role }),
   });
+};
+
+export const getAdminUserDetail = async (userId: string): Promise<AdminUserDetail> => {
+  return apiRequest<AdminUserDetail>(`/admin/users/${userId}`);
 };
 
 export const getAdminUserCounts = async (
