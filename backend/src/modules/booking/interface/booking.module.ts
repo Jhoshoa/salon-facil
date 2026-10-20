@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BookingController } from './controllers/booking.controller';
 import { BookingDetailController } from './controllers/booking-detail.controller';
 import { CalendarController, CalendarPublicController } from './controllers/calendar.controller';
+import { AdminBookingController } from './controllers/admin-booking.controller';
 import { BookingService } from '../application/services/booking.service';
 import { PriceCalculatorService } from '../application/services/price-calculator.service';
 import { AvailabilityService } from '../application/services/availability.service';
@@ -19,6 +20,7 @@ import { PrismaModule } from '../../../prisma/prisma.module';
     BookingDetailController,
     CalendarController,
     CalendarPublicController,
+    AdminBookingController,
   ],
   providers: [
     BookingService,

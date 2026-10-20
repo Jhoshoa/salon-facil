@@ -95,6 +95,42 @@ export class BookingRepository implements IBookingRepository {
     return bookings.map((b) => this.toEntity(b));
   }
 
+  async findAllForAdmin(params: {
+    search?: string;
+    status?: BookingStatus;
+    venueId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    page: number;
+    limit: number;
+  }): Promise<{ items: BookingEntity[]; total: number }> {
+    const where: Prisma.BookingWhereInput = {
+      ...(params.status && { status: params.status }),
+      ...(params.venueId && { venueId: params.venueId }),
+      ...(params.startDate &&
+        params.endDate && { eventDate: { gte: params.startDate, lte: params.endDate } }),
+      ...(params.search && {
+        OR: [
+          { venue: { name: { contains: params.search, mode: 'insensitive' } } },
+          { client: { fullName: { contains: params.search, mode: 'insensitive' } } },
+        ],
+      }),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.booking.findMany({
+        where,
+        include: BOOKING_INCLUDE,
+        orderBy: { eventDate: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.booking.count({ where }),
+    ]);
+
+    return { items: items.map((b) => this.toEntity(b)), total };
+  }
+
   async findActiveByVenueInRange(
     venueId: string,
     startDate: Date,

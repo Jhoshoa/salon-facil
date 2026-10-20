@@ -111,6 +111,7 @@ describe('ReviewService', () => {
       findActiveByVenueInRange: jest.fn(),
       findBookedDatesInRange: jest.fn(),
       findByVenueAndStatus: jest.fn(),
+      findAllForAdmin: jest.fn(),
       create: jest.fn(),
       updateStatus: jest.fn(),
       markDepositPaid: jest.fn(),
