@@ -563,6 +563,18 @@ export interface AdminUserCounts {
   status: Record<AdminUser['status'], number>;
 }
 
+export interface AuditLogEntry {
+  id: string;
+  adminId: string | null;
+  adminName: string | null;
+  adminEmail: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export interface AdminAnalyticsDashboard {
   summary: {
     revenueThisMonth: number;

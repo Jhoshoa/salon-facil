@@ -7,6 +7,7 @@ import {
   BarChart3,
   Building2,
   CalendarRange,
+  History,
   LayoutGrid,
   Menu,
   ShieldCheck,
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },
   { href: '/admin/catalog/amenities', label: 'Comodidades', icon: Tag },
   { href: '/admin/catalog/seasonal-events', label: 'Feriados y temporadas', icon: CalendarRange },
+  { href: '/admin/audit-log', label: 'Historial de acciones', icon: History },
 ];
 
 interface AdminShellProps {
