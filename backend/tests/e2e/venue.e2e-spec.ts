@@ -391,6 +391,26 @@ describe('Venues (e2e)', () => {
         .send({ approve: true })
         .expect(403);
     });
+
+    it('should store the rejection reason when ADMIN rejects a venue', async () => {
+      const createRes = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Reject Reason Test Venue ${uniqueId}`)
+        .field('description', 'Venue para probar el motivo de rechazo.')
+        .field('address', 'Reject Address 12345')
+        .field('district', 'Reject District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+
+      const res = await adminAgent
+        .put(`/api/v1/venues/${createRes.body.id}/verify`)
+        .send({ approve: false, rejectionReason: 'Fotos borrosas, no se distingue el espacio' })
+        .expect(200);
+
+      expect(res.body.status).toBe('REJECTED');
+      expect(res.body.rejectionReason).toBe('Fotos borrosas, no se distingue el espacio');
+    });
   });
 
   // ===== Deactivate / reactivate (reversible pause, distinct from DELETE's soft delete) =====

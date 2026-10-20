@@ -94,7 +94,12 @@ export interface IVenueRepository {
   ): Promise<SeasonalEventCatalogItem>;
   create(data: Record<string, unknown>, ownerId: string): Promise<VenueEntity>;
   update(id: string, data: Record<string, unknown>): Promise<VenueEntity>;
-  updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity>;
+  updateStatus(
+    id: string,
+    status: string,
+    verifiedById?: string,
+    rejectionReason?: string,
+  ): Promise<VenueEntity>;
   addMedia(
     venueId: string,
     uploads: { url: string; publicId: string }[],

@@ -631,7 +631,40 @@ describe('VenueService', () => {
       );
     });
 
-    it('should reject venue', async () => {
+    it('should reject venue with a reason', async () => {
+      mockRepository.updateStatus.mockResolvedValue({
+        ...mockVenue,
+        status: VenueStatus.REJECTED,
+        rejectionReason: 'Fotos borrosas, no se distingue el espacio',
+      });
+
+      await service.verifyVenue(
+        'venue-1',
+        'admin-1',
+        false,
+        'Fotos borrosas, no se distingue el espacio',
+      );
+
+      expect(mockRepository.updateStatus).toHaveBeenCalledWith(
+        'venue-1',
+        VenueStatus.REJECTED,
+        undefined,
+        'Fotos borrosas, no se distingue el espacio',
+      );
+      expect(mockAuditLogService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminId: 'admin-1',
+          action: AUDIT_ACTION.VENUE_REJECTED,
+          targetType: AUDIT_TARGET_TYPE.VENUE,
+          targetId: 'venue-1',
+          metadata: expect.objectContaining({
+            reason: 'Fotos borrosas, no se distingue el espacio',
+          }),
+        }),
+      );
+    });
+
+    it('should reject venue without a reason', async () => {
       mockRepository.updateStatus.mockResolvedValue({
         ...mockVenue,
         status: VenueStatus.REJECTED,
@@ -639,7 +672,12 @@ describe('VenueService', () => {
 
       await service.verifyVenue('venue-1', 'admin-1', false);
 
-      expect(mockRepository.updateStatus).toHaveBeenCalledWith('venue-1', VenueStatus.REJECTED);
+      expect(mockRepository.updateStatus).toHaveBeenCalledWith(
+        'venue-1',
+        VenueStatus.REJECTED,
+        undefined,
+        undefined,
+      );
       expect(mockAuditLogService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           adminId: 'admin-1',

@@ -3,7 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Eye, LayoutGrid, Play, Power, Search, Trash2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  LayoutGrid,
+  Play,
+  Power,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   deactivateVenue,
@@ -225,6 +234,9 @@ export const AllVenuesList = () => {
                     Propietario: {venue.owner?.fullName ?? 'N/D'}
                     {venue.owner?.phone ? ` · ${venue.owner.phone}` : ''}
                   </p>
+                  {venue.status === 'REJECTED' && venue.rejectionReason ? (
+                    <p className="mt-1 text-sm text-destructive">Motivo: {venue.rejectionReason}</p>
+                  ) : null}
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-2">
