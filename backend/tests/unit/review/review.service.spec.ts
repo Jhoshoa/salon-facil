@@ -97,6 +97,7 @@ describe('ReviewService', () => {
       findById: jest.fn(),
       findByBookingId: jest.fn(),
       findByVenue: jest.fn(),
+      findAllForAdmin: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       setOwnerResponse: jest.fn(),
@@ -281,6 +282,45 @@ describe('ReviewService', () => {
       await expect(
         service.respondToReview('review-1', 'owner-1', UserRole.OWNER, { response: 'Hola' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('listReviewsForAdmin', () => {
+    it('returns a paginated result built from the repository', async () => {
+      reviewRepository.findAllForAdmin.mockResolvedValue({ items: [makeReview()], total: 1 });
+
+      const result = await service.listReviewsForAdmin({ page: 1, limit: 20 });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.totalPages).toBe(1);
+      expect(reviewRepository.findAllForAdmin).toHaveBeenCalledWith({
+        search: undefined,
+        rating: undefined,
+        hasResponse: undefined,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('forwards the search, rating and hasResponse filters', async () => {
+      reviewRepository.findAllForAdmin.mockResolvedValue({ items: [], total: 0 });
+
+      await service.listReviewsForAdmin({
+        search: 'ruidoso',
+        rating: 2,
+        hasResponse: false,
+        page: 2,
+        limit: 10,
+      });
+
+      expect(reviewRepository.findAllForAdmin).toHaveBeenCalledWith({
+        search: 'ruidoso',
+        rating: 2,
+        hasResponse: false,
+        page: 2,
+        limit: 10,
+      });
     });
   });
 });
