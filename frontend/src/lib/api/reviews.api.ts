@@ -1,5 +1,5 @@
-import { apiRequest } from './client';
-import type { CreateReviewPayload, PaginatedResponse, Review } from '@/types/api';
+import { apiRequest, buildQueryString } from './client';
+import type { AdminReview, CreateReviewPayload, PaginatedResponse, Review } from '@/types/api';
 
 export const getVenueReviews = async (
   venueId: string,
@@ -45,4 +45,20 @@ export const respondToReview = async (reviewId: string, response: string): Promi
     method: 'POST',
     body: JSON.stringify({ response }),
   });
+};
+
+// ========== ADMIN ==========
+
+export interface AdminReviewsParams {
+  search?: string;
+  rating?: number;
+  hasResponse?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export const getAdminReviews = async (
+  params: AdminReviewsParams = {},
+): Promise<PaginatedResponse<AdminReview>> => {
+  return apiRequest<PaginatedResponse<AdminReview>>(`/admin/reviews${buildQueryString(params)}`);
 };

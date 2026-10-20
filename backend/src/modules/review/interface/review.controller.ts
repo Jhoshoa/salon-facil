@@ -20,6 +20,7 @@ import { ReviewService } from '../application/services/review.service';
 import { CreateReviewDto } from '../application/dto/create-review.dto';
 import { UpdateReviewDto } from '../application/dto/update-review.dto';
 import { OwnerResponseDto } from '../application/dto/owner-response.dto';
+import { AdminReviewQueryDto } from '../application/dto/admin-review-query.dto';
 
 // The client's email is fetched internally so the service can notify them of an owner's
 // response, but must never reach a public/other-user response — this is the only place
@@ -37,6 +38,13 @@ const toPublicReviewDto = (review: ReviewEntity) => ({
   createdAt: review.createdAt,
   updatedAt: review.updatedAt,
   client: review.client ? { id: review.client.id, fullName: review.client.fullName } : undefined,
+});
+
+const toAdminReviewDto = (review: ReviewEntity) => ({
+  ...toPublicReviewDto(review),
+  venue: review.venue
+    ? { id: review.venue.id, name: review.venue.name, slug: review.venue.slug }
+    : undefined,
 });
 
 @ApiTags('Reviews')
@@ -143,5 +151,21 @@ export class ReviewController {
   ) {
     const review = await this.reviewService.respondToReview(reviewId, user.id, user.role, dto);
     return toPublicReviewDto(review);
+  }
+}
+
+@ApiTags('Admin')
+@ApiBearerAuth()
+@Controller('admin/reviews')
+export class AdminReviewController {
+  constructor(private readonly reviewService: ReviewService) {}
+
+  @Get()
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Listar y buscar reseñas de toda la plataforma (ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Reseñas paginadas, con el local y el cliente' })
+  async list(@Query() dto: AdminReviewQueryDto) {
+    const result = await this.reviewService.listReviewsForAdmin(dto);
+    return { ...result, data: result.data.map(toAdminReviewDto) };
   }
 }

@@ -6,9 +6,12 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   Building2,
+  CalendarDays,
   CalendarRange,
+  History,
   LayoutGrid,
   Menu,
+  MessageSquare,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -24,10 +27,13 @@ const navItems = [
   { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/venues', label: 'Verificacion de locales', icon: ShieldCheck },
   { href: '/admin/venues/all', label: 'Todos los locales', icon: Building2 },
+  { href: '/admin/bookings', label: 'Reservas', icon: CalendarDays },
+  { href: '/admin/reviews', label: 'Reseñas', icon: MessageSquare },
   { href: '/admin/catalog/space-types', label: 'Tipos de espacio', icon: LayoutGrid },
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },
   { href: '/admin/catalog/amenities', label: 'Comodidades', icon: Tag },
   { href: '/admin/catalog/seasonal-events', label: 'Feriados y temporadas', icon: CalendarRange },
+  { href: '/admin/audit-log', label: 'Historial de acciones', icon: History },
 ];
 
 interface AdminShellProps {

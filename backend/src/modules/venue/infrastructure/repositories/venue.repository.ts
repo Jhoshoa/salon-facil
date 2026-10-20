@@ -929,7 +929,12 @@ export class VenueRepository implements IVenueRepository {
     }));
   }
 
-  async updateStatus(id: string, status: string, verifiedById?: string): Promise<VenueEntity> {
+  async updateStatus(
+    id: string,
+    status: string,
+    verifiedById?: string,
+    rejectionReason?: string,
+  ): Promise<VenueEntity> {
     const updateData: Prisma.VenueUpdateInput = {
       status: status as VenueStatus,
     };
@@ -938,10 +943,13 @@ export class VenueRepository implements IVenueRepository {
       updateData.isVerified = true;
       updateData.verifiedAt = new Date();
       updateData.verifiedBy = { connect: { id: verifiedById } };
+      // Clear out whatever reason a previous rejection left behind -- this approval supersedes it.
+      updateData.rejectionReason = null;
     } else if (status === 'REJECTED') {
       updateData.isVerified = false;
       updateData.verifiedAt = null;
       updateData.verifiedBy = { disconnect: true };
+      updateData.rejectionReason = rejectionReason ?? null;
     }
 
     const venue = await this.prisma.venue.update({
@@ -1155,6 +1163,7 @@ export class VenueRepository implements IVenueRepository {
       isVerified: raw.isVerified,
       verifiedAt: raw.verifiedAt,
       verifiedById: raw.verifiedById,
+      rejectionReason: raw.rejectionReason,
       isFeatured: raw.isFeatured,
       featuredUntil: raw.featuredUntil,
       viewCount: raw.viewCount,

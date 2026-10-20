@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   CreateReviewData,
@@ -19,6 +20,7 @@ type RawReview = {
   createdAt: Date;
   updatedAt: Date;
   client?: { id: string; fullName: string; email: string } | null;
+  venue?: { id: string; name: string; slug: string } | null;
 };
 
 const reviewInclude = { client: { select: { id: true, fullName: true, email: true } } };
@@ -77,6 +79,40 @@ export class ReviewRepository implements IReviewRepository {
     return { items: items.map((item) => this.toEntity(item)), total };
   }
 
+  async findAllForAdmin(params: {
+    search?: string;
+    rating?: number;
+    hasResponse?: boolean;
+    page: number;
+    limit: number;
+  }): Promise<{ items: ReviewEntity[]; total: number }> {
+    const where: Prisma.ReviewWhereInput = {
+      ...(params.rating && { rating: params.rating }),
+      ...(params.hasResponse === true && { ownerResponse: { not: null } }),
+      ...(params.hasResponse === false && { ownerResponse: null }),
+      ...(params.search && {
+        OR: [
+          { comment: { contains: params.search, mode: 'insensitive' } },
+          { venue: { name: { contains: params.search, mode: 'insensitive' } } },
+          { client: { fullName: { contains: params.search, mode: 'insensitive' } } },
+        ],
+      }),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        include: { ...reviewInclude, venue: { select: { id: true, name: true, slug: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.review.count({ where }),
+    ]);
+
+    return { items: items.map((item) => this.toEntity(item)), total };
+  }
+
   async update(
     id: string,
     data: { rating?: number; comment?: string | null },
@@ -116,6 +152,7 @@ export class ReviewRepository implements IReviewRepository {
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
       client: raw.client ?? undefined,
+      venue: raw.venue ?? undefined,
     });
   }
 }

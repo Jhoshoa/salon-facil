@@ -473,6 +473,40 @@ export class BookingService {
     return this.bookingRepository.findByClient(clientId);
   }
 
+  async getAllBookingsForAdmin(dto: {
+    search?: string;
+    status?: BookingStatus;
+    venueId?: string;
+    startDate?: string;
+    endDate?: string;
+    page: number;
+    limit: number;
+  }): Promise<{
+    data: BookingEntity[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const { items, total } = await this.bookingRepository.findAllForAdmin({
+      search: dto.search,
+      status: dto.status,
+      venueId: dto.venueId,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+      page: dto.page,
+      limit: dto.limit,
+    });
+
+    return {
+      data: items,
+      total,
+      page: dto.page,
+      limit: dto.limit,
+      totalPages: Math.max(1, Math.ceil(total / dto.limit)),
+    };
+  }
+
   async getVenueBookings(
     venueId: string,
     userId: string,

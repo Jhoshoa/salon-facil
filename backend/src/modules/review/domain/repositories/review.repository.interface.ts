@@ -19,6 +19,13 @@ export interface IReviewRepository {
     page: number,
     limit: number,
   ): Promise<{ items: ReviewEntity[]; total: number }>;
+  findAllForAdmin(params: {
+    search?: string;
+    rating?: number;
+    hasResponse?: boolean;
+    page: number;
+    limit: number;
+  }): Promise<{ items: ReviewEntity[]; total: number }>;
   update(id: string, data: { rating?: number; comment?: string | null }): Promise<ReviewEntity>;
   delete(id: string): Promise<void>;
   setOwnerResponse(id: string, response: string): Promise<ReviewEntity>;
