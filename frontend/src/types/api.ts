@@ -227,6 +227,7 @@ export interface Venue {
   rules: string | null;
   cancellationPolicy: string | null;
   status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+  rejectionReason: string | null;
   isVerified: boolean;
   viewCount: number;
   bookingCount: number;
@@ -564,6 +565,44 @@ export interface AdminUser {
 export interface AdminUserCounts {
   role: Record<AdminUser['role'], number>;
   status: Record<AdminUser['status'], number>;
+}
+
+export interface AdminUserVenueSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+  district: string;
+  departamento: Departamento;
+  createdAt: string;
+}
+
+export interface AdminUserBookingSummary {
+  id: string;
+  venueId: string;
+  venueName: string | null;
+  eventDate: string;
+  status: BookingStatus;
+  totalPrice: number;
+  createdAt: string;
+}
+
+export interface AdminUserDetail {
+  user: AdminUser;
+  venues?: AdminUserVenueSummary[];
+  bookings?: AdminUserBookingSummary[];
+}
+
+export interface AuditLogEntry {
+  id: string;
+  adminId: string | null;
+  adminName: string | null;
+  adminEmail: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 export interface AdminAnalyticsDashboard {

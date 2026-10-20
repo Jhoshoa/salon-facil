@@ -155,6 +155,7 @@ model User {
   identities             UserIdentity[]
   emailVerificationCodes EmailVerificationCode[]
   favorites              VenueFavorite[]
+  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogActor")
 
   @@index([email])
   @@index([phone])
@@ -267,6 +268,10 @@ model Venue {
   isVerified         Boolean       @default(false) @map("is_verified")
   verifiedAt         DateTime?     @map("verified_at")
   verifiedById       String?       @map("verified_by_id")
+  // Set when an ADMIN rejects the venue (status -> REJECTED); cleared back to null on the next
+  // approval, so a venue that was rejected, resubmitted and later approved doesn't carry a stale
+  // reason around.
+  rejectionReason    String?       @map("rejection_reason") @db.Text
   isFeatured         Boolean       @default(false) @map("is_featured")
   featuredUntil      DateTime?     @map("featured_until")
   viewCount          Int           @default(0) @map("view_count")
@@ -637,6 +642,27 @@ model Review {
   @@index([clientId])
   @@index([bookingId])
   @@map("reviews")
+}
+
+// Append-only trail of actions an ADMIN took against another user's data -- a status change, a
+// venue rejection, a review deletion, a payment refund, etc. `action`/`targetType` are free-form
+// strings rather than enums (see backend/src/modules/admin/application/audit-log-actions.ts for
+// the known values in use) so a new admin capability can log a new action without a migration.
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String?  @map("admin_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User? @relation("AdminAuditLogActor", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
 }
 
 model Notification {

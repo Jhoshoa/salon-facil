@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Search, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getAdminUserCounts,
@@ -34,7 +35,10 @@ const statusLabels: Record<AdminUser['status'], string> = {
   PENDING_VERIFICATION: 'Pendiente de verificacion',
 };
 
-const statusBadgeVariant: Record<AdminUser['status'], 'success' | 'warning' | 'destructive' | 'secondary'> = {
+const statusBadgeVariant: Record<
+  AdminUser['status'],
+  'success' | 'warning' | 'destructive' | 'secondary'
+> = {
   ACTIVE: 'success',
   INACTIVE: 'secondary',
   SUSPENDED: 'destructive',
@@ -219,11 +223,19 @@ export const AdminUserManagement = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{user.fullName}</h3>
                     <Badge variant="outline">{roleLabels[user.role]}</Badge>
-                    <Badge variant={statusBadgeVariant[user.status]}>{statusLabels[user.status]}</Badge>
+                    <Badge variant={statusBadgeVariant[user.status]}>
+                      {statusLabels[user.status]}
+                    </Badge>
                   </div>
                   <p className="truncate text-sm text-muted-foreground">
                     {user.email} · {user.phone}
                   </p>
+                  <Button asChild size="sm" variant="outline" className="mt-2">
+                    <Link href={`/admin/users/${user.id}`}>
+                      <Eye className="h-4 w-4" />
+                      Ver detalle
+                    </Link>
+                  </Button>
                 </div>
 
                 <div className="flex flex-col gap-2 sm:w-56">

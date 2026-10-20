@@ -164,10 +164,14 @@ export const reorderVenueMedia = async (
   });
 };
 
-export const verifyVenue = async (id: string, approve: boolean): Promise<Venue> => {
+export const verifyVenue = async (
+  id: string,
+  approve: boolean,
+  rejectionReason?: string,
+): Promise<Venue> => {
   return apiRequest<Venue>(`/venues/${id}/verify`, {
     method: 'PUT',
-    body: JSON.stringify({ approve }),
+    body: JSON.stringify({ approve, rejectionReason }),
   });
 };
 
