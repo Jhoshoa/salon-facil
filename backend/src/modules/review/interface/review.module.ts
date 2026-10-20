@@ -3,6 +3,7 @@ import {
   VenueReviewController,
   BookingReviewController,
   ReviewController,
+  AdminReviewController,
 } from './review.controller';
 import { ReviewService } from '../application/services/review.service';
 import { ReviewRepository } from '../infrastructure/repositories/review.repository';
@@ -14,7 +15,12 @@ import { PrismaModule } from '../../../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule, BookingModule, VenueModule, NotificationModule],
-  controllers: [VenueReviewController, BookingReviewController, ReviewController],
+  controllers: [
+    VenueReviewController,
+    BookingReviewController,
+    ReviewController,
+    AdminReviewController,
+  ],
   providers: [
     ReviewService,
     {
