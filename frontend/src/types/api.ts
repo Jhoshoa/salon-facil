@@ -562,6 +562,32 @@ export interface AdminUserCounts {
   status: Record<AdminUser['status'], number>;
 }
 
+export interface AdminUserVenueSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+  district: string;
+  departamento: Departamento;
+  createdAt: string;
+}
+
+export interface AdminUserBookingSummary {
+  id: string;
+  venueId: string;
+  venueName: string | null;
+  eventDate: string;
+  status: BookingStatus;
+  totalPrice: number;
+  createdAt: string;
+}
+
+export interface AdminUserDetail {
+  user: AdminUser;
+  venues?: AdminUserVenueSummary[];
+  bookings?: AdminUserBookingSummary[];
+}
+
 export interface AdminAnalyticsDashboard {
   summary: {
     revenueThisMonth: number;

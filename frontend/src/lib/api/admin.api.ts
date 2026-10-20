@@ -1,5 +1,11 @@
 import { apiRequest, buildQueryString } from './client';
-import type { AdminAnalyticsDashboard, AdminUser, AdminUserCounts, PaginatedResponse } from '@/types/api';
+import type {
+  AdminAnalyticsDashboard,
+  AdminUser,
+  AdminUserCounts,
+  AdminUserDetail,
+  PaginatedResponse,
+} from '@/types/api';
 
 export const getAdminAnalyticsDashboard = async (): Promise<AdminAnalyticsDashboard> => {
   return apiRequest<AdminAnalyticsDashboard>('/admin/analytics/dashboard');
@@ -19,10 +25,7 @@ export const getAdminUsers = async (
   return apiRequest<PaginatedResponse<AdminUser>>(`/admin/users${buildQueryString(params)}`);
 };
 
-export const updateAdminUserStatus = async (
-  userId: string,
-  status: string,
-): Promise<AdminUser> => {
+export const updateAdminUserStatus = async (userId: string, status: string): Promise<AdminUser> => {
   return apiRequest<AdminUser>(`/admin/users/${userId}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
@@ -37,6 +40,10 @@ export const updateAdminUserRole = async (
     method: 'PUT',
     body: JSON.stringify({ role }),
   });
+};
+
+export const getAdminUserDetail = async (userId: string): Promise<AdminUserDetail> => {
+  return apiRequest<AdminUserDetail>(`/admin/users/${userId}`);
 };
 
 export const getAdminUserCounts = async (
