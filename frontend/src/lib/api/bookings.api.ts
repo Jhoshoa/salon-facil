@@ -1,10 +1,12 @@
-import { apiRequest } from './client';
+import { apiRequest, buildQueryString } from './client';
 import type {
   AvailabilityRangeEntry,
   Booking,
+  BookingStatus,
   CreateBookingPayload,
   CreateBookingResponse,
   DailyScheduleEntry,
+  PaginatedResponse,
   RangePriceCalculation,
 } from '@/types/api';
 
@@ -96,4 +98,22 @@ export const markBookingNoShow = async (id: string): Promise<Booking> => {
 export const getPendingOwnerBookingsCount = async (): Promise<number> => {
   const result = await apiRequest<{ count: number }>('/bookings/owner/pending-count');
   return result.count;
+};
+
+// ========== ADMIN ==========
+
+export interface AdminBookingsParams {
+  search?: string;
+  status?: BookingStatus;
+  venueId?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const getAdminBookings = async (
+  params: AdminBookingsParams = {},
+): Promise<PaginatedResponse<Booking>> => {
+  return apiRequest<PaginatedResponse<Booking>>(`/admin/bookings${buildQueryString(params)}`);
 };

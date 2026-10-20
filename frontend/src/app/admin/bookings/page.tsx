@@ -1,0 +1,18 @@
+import { AdminBookingsList } from '@/components/admin/admin-bookings-list';
+
+const AdminBookingsPage = () => {
+  return (
+    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Reservas</h1>
+        <p className="text-sm text-muted-foreground">
+          Todas las reservas de la plataforma, de cualquier local — busca por cliente o local,
+          filtra por estado o rango de fechas.
+        </p>
+      </div>
+      <AdminBookingsList />
+    </main>
+  );
+};
+
+export default AdminBookingsPage;

@@ -104,6 +104,7 @@ describe('BookingService', () => {
     findActiveByVenueInRange: jest.Mock;
     findBookedDatesInRange: jest.Mock;
     findByVenueAndStatus: jest.Mock;
+    findAllForAdmin: jest.Mock;
     create: jest.Mock;
     updateStatus: jest.Mock;
     markDepositPaid: jest.Mock;
@@ -146,6 +147,7 @@ describe('BookingService', () => {
       findActiveByVenueInRange: jest.fn(),
       findBookedDatesInRange: jest.fn().mockResolvedValue([]),
       findByVenueAndStatus: jest.fn(),
+      findAllForAdmin: jest.fn(),
       create: jest.fn(),
       updateStatus: jest.fn(),
       markDepositPaid: jest.fn(),
@@ -1035,6 +1037,48 @@ describe('BookingService', () => {
       expect(count).toBe(11);
       expect(mockBookingRepository.countAllPending).toHaveBeenCalled();
       expect(mockBookingRepository.countPendingByOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllBookingsForAdmin', () => {
+    it('returns a paginated result and forwards every filter', async () => {
+      mockBookingRepository.findAllForAdmin.mockResolvedValue({
+        items: [makeBooking()],
+        total: 1,
+      });
+
+      const result = await service.getAllBookingsForAdmin({
+        search: 'Salon',
+        status: BookingStatus.APPROVED,
+        venueId: 'venue-1',
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+        page: 1,
+        limit: 20,
+      });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.totalPages).toBe(1);
+      expect(mockBookingRepository.findAllForAdmin).toHaveBeenCalledWith({
+        search: 'Salon',
+        status: BookingStatus.APPROVED,
+        venueId: 'venue-1',
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-01-31'),
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('leaves the date range undefined when no dates are given', async () => {
+      mockBookingRepository.findAllForAdmin.mockResolvedValue({ items: [], total: 0 });
+
+      await service.getAllBookingsForAdmin({ page: 1, limit: 20 });
+
+      expect(mockBookingRepository.findAllForAdmin).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: undefined, endDate: undefined }),
+      );
     });
   });
 });
