@@ -23,6 +23,7 @@ import {
 import { CreateReviewDto } from '../dto/create-review.dto';
 import { UpdateReviewDto } from '../dto/update-review.dto';
 import { OwnerResponseDto } from '../dto/owner-response.dto';
+import { AdminReviewQueryDto } from '../dto/admin-review-query.dto';
 
 @Injectable()
 export class ReviewService {
@@ -93,6 +94,24 @@ export class ReviewService {
       page: safePage,
       limit: safeLimit,
       totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+    };
+  }
+
+  async listReviewsForAdmin(dto: AdminReviewQueryDto) {
+    const { items, total } = await this.reviewRepository.findAllForAdmin({
+      search: dto.search,
+      rating: dto.rating,
+      hasResponse: dto.hasResponse,
+      page: dto.page,
+      limit: dto.limit,
+    });
+
+    return {
+      data: items,
+      total,
+      page: dto.page,
+      limit: dto.limit,
+      totalPages: Math.max(1, Math.ceil(total / dto.limit)),
     };
   }
 
