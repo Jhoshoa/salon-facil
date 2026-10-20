@@ -10,6 +10,13 @@ import {
   UserRole,
   UserStatus,
 } from '../../../src/modules/auth/domain/entities/user.entity';
+import { VENUE_REPOSITORY } from '../../../src/modules/venue/domain/repositories/venue.repository.interface';
+import { VenueEntity, VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
+import { BOOKING_REPOSITORY } from '../../../src/modules/booking/domain/repositories/booking.repository.interface';
+import {
+  BookingEntity,
+  BookingStatus,
+} from '../../../src/modules/booking/domain/entities/booking.entity';
 
 const makeUser = (overrides: Partial<UserEntity> = {}) =>
   new UserEntity({
@@ -25,11 +32,53 @@ const makeUser = (overrides: Partial<UserEntity> = {}) =>
     ...overrides,
   });
 
+const makeVenue = (overrides: Partial<VenueEntity> = {}) =>
+  new VenueEntity({
+    id: 'venue-1',
+    ownerId: 'user-1',
+    name: 'Salon Perfecto',
+    slug: 'salon-perfecto',
+    address: 'Av. 6 de Octubre',
+    district: 'Zone 1',
+    departamento: 'LA_PAZ' as VenueEntity['departamento'],
+    capacityMax: 200,
+    status: VenueStatus.ACTIVE,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
+
+const makeBooking = (overrides: Partial<BookingEntity> = {}) =>
+  new BookingEntity({
+    id: 'booking-1',
+    venueId: 'venue-1',
+    clientId: 'user-1',
+    eventType: 'Boda',
+    eventDate: new Date('2026-12-01'),
+    endDate: new Date('2026-12-01'),
+    startTime: '18:00',
+    endTime: '23:00',
+    guestCount: 100,
+    basePrice: 1000,
+    appliedPrice: 1000,
+    totalPrice: 1000,
+    depositAmount: 300,
+    status: BookingStatus.APPROVED,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
+
 describe('AdminUserService', () => {
   let service: AdminUserService;
   let authRepository: jest.Mocked<IAuthRepository>;
+  let venueRepository: Record<string, jest.Mock>;
+  let bookingRepository: Record<string, jest.Mock>;
 
   beforeEach(async () => {
+    venueRepository = { findByOwner: jest.fn() };
+    bookingRepository = { findByClient: jest.fn() };
+
     authRepository = {
       findById: jest.fn(),
       findByEmail: jest.fn(),
@@ -65,7 +114,12 @@ describe('AdminUserService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AdminUserService, { provide: AUTH_REPOSITORY, useValue: authRepository }],
+      providers: [
+        AdminUserService,
+        { provide: AUTH_REPOSITORY, useValue: authRepository },
+        { provide: VENUE_REPOSITORY, useValue: venueRepository },
+        { provide: BOOKING_REPOSITORY, useValue: bookingRepository },
+      ],
     }).compile();
 
     service = module.get<AdminUserService>(AdminUserService);
@@ -141,6 +195,49 @@ describe('AdminUserService', () => {
       await expect(
         service.updateUserRole('admin-1', 'admin-1', { role: UserRole.OWNER }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getUserDetail', () => {
+    it('throws NotFoundException for a missing user', async () => {
+      authRepository.findById.mockResolvedValue(null);
+
+      await expect(service.getUserDetail('missing')).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns the venues for an OWNER and no bookings', async () => {
+      authRepository.findById.mockResolvedValue(makeUser({ role: UserRole.OWNER }));
+      venueRepository.findByOwner.mockResolvedValue([makeVenue()]);
+
+      const result = await service.getUserDetail('user-1');
+
+      expect(result.venues).toHaveLength(1);
+      expect(result.bookings).toBeUndefined();
+      expect(venueRepository.findByOwner).toHaveBeenCalledWith('user-1');
+      expect(bookingRepository.findByClient).not.toHaveBeenCalled();
+    });
+
+    it('returns the bookings for a CLIENT and no venues', async () => {
+      authRepository.findById.mockResolvedValue(makeUser({ role: UserRole.CLIENT }));
+      bookingRepository.findByClient.mockResolvedValue([makeBooking()]);
+
+      const result = await service.getUserDetail('user-1');
+
+      expect(result.bookings).toHaveLength(1);
+      expect(result.venues).toBeUndefined();
+      expect(bookingRepository.findByClient).toHaveBeenCalledWith('user-1');
+      expect(venueRepository.findByOwner).not.toHaveBeenCalled();
+    });
+
+    it('returns neither venues nor bookings for an ADMIN', async () => {
+      authRepository.findById.mockResolvedValue(makeUser({ role: UserRole.ADMIN }));
+
+      const result = await service.getUserDetail('user-1');
+
+      expect(result.venues).toBeUndefined();
+      expect(result.bookings).toBeUndefined();
+      expect(venueRepository.findByOwner).not.toHaveBeenCalled();
+      expect(bookingRepository.findByClient).not.toHaveBeenCalled();
     });
   });
 

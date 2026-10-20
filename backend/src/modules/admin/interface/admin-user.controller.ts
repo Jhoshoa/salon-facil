@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { Roles } from '../../../shared/decorators/roles.decorator';
 import { UserEntity, UserRole } from '../../auth/domain/entities/user.entity';
+import { VenueEntity } from '../../venue/domain/entities/venue.entity';
+import { BookingEntity } from '../../booking/domain/entities/booking.entity';
 import { AdminUserService } from '../application/services/admin-user.service';
 import { ListUsersDto } from '../application/dto/list-users.dto';
 import { UpdateUserStatusDto } from '../application/dto/update-user-status.dto';
@@ -20,6 +22,26 @@ const toAdminUserDto = (user: UserEntity) => ({
   district: user.district,
   createdAt: user.createdAt,
   lastLoginAt: user.lastLoginAt,
+});
+
+const toAdminUserVenueSummaryDto = (venue: VenueEntity) => ({
+  id: venue.id,
+  name: venue.name,
+  slug: venue.slug,
+  status: venue.status,
+  district: venue.district,
+  departamento: venue.departamento,
+  createdAt: venue.createdAt,
+});
+
+const toAdminUserBookingSummaryDto = (booking: BookingEntity) => ({
+  id: booking.id,
+  venueId: booking.venueId,
+  venueName: booking.venue?.name ?? null,
+  eventDate: booking.eventDate,
+  status: booking.status,
+  totalPrice: booking.totalPrice,
+  createdAt: booking.createdAt,
 });
 
 @ApiTags('Admin')
@@ -45,6 +67,22 @@ export class AdminUserController {
   @ApiResponse({ status: 200, description: 'Conteo por UserRole y por UserStatus' })
   async getCounts(@Query() dto: UserCountsQueryDto) {
     return this.adminUserService.getUserCounts(dto);
+  }
+
+  @Get(':userId')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Detalle de un usuario: datos de cuenta y sus locales o reservas (ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Usuario con sus locales (OWNER) o reservas (CLIENT)' })
+  @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+  async getDetail(@Param('userId') userId: string) {
+    const { user, venues, bookings } = await this.adminUserService.getUserDetail(userId);
+    return {
+      user: toAdminUserDto(user),
+      venues: venues?.map(toAdminUserVenueSummaryDto),
+      bookings: bookings?.map(toAdminUserBookingSummaryDto),
+    };
   }
 
   @Put(':userId/status')
