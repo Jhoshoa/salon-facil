@@ -443,6 +443,10 @@ export interface Review {
   client?: { id: string; fullName: string };
 }
 
+export interface AdminReview extends Review {
+  venue?: { id: string; name: string; slug: string };
+}
+
 export interface CreateReviewPayload {
   rating: number;
   comment?: string;
