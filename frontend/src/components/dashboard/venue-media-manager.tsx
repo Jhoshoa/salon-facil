@@ -33,6 +33,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['owner-venues'] });
+    queryClient.invalidateQueries({ queryKey: ['owner-venue', venue.id] });
   };
 
   const uploadMutation = useMutation({

@@ -10,6 +10,16 @@ export interface UserIdentityRecord {
   email: string | null;
 }
 
+export interface PendingOwnerInvite {
+  id: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  createdAt: Date;
+  venues: { id: string; name: string; status: string }[];
+  latestInvite: { sentAt: Date; expiresAt: Date } | null;
+}
+
 export interface IAuthRepository {
   findById(id: string): Promise<UserEntity | null>;
   findByEmail(email: string): Promise<UserEntity | null>;
@@ -132,6 +142,16 @@ export interface IAuthRepository {
   } | null>;
   markOwnerInviteTokenUsed(id: string): Promise<void>;
   /** Same idea as invalidateActivePasswordResetTokens — called right before issuing a fresh
-   * token so a resent invite immediately supersedes any earlier one. */
-  invalidateActiveOwnerInviteTokens(userId: string): Promise<void>;
+   * token so a resent invite immediately supersedes any earlier one. Returns how many were
+   * invalidated, so the caller can tell a first invite from a resend. */
+  invalidateActiveOwnerInviteTokens(userId: string): Promise<number>;
+  /** OWNER accounts with no password yet — i.e. created by an admin via the phone-onboarding
+   * flow and not yet claimed. `passwordHash: null` is the whole signal: a normal OWNER
+   * registration always sets one immediately, so this can never catch a real self-registered
+   * owner mid-flow. */
+  findPendingOwnerInvites(params: {
+    search?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ items: PendingOwnerInvite[]; total: number }>;
 }

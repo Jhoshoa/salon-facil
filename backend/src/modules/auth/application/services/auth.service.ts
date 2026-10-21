@@ -422,9 +422,11 @@ export class AuthService {
 
   /** Issues (or re-issues, invalidating whatever was outstanding) the token an admin-created
    * placeholder owner uses to view/claim their venue — see the owner-invite phone-onboarding
-   * flow. Returns the raw token; only its hash is ever persisted. */
-  async issueOwnerInviteToken(userId: string): Promise<string> {
-    await this.authRepository.invalidateActiveOwnerInviteTokens(userId);
+   * flow. Returns the raw token (only its hash is ever persisted) plus whether this superseded
+   * an earlier still-active token, so the caller (admin "enviar invitacion" endpoint) can tell
+   * a first send from a resend for its own audit log. */
+  async issueOwnerInviteToken(userId: string): Promise<{ token: string; resent: boolean }> {
+    const invalidatedCount = await this.authRepository.invalidateActiveOwnerInviteTokens(userId);
 
     const token = this.tokenService.generateOwnerInviteToken();
     await this.authRepository.createOwnerInviteToken({
@@ -433,7 +435,7 @@ export class AuthService {
       expiresAt: new Date(Date.now() + OWNER_INVITE_TOKEN_TTL_MS),
     });
 
-    return token;
+    return { token, resent: invalidatedCount > 0 };
   }
 
   /** Read-only lookup used by the public venue preview route — deliberately does NOT check
