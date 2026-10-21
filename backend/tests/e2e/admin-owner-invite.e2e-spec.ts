@@ -224,4 +224,79 @@ describe('Admin owner invites (e2e)', () => {
       ).toBeUndefined();
     });
   });
+
+  // Covers the "manage it ourselves first, invite the owner later" scenario: the admin never
+  // has to send the invite while the venue is still DRAFT. sendInvite() doesn't look at venue
+  // status at all, so approving (and letting it collect real inquiries) before ever inviting
+  // the owner has to keep working exactly the same as inviting right away.
+  describe('approve-then-invite (venue goes public before the owner is ever invited)', () => {
+    /** The real raw token is never returned by any API response (only its hash is persisted) --
+     * the only place it legitimately appears is in the body of the notification we already
+     * enqueued, same as a real email/WhatsApp message would contain it. */
+    async function extractRawTokenFromLatestInvite(ownerId: string): Promise<string> {
+      const notification = await prisma.notification.findFirst({
+        where: { userId: ownerId, type: 'VENUE_OWNER_INVITE', channel: 'EMAIL' },
+        orderBy: { createdAt: 'desc' },
+      });
+      const match = notification?.content.match(/\/preview\/([a-f0-9]+)/);
+      if (!match) throw new Error('No invite token found in the notification content');
+      return match[1];
+    }
+
+    it('lets the admin approve/publish the venue first and invite the owner long after', async () => {
+      const created = await adminAgent
+        .post('/api/v1/admin/owner-invites')
+        .send(ownerInviteBody(30))
+        .expect(201);
+      const { owner, venue } = created.body;
+
+      // Admin manages it fully and publishes it -- the owner hasn't been invited at all yet.
+      const verifyRes = await adminAgent
+        .put(`/api/v1/venues/${venue.id}/verify`)
+        .send({ approve: true })
+        .expect(200);
+      expect(verifyRes.body.status).toBe('ACTIVE');
+      expect(verifyRes.body.isVerified).toBe(true);
+
+      // Now it's genuinely public -- anyone can find it, no auth, same as any other listed venue.
+      await request(app.getHttpServer()).get(`/api/v1/venues/${verifyRes.body.slug}`).expect(200);
+
+      // The owner still has no password and isn't in any "claimed" state.
+      const beforeInvite = await prisma.user.findUniqueOrThrow({ where: { id: owner.id } });
+      expect(beforeInvite.passwordHash).toBeNull();
+
+      // Days/weeks later, the admin finally sends the invite -- after the venue is already live.
+      const sendRes = await adminAgent
+        .post(`/api/v1/admin/owner-invites/${venue.id}/send`)
+        .expect(200);
+      expect(sendRes.body.resent).toBe(false);
+
+      const token = await extractRawTokenFromLatestInvite(owner.id);
+
+      // The preview endpoint works the same for an ACTIVE/public venue as for a DRAFT one.
+      const previewRes = await request(app.getHttpServer())
+        .get(`/api/v1/venues/preview/${token}`)
+        .expect(200);
+      expect(previewRes.body).toHaveLength(1);
+      expect(previewRes.body[0].id).toBe(venue.id);
+      expect(previewRes.body[0].status).toBe('ACTIVE');
+
+      // Claiming still activates the account and logs the owner in, exactly as if the venue
+      // had still been a DRAFT -- the venue's own lifecycle never blocks or alters this.
+      const claimRes = await request(app.getHttpServer())
+        .post('/api/v1/auth/claim-invite')
+        .send({ token, password: 'ApprovedFirst123!' })
+        .expect(200);
+      expect(claimRes.body.user.id).toBe(owner.id);
+
+      const afterClaim = await prisma.user.findUniqueOrThrow({ where: { id: owner.id } });
+      expect(afterClaim.status).toBe('ACTIVE');
+      expect(afterClaim.passwordHash).not.toBeNull();
+
+      // The venue itself is untouched by the claim -- still ACTIVE, still owned by the same id.
+      const venueAfterClaim = await prisma.venue.findUniqueOrThrow({ where: { id: venue.id } });
+      expect(venueAfterClaim.status).toBe('ACTIVE');
+      expect(venueAfterClaim.ownerId).toBe(owner.id);
+    });
+  });
 });
