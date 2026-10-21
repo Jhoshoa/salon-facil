@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
-import { getMyVenues } from '@/lib/api/venues.api';
+import { getVenueById } from '@/lib/api/venues.api';
 import { VenueForm, tabs, type TabKey } from './venue-form';
 import { VenueMediaManager } from './venue-media-manager';
 import { VenueCompletionCard } from './venue-completion-card';
@@ -19,7 +19,14 @@ interface OwnerVenueEditProps {
 
 export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>('general');
-  const query = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
+  // By id (not getMyVenues + find) so this also works for an ADMIN editing a venue they don't
+  // literally own -- e.g. completing a placeholder venue from the phone-onboarding flow. The
+  // backend's canBeEditedBy already permits this; getMyVenues only ever returns the caller's
+  // own venues regardless of role, which silently 404'd this page for an admin before.
+  const query = useQuery({
+    queryKey: ['owner-venue', venueId],
+    queryFn: () => getVenueById(venueId),
+  });
 
   if (query.isLoading) {
     return (
@@ -31,16 +38,21 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
   }
 
   if (query.isError) {
-    return <ErrorState title="No se pudo cargar el local" onRetry={() => query.refetch()} />;
+    return (
+      <ErrorState
+        title="Local no encontrado"
+        description="Puede que no exista o que no tengas permiso para editarlo."
+        onRetry={() => query.refetch()}
+      />
+    );
   }
 
-  const venue = query.data?.find((item) => item.id === venueId);
-
+  const venue = query.data;
   if (!venue) {
     return (
       <ErrorState
         title="Local no encontrado"
-        description="Puede que no exista o que no seas su propietario."
+        description="Puede que no exista o que no tengas permiso para editarlo."
         onRetry={() => query.refetch()}
       />
     );
@@ -92,7 +104,7 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
         <VenueForm venue={venue} activeTab={activeTab} onTabChange={setActiveTab} />
         <VenueMediaManager venue={venue} />
       </div>
-      <div className="hidden space-y-6 lg:block lg:sticky lg:top-24 lg:self-start">
+      <div className="hidden space-y-6 lg:sticky lg:top-24 lg:block lg:self-start">
         <nav className="flex flex-col gap-1 rounded-[var(--radius)] border bg-card p-2">
           {tabs.map((tab) => (
             <button
