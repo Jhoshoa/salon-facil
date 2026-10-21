@@ -3,6 +3,7 @@ import { Prisma, User as PrismaUser } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   IAuthRepository,
+  PendingOwnerInvite,
   UserIdentityRecord,
 } from '../../domain/repositories/auth.repository.interface';
 import { UserEntity, UserRole, UserStatus } from '../../domain/entities/user.entity';
@@ -412,11 +413,71 @@ export class AuthRepository implements IAuthRepository {
     });
   }
 
-  async invalidateActiveOwnerInviteTokens(userId: string): Promise<void> {
-    await this.prisma.ownerInviteToken.updateMany({
+  async invalidateActiveOwnerInviteTokens(userId: string): Promise<number> {
+    const { count } = await this.prisma.ownerInviteToken.updateMany({
       where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
       data: { usedAt: new Date() },
     });
+    return count;
+  }
+
+  async findPendingOwnerInvites(params: {
+    search?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ items: PendingOwnerInvite[]; total: number }> {
+    const where: Prisma.UserWhereInput = {
+      role: UserRole.OWNER,
+      passwordHash: null,
+      ...(params.search
+        ? {
+            OR: [
+              { fullName: { contains: params.search, mode: 'insensitive' } },
+              { email: { contains: params.search, mode: 'insensitive' } },
+              { phone: { contains: params.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        include: {
+          venues: {
+            select: { id: true, name: true, status: true },
+            orderBy: { createdAt: 'desc' },
+          },
+          ownerInviteTokens: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { createdAt: true, expiresAt: true },
+          },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        phone: row.phone,
+        fullName: row.fullName,
+        createdAt: row.createdAt,
+        venues: row.venues.map((v) => ({ id: v.id, name: v.name, status: v.status })),
+        latestInvite: row.ownerInviteTokens[0]
+          ? {
+              sentAt: row.ownerInviteTokens[0].createdAt,
+              expiresAt: row.ownerInviteTokens[0].expiresAt,
+            }
+          : null,
+      })),
+      total,
+    };
   }
 
   private toEntity(prismaUser: PrismaUser): UserEntity {

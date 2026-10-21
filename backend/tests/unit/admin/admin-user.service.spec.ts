@@ -119,6 +119,7 @@ describe('AdminUserService', () => {
       findOwnerInviteToken: jest.fn(),
       markOwnerInviteTokenUsed: jest.fn(),
       invalidateActiveOwnerInviteTokens: jest.fn(),
+      findPendingOwnerInvites: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
