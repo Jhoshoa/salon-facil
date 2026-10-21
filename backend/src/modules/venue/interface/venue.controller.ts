@@ -148,6 +148,15 @@ export class VenueController {
     return this.venueService.getSeasonalEventsCatalog();
   }
 
+  @Get('preview/:token')
+  @Public()
+  @ApiOperation({ summary: 'Ver local(es) de una invitacion de propietario, sin iniciar sesion' })
+  @ApiResponse({ status: 200, description: 'Locales del dueno invitado' })
+  @ApiResponse({ status: 404, description: 'Token invalido o expirado' })
+  async getByInviteToken(@Param('token') token: string) {
+    return this.venueService.getVenuesByInviteToken(token);
+  }
+
   @Get(':slug/similar')
   @Public()
   @ApiOperation({ summary: 'Obtener locales similares a uno dado' })

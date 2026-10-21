@@ -112,6 +112,8 @@ enum NotificationType {
   EMAIL_VERIFICATION
   ACCOUNT_LINKED
   PASSWORD_CHANGED
+  PAYMENT_REFUNDED
+  VENUE_OWNER_INVITE
 }
 
 enum NotificationChannel {
@@ -148,6 +150,7 @@ model User {
   bookings               Booking[]               @relation("ClientBookings")
   reviews                Review[]                @relation("ClientReviews")
   confirmedPayments      Payment[]               @relation("PaymentConfirmedBy")
+  refundedPayments       Payment[]               @relation("PaymentRefundedBy")
   notifications          Notification[]
   notificationPreferences NotificationPreference[]
   refreshTokens          RefreshToken[]
@@ -156,6 +159,7 @@ model User {
   emailVerificationCodes EmailVerificationCode[]
   favorites              VenueFavorite[]
   adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogActor")
+  ownerInviteTokens      OwnerInviteToken[]
 
   @@index([email])
   @@index([phone])
@@ -230,6 +234,25 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// Issued when an ADMIN creates a placeholder owner account + venue on a real owner's behalf
+// (phone onboarding) and emails/WhatsApps them a link to activate it. Viewing the preview via
+// `validate()` does NOT consume the token -- only `claim()` (setting a password) does, via
+// `usedAt`. See docs/owner-invite analysis in chat for the full flow.
+model OwnerInviteToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("owner_invite_tokens")
 }
 
 model Venue {
@@ -593,10 +616,19 @@ model Payment {
   stripeChargeId        String?       @map("stripe_charge_id")
   transactionReference  String?       @map("transaction_reference")
   paidAt                DateTime?     @map("paid_at")
+  // Set together when an ADMIN refunds a COMPLETED payment (see PaymentService.refundPayment).
+  // No payment gateway is wired in today (ManualProofGateway.refund() always reports
+  // success: false) -- this is a record of the decision, not proof that money actually moved;
+  // the owner still has to return it to the client outside the system, same as how they
+  // collected it in the first place.
+  refundedAt            DateTime?     @map("refunded_at")
+  refundReason          String?       @map("refund_reason") @db.Text
+  refundedById          String?       @map("refunded_by_id")
   createdAt             DateTime      @default(now()) @map("created_at")
 
   booking     Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   confirmedBy User?   @relation("PaymentConfirmedBy", fields: [confirmedByOwnerId], references: [id], onDelete: SetNull)
+  refundedBy  User?   @relation("PaymentRefundedBy", fields: [refundedById], references: [id], onDelete: SetNull)
 
   @@index([bookingId])
   @@index([status])

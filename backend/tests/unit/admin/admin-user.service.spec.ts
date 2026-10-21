@@ -115,6 +115,10 @@ describe('AdminUserService', () => {
       markEmailVerificationCodeUsed: jest.fn(),
       invalidateActiveEmailVerificationCodes: jest.fn(),
       countEmailVerificationCodesSince: jest.fn(),
+      createOwnerInviteToken: jest.fn(),
+      findOwnerInviteToken: jest.fn(),
+      markOwnerInviteTokenUsed: jest.fn(),
+      invalidateActiveOwnerInviteTokens: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

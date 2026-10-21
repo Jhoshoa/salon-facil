@@ -21,6 +21,7 @@ import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
 import { AuditLogService } from '../../../audit-log/audit-log.service';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../audit-log/audit-log-actions';
+import { AuthService } from '../../../auth/application/services/auth.service';
 
 export interface VenueCompletion {
   score: number;
@@ -38,6 +39,7 @@ export class VenueService {
     private readonly slugService: SlugService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly auditLogService: AuditLogService,
+    private readonly authService: AuthService,
   ) {}
 
   async createVenue(dto: CreateVenueDto, ownerId: string): Promise<VenueEntity> {
@@ -132,6 +134,19 @@ export class VenueService {
 
   async getMyVenues(ownerId: string): Promise<VenueEntity[]> {
     return this.venueRepository.findByOwner(ownerId);
+  }
+
+  /** Backs the public, unauthenticated `/venues/preview/:token` route used by the owner-invite
+   * phone-onboarding flow — like getVenueBySlug, an invalid/expired token 404s generically
+   * rather than distinguishing "doesn't exist" from "expired" (nothing to enumerate here, but
+   * same defensive habit). Shows the venue(s) regardless of status (DRAFT included) since that's
+   * the whole point of a preview before the real owner has claimed the account. */
+  async getVenuesByInviteToken(rawToken: string): Promise<VenueEntity[]> {
+    const userId = await this.authService.validateOwnerInviteToken(rawToken);
+    if (!userId) {
+      throw new NotFoundException('El enlace de vista previa es invalido o expiro');
+    }
+    return this.venueRepository.findByOwner(userId);
   }
 
   /** Favoriting a venue that doesn't exist (or no longer does) fails loudly rather than

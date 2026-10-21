@@ -80,6 +80,13 @@ export const getMyVenues = async (): Promise<Venue[]> => {
   return apiRequest<Venue[]>('/venues/my/venues');
 };
 
+/** Public, unauthenticated lookup for the owner-invite phone-onboarding flow — works for a
+ * DRAFT venue, since that's the whole point of a preview before the real owner has claimed
+ * their account. Returns every venue tied to the invited owner (usually just one). */
+export const getVenuesByInviteToken = async (token: string): Promise<Venue[]> => {
+  return apiRequest<Venue[]>(`/venues/preview/${token}`, { auth: false });
+};
+
 export const createVenue = async (
   payload: VenueFormPayload,
   files: File[] = [],

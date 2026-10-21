@@ -10,6 +10,7 @@ import {
   loginAdmin,
   registerFixtureUsers,
   BookingFixtureUsers,
+  TestAgent,
 } from './helpers/booking-fixtures';
 
 // Cloudinary isn't configured in this environment (no CLOUDINARY_* env vars — see
@@ -32,6 +33,7 @@ describe('Payments (e2e)', () => {
   let users: BookingFixtureUsers;
   let venueId: string;
   let dayCounter = 100;
+  let adminAgent: TestAgent;
 
   const uniqueId = Date.now();
 
@@ -60,7 +62,7 @@ describe('Payments (e2e)', () => {
     await app.init();
 
     users = await registerFixtureUsers(app, uniqueId);
-    const adminAgent = await loginAdmin(app);
+    adminAgent = await loginAdmin(app);
     venueId = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
       capacityMax: 100,
       basePrice: 1000,
@@ -270,6 +272,90 @@ describe('Payments (e2e)', () => {
       expect(res.body.summary.totalEarned).toBeGreaterThan(0);
       expect(res.body.summary.paymentCount).toBeGreaterThan(0);
       expect(Array.isArray(res.body.breakdown)).toBe(true);
+    });
+  });
+
+  describe('PUT /api/v1/payments/:paymentId/refund (ADMIN)', () => {
+    const confirmedPayment = async () => {
+      const booking = await nextBooking();
+      const paymentRes = await users.clientAgent
+        .post(`/api/v1/payments/bookings/${booking.bookingId}`)
+        .send({ paymentType: 'FULL', method: 'QR_BANK', amount: booking.totalPrice })
+        .expect(201);
+      await users.clientAgent
+        .post(`/api/v1/payments/${paymentRes.body.id}/proof`)
+        .attach('file', Buffer.from('fake-image-bytes'), 'proof.jpg')
+        .expect(201);
+      await users.ownerAgent.put(`/api/v1/payments/${paymentRes.body.id}/confirm`).expect(200);
+      return paymentRes.body.id as string;
+    };
+
+    it('marks a confirmed payment as REFUNDED and stores the reason', async () => {
+      const paymentId = await confirmedPayment();
+
+      const res = await adminAgent
+        .put(`/api/v1/payments/${paymentId}/refund`)
+        .send({ reason: 'El cliente cancelo el evento' })
+        .expect(200);
+
+      expect(res.body.status).toBe('REFUNDED');
+      expect(res.body.refundReason).toBe('El cliente cancelo el evento');
+      expect(res.body.refundedById).toBeTruthy();
+    });
+
+    it('rejects refunding a payment that is still pending', async () => {
+      const booking = await nextBooking();
+      const paymentRes = await users.clientAgent
+        .post(`/api/v1/payments/bookings/${booking.bookingId}`)
+        .send({ paymentType: 'FULL', method: 'QR_BANK', amount: booking.totalPrice })
+        .expect(201);
+
+      await adminAgent
+        .put(`/api/v1/payments/${paymentRes.body.id}/refund`)
+        .send({ reason: 'motivo' })
+        .expect(400);
+    });
+
+    it('returns 403 for a non-admin', async () => {
+      const paymentId = await confirmedPayment();
+
+      await users.ownerAgent
+        .put(`/api/v1/payments/${paymentId}/refund`)
+        .send({ reason: 'motivo' })
+        .expect(403);
+    });
+  });
+
+  describe('GET /api/v1/admin/payments', () => {
+    it('lists the refunded payment for an admin', async () => {
+      const paymentId = await (async () => {
+        const booking = await nextBooking();
+        const paymentRes = await users.clientAgent
+          .post(`/api/v1/payments/bookings/${booking.bookingId}`)
+          .send({ paymentType: 'FULL', method: 'QR_BANK', amount: booking.totalPrice })
+          .expect(201);
+        await users.clientAgent
+          .post(`/api/v1/payments/${paymentRes.body.id}/proof`)
+          .attach('file', Buffer.from('fake-image-bytes'), 'proof.jpg')
+          .expect(201);
+        await users.ownerAgent.put(`/api/v1/payments/${paymentRes.body.id}/confirm`).expect(200);
+        await adminAgent
+          .put(`/api/v1/payments/${paymentRes.body.id}/refund`)
+          .send({ reason: 'listado de admin' })
+          .expect(200);
+        return paymentRes.body.id as string;
+      })();
+
+      const res = await adminAgent
+        .get('/api/v1/admin/payments')
+        .query({ status: 'REFUNDED' })
+        .expect(200);
+
+      expect(res.body.data.some((payment: { id: string }) => payment.id === paymentId)).toBe(true);
+    });
+
+    it('returns 403 for a non-admin', () => {
+      return users.ownerAgent.get('/api/v1/admin/payments').expect(403);
     });
   });
 });

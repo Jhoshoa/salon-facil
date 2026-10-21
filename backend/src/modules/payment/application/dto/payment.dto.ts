@@ -35,3 +35,9 @@ export class RejectPaymentDto {
   @MaxLength(1000)
   reason!: string;
 }
+
+export class RefundPaymentDto {
+  @IsString({ message: 'El motivo es requerido' })
+  @MaxLength(1000)
+  reason!: string;
+}

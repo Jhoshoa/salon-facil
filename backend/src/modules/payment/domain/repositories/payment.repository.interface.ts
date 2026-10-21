@@ -1,4 +1,9 @@
-import { PaymentEntity, PaymentMethod, PaymentType } from '../entities/payment.entity';
+import {
+  PaymentEntity,
+  PaymentMethod,
+  PaymentStatus,
+  PaymentType,
+} from '../entities/payment.entity';
 
 export const PAYMENT_REPOSITORY = Symbol('PAYMENT_REPOSITORY');
 
@@ -12,6 +17,15 @@ export interface IPaymentRepository {
   uploadProof(id: string, comprobanteUrl: string): Promise<PaymentEntity>;
   confirm(id: string, ownerId: string, notes?: string): Promise<PaymentEntity>;
   reject(id: string, reason: string): Promise<PaymentEntity>;
+  refund(id: string, adminId: string, reason: string): Promise<PaymentEntity>;
+  /** Platform-wide, paginated and filtered -- backs the admin disputes/refunds list. */
+  findAllForAdmin(params: {
+    search?: string;
+    status?: PaymentStatus;
+    venueId?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ items: PaymentEntity[]; total: number }>;
   getOwnerEarningsSummary(
     ownerId: string,
     venueId?: string,

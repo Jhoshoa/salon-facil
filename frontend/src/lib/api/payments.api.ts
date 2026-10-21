@@ -1,5 +1,12 @@
-import { apiRequest } from './client';
-import type { CreatePaymentPayload, OwnerEarnings, Payment, PaymentMethod } from '@/types/api';
+import { apiRequest, buildQueryString } from './client';
+import type {
+  CreatePaymentPayload,
+  OwnerEarnings,
+  PaginatedResponse,
+  Payment,
+  PaymentMethod,
+  PaymentStatus,
+} from '@/types/api';
 
 export const createPayment = async (
   bookingId: string,
@@ -41,6 +48,29 @@ export const rejectPayment = async (paymentId: string, reason: string): Promise<
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });
+};
+
+export const refundPayment = async (paymentId: string, reason: string): Promise<Payment> => {
+  return apiRequest<Payment>(`/payments/${paymentId}/refund`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+// ========== ADMIN ==========
+
+export interface AdminPaymentsParams {
+  search?: string;
+  status?: PaymentStatus;
+  venueId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const getAdminPayments = async (
+  params: AdminPaymentsParams = {},
+): Promise<PaginatedResponse<Payment>> => {
+  return apiRequest<PaginatedResponse<Payment>>(`/admin/payments${buildQueryString(params)}`);
 };
 
 export const getOwnerEarnings = async (months = 6, venueId?: string): Promise<OwnerEarnings> => {

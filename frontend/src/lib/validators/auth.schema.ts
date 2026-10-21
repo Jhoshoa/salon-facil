@@ -39,8 +39,13 @@ export const completeProfileSchema = z.object({
   phone: z.string().regex(PHONE_REGEX, PHONE_HINT),
 });
 
+export const claimInviteSchema = z.object({
+  password: z.string().regex(PASSWORD_REGEX, PASSWORD_HINT),
+});
+
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 export type CompleteProfileFormValues = z.infer<typeof completeProfileSchema>;
+export type ClaimInviteFormValues = z.infer<typeof claimInviteSchema>;

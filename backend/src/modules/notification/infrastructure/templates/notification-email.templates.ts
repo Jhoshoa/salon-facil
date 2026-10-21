@@ -68,7 +68,17 @@ export type NotificationEmailMetadata =
     }
   | { kind: 'reviewResponse'; venueName: string; responseText: string; bookingId: string }
   | { kind: 'accountLinked'; provider: string }
-  | { kind: 'passwordChanged' };
+  | { kind: 'passwordChanged' }
+  | {
+      kind: 'paymentRefunded';
+      recipient: 'client' | 'owner';
+      venueName: string;
+      paymentTypeLabel: string;
+      amount: number;
+      reason: string;
+      bookingId: string;
+    }
+  | { kind: 'venueOwnerInvite'; ownerName: string; venueName: string; previewUrl: string };
 
 const bs = (amount: number) => `Bs ${amount.toLocaleString('es-BO')}`;
 
@@ -260,6 +270,48 @@ export const buildNotificationEmailHtml = (
       return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
     }
 
+    case 'paymentRefunded': {
+      const bodyHtml =
+        metadata.recipient === 'client'
+          ? `
+        <p style="margin:0 0 4px;">${badge('Reembolsado', 'warning')}</p>
+        <p style="margin:16px 0;">Un administrador aprobo el reembolso de tu pago. El propietario del local se va a contactar para devolverte el dinero por fuera del sistema.</p>
+        ${detailsCard([
+          { label: 'Local', value: metadata.venueName },
+          { label: 'Concepto', value: metadata.paymentTypeLabel },
+          { label: 'Monto', value: bs(metadata.amount) },
+          { label: 'Motivo', value: metadata.reason },
+        ])}
+        ${button({ label: 'Ver mi reserva', url: `${frontendUrl}/bookings/${metadata.bookingId}` })}`
+          : `
+        <p style="margin:0 0 4px;">${badge('Reembolsado', 'warning')}</p>
+        <p style="margin:16px 0;">Un administrador marco un pago de tu local como reembolsado. Como no hay una pasarela de pago conectada, tenes que devolverle el dinero al cliente por fuera del sistema (la misma via por la que lo cobraste).</p>
+        ${detailsCard([
+          { label: 'Local', value: metadata.venueName },
+          { label: 'Concepto', value: metadata.paymentTypeLabel },
+          { label: 'Monto', value: bs(metadata.amount) },
+          { label: 'Motivo', value: metadata.reason },
+        ])}
+        ${button({ label: 'Ver pagos', url: `${frontendUrl}/dashboard/earnings`, variant: 'secondary' })}`;
+      return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
+    }
+
+    case 'venueOwnerInvite': {
+      const bodyHtml = `
+        <p style="margin:0 0 4px;">Hola ${metadata.ownerName},</p>
+        <p style="margin:16px 0;">Cargamos tu local <strong>${metadata.venueName}</strong> en Mi Evento. Mira como quedo y, si queres, activa tu cuenta para administrarlo vos mismo.</p>
+        ${button({ label: 'Ver mi local', url: metadata.previewUrl })}
+        <p style="margin:16px 0 0; font-size:13px; color:${emailUi.colors.muted};">
+          Si el boton no funciona, copia y pega este enlace: <a href="${metadata.previewUrl}" style="color:${emailUi.colors.navy};">${metadata.previewUrl}</a>
+        </p>
+        <p style="margin:16px 0 0; font-size:13px; color:${emailUi.colors.muted};">Este enlace vence en 20 dias. Podes volver a verlo las veces que quieras hasta entonces.</p>`;
+      return renderEmailLayout({
+        preheader: title,
+        heading: 'Mira como quedo tu local',
+        bodyHtml,
+      });
+    }
+
     case 'accountLinked': {
       const bodyHtml = `
         <p style="margin:0 0 4px;">${badge('Alerta de seguridad', 'neutral')}</p>
@@ -312,4 +364,6 @@ export const EXPECTED_METADATA_KIND: Record<
   REVIEW_RESPONSE: 'reviewResponse',
   ACCOUNT_LINKED: 'accountLinked',
   PASSWORD_CHANGED: 'passwordChanged',
+  PAYMENT_REFUNDED: 'paymentRefunded',
+  VENUE_OWNER_INVITE: 'venueOwnerInvite',
 };

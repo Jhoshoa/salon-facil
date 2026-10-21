@@ -545,6 +545,9 @@ export interface Payment {
   paidAt: string | null;
   notes: string | null;
   transactionReference: string | null;
+  refundedAt: string | null;
+  refundReason: string | null;
+  refundedById: string | null;
   createdAt: string;
   booking?: Booking;
 }

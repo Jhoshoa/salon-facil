@@ -13,9 +13,10 @@ import { VENUE_REPOSITORY } from '../domain/repositories/venue.repository.interf
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { UploadModule } from '../../upload/upload.module';
 import { AuditLogModule } from '../../audit-log/audit-log.module';
+import { AuthModule } from '../../auth/interface/auth.module';
 
 @Module({
-  imports: [PrismaModule, UploadModule, AuditLogModule],
+  imports: [PrismaModule, UploadModule, AuditLogModule, AuthModule],
   controllers: [VenueController],
   providers: [
     VenueService,
