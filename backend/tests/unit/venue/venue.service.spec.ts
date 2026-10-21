@@ -8,6 +8,7 @@ import { VenueStatus } from '../../../src/modules/venue/domain/entities/venue.en
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
 import { AuditLogService } from '../../../src/modules/audit-log/audit-log.service';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../src/modules/audit-log/audit-log-actions';
+import { AuthService } from '../../../src/modules/auth/application/services/auth.service';
 
 describe('VenueService', () => {
   let service: VenueService;
@@ -15,6 +16,7 @@ describe('VenueService', () => {
   let mockSlugService: Record<string, jest.Mock>;
   let mockCloudinaryService: Record<string, jest.Mock>;
   let mockAuditLogService: Record<string, jest.Mock>;
+  let mockAuthService: Record<string, jest.Mock>;
 
   const mockVenue = {
     id: 'venue-1',
@@ -70,6 +72,10 @@ describe('VenueService', () => {
       record: jest.fn(),
     };
 
+    mockAuthService = {
+      validateOwnerInviteToken: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VenueService,
@@ -77,6 +83,7 @@ describe('VenueService', () => {
         { provide: SlugService, useValue: mockSlugService },
         { provide: CloudinaryService, useValue: mockCloudinaryService },
         { provide: AuditLogService, useValue: mockAuditLogService },
+        { provide: AuthService, useValue: mockAuthService },
       ],
     }).compile();
 
@@ -212,6 +219,26 @@ describe('VenueService', () => {
 
       expect(result).toHaveLength(1);
       expect(mockRepository.findByOwner).toHaveBeenCalledWith('owner-1');
+    });
+  });
+
+  describe('getVenuesByInviteToken', () => {
+    it('returns the venues owned by the token holder for a valid token', async () => {
+      mockAuthService.validateOwnerInviteToken.mockResolvedValue('owner-1');
+      mockRepository.findByOwner.mockResolvedValue([mockVenue]);
+
+      const result = await service.getVenuesByInviteToken('raw-token');
+
+      expect(result).toHaveLength(1);
+      expect(mockAuthService.validateOwnerInviteToken).toHaveBeenCalledWith('raw-token');
+      expect(mockRepository.findByOwner).toHaveBeenCalledWith('owner-1');
+    });
+
+    it('throws NotFoundException for an invalid or expired token', async () => {
+      mockAuthService.validateOwnerInviteToken.mockResolvedValue(null);
+
+      await expect(service.getVenuesByInviteToken('bad-token')).rejects.toThrow(NotFoundException);
+      expect(mockRepository.findByOwner).not.toHaveBeenCalled();
     });
   });
 

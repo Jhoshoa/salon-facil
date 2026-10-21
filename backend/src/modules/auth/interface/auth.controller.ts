@@ -27,6 +27,7 @@ import { LoginDto } from '../application/dto/login.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
 import { ForgotPasswordDto } from '../application/dto/forgot-password.dto';
 import { ResetPasswordDto } from '../application/dto/reset-password.dto';
+import { ClaimInviteDto } from '../application/dto/claim-invite.dto';
 import { VerifyEmailDto } from '../application/dto/verify-email.dto';
 import { AuthResponseDto, PublicAuthResponseDto } from '../application/dto/auth-response.dto';
 import { LogoutDto } from '../application/dto/logout.dto';
@@ -181,6 +182,25 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Token inválido o expirado' })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
     return this.authService.resetPassword(dto);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('claim-invite')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Activar una cuenta de propietario creada por el admin, con el token recibido por email/WhatsApp',
+  })
+  @ApiResponse({ status: 200, description: 'Cuenta activada y sesion iniciada' })
+  @ApiResponse({ status: 400, description: 'Token invalido, expirado o ya usado' })
+  async claimInvite(
+    @Body() dto: ClaimInviteDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<PublicAuthResponseDto> {
+    const auth = await this.authService.claimInvite(dto);
+    setAuthCookies(res, auth, this.tokenService.getRefreshTokenExpiresAt(auth.refreshToken));
+    return toPublicResponse(auth);
   }
 
   @Get('me')
