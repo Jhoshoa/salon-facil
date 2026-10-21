@@ -23,6 +23,7 @@ const points = [
     title: 'Pagos revisados antes de confirmar',
     description:
       'Cada comprobante que sube un cliente lo revisa el propietario (o un admin) antes de que la reserva quede confirmada.',
+    badge: 'Proximamente',
   },
   {
     icon: Lock,
@@ -76,9 +77,16 @@ export default function SecurityPage() {
             const Icon = point.icon;
             return (
               <div key={point.title} className="sf-feature-card">
-                <span className="sf-feature-icon">
-                  <Icon className="h-5 w-5" />
-                </span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="sf-feature-icon">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  {point.badge && (
+                    <Badge variant="outline" className="shrink-0">
+                      {point.badge}
+                    </Badge>
+                  )}
+                </div>
                 <h2 className="text-base font-semibold">{point.title}</h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{point.description}</p>
               </div>
