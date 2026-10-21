@@ -75,6 +75,19 @@ export const resetPassword = async (payload: {
   });
 };
 
+/** Activates an admin-created placeholder owner account (phone-onboarding flow) — sets the
+ * first password and logs the owner straight in, same response shape as login/register. */
+export const claimInvite = async (payload: {
+  token: string;
+  password: string;
+}): Promise<PublicAuthResponse> => {
+  return apiRequest<PublicAuthResponse>('/auth/claim-invite', {
+    auth: false,
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
 export const verifyEmail = async (code: string): Promise<{ message: string }> => {
   return apiRequest<{ message: string }>('/auth/verify-email', {
     method: 'POST',
