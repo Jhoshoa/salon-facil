@@ -333,7 +333,7 @@ export default function HomePage() {
             <br />
             mi evento
           </span>
-          <h3 className="mx-auto max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
+          <h3 className="mx-auto max-w-xl text-3xl font-semibold leading-tight text-primary-foreground sm:text-4xl">
             Tu espacio tambien merece{' '}
             <em className="font-normal italic text-secondary">su propia entrada</em> en el cuaderno.
           </h3>

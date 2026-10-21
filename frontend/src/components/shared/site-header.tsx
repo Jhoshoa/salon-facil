@@ -120,11 +120,10 @@ export const SiteHeader = () => {
                     Iniciar sesion
                   </Link>
                 </Button>
-                <Button asChild variant="secondary" size="sm">
+                <Button asChild variant="secondary" size="sm" className="hidden sm:inline-flex">
                   <Link href="/register">
                     <UserPlus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Crear cuenta</span>
-                    <span className="sm:hidden">Registro</span>
+                    Crear cuenta
                   </Link>
                 </Button>
               </>
