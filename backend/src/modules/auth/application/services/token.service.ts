@@ -97,6 +97,14 @@ export class TokenService {
     return randomBytes(32).toString('hex');
   }
 
+  /** Opaque token for the owner-invite claim flow — same shape as generatePasswordResetToken
+   * (unguessable, validated by DB lookup of its hash), kept as its own method since it's a
+   * conceptually distinct token purpose (viewing a preview doesn't consume it; only claiming
+   * does) even though the generation mechanics are identical. */
+  generateOwnerInviteToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
   /** Opaque, single-use code for the email-verification flow — same shape as
    * generatePasswordResetToken, just shorter (this one gets typed by hand into a modal, not
    * clicked from a link) and numeric-only so it's easy to read off an email on a phone. */

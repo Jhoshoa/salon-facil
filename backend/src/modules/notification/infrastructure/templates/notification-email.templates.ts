@@ -77,7 +77,8 @@ export type NotificationEmailMetadata =
       amount: number;
       reason: string;
       bookingId: string;
-    };
+    }
+  | { kind: 'venueOwnerInvite'; ownerName: string; venueName: string; previewUrl: string };
 
 const bs = (amount: number) => `Bs ${amount.toLocaleString('es-BO')}`;
 
@@ -295,6 +296,22 @@ export const buildNotificationEmailHtml = (
       return renderEmailLayout({ preheader: title, heading: title, bodyHtml });
     }
 
+    case 'venueOwnerInvite': {
+      const bodyHtml = `
+        <p style="margin:0 0 4px;">Hola ${metadata.ownerName},</p>
+        <p style="margin:16px 0;">Cargamos tu local <strong>${metadata.venueName}</strong> en Mi Evento. Mira como quedo y, si queres, activa tu cuenta para administrarlo vos mismo.</p>
+        ${button({ label: 'Ver mi local', url: metadata.previewUrl })}
+        <p style="margin:16px 0 0; font-size:13px; color:${emailUi.colors.muted};">
+          Si el boton no funciona, copia y pega este enlace: <a href="${metadata.previewUrl}" style="color:${emailUi.colors.navy};">${metadata.previewUrl}</a>
+        </p>
+        <p style="margin:16px 0 0; font-size:13px; color:${emailUi.colors.muted};">Este enlace vence en 20 dias. Podes volver a verlo las veces que quieras hasta entonces.</p>`;
+      return renderEmailLayout({
+        preheader: title,
+        heading: 'Mira como quedo tu local',
+        bodyHtml,
+      });
+    }
+
     case 'accountLinked': {
       const bodyHtml = `
         <p style="margin:0 0 4px;">${badge('Alerta de seguridad', 'neutral')}</p>
@@ -348,4 +365,5 @@ export const EXPECTED_METADATA_KIND: Record<
   ACCOUNT_LINKED: 'accountLinked',
   PASSWORD_CHANGED: 'passwordChanged',
   PAYMENT_REFUNDED: 'paymentRefunded',
+  VENUE_OWNER_INVITE: 'venueOwnerInvite',
 };

@@ -35,6 +35,7 @@ export class AuthRepository implements IAuthRepository {
     city?: string;
     district?: string;
     emailVerifiedAt?: Date;
+    status?: UserStatus;
   }): Promise<UserEntity> {
     const user = await this.prisma.user.create({
       data: {
@@ -47,7 +48,7 @@ export class AuthRepository implements IAuthRepository {
         // independent of email-verification status (emailVerifiedAt / isVerified()) — the
         // former is an admin-controlled lever, the latter gates specific trust/money actions.
         // See docs/auth-improvement/oauth-redirects-verification.md §4.
-        status: UserStatus.ACTIVE,
+        status: data.status ?? UserStatus.ACTIVE,
         city: data.city ?? null,
         district: data.district ?? null,
         emailVerifiedAt: data.emailVerifiedAt ?? null,
@@ -381,6 +382,40 @@ export class AuthRepository implements IAuthRepository {
   async countEmailVerificationCodesSince(userId: string, since: Date): Promise<number> {
     return this.prisma.emailVerificationCode.count({
       where: { userId, createdAt: { gte: since } },
+    });
+  }
+
+  async createOwnerInviteToken(data: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.prisma.ownerInviteToken.create({ data });
+  }
+
+  async findOwnerInviteToken(tokenHash: string): Promise<{
+    id: string;
+    userId: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+  } | null> {
+    return this.prisma.ownerInviteToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true, expiresAt: true, usedAt: true },
+    });
+  }
+
+  async markOwnerInviteTokenUsed(id: string): Promise<void> {
+    await this.prisma.ownerInviteToken.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  }
+
+  async invalidateActiveOwnerInviteTokens(userId: string): Promise<void> {
+    await this.prisma.ownerInviteToken.updateMany({
+      where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
     });
   }
 

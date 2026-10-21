@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { NotificationType } from '@prisma/client';
-import { UserEntity, UserRole } from '../../domain/entities/user.entity';
+import { UserEntity, UserRole, UserStatus } from '../../domain/entities/user.entity';
 import {
   AUTH_REPOSITORY,
   IAuthRepository,
@@ -21,10 +21,15 @@ import { AuthResponseDto } from '../dto/auth-response.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
+import { ClaimInviteDto } from '../dto/claim-invite.dto';
 import { NotificationService } from '../../../notification/application/services/notification.service';
 import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+// Mucho mas largo que el reset de password: el dueño invitado por telefono puede tardar dias en
+// siquiera abrir el email/WhatsApp, a diferencia de alguien que pidio "olvide mi contrasena" y
+// esta esperando en la pantalla de login. Valor fijo por ahora (sin panel de configuracion).
+const OWNER_INVITE_TOKEN_TTL_MS = 20 * 24 * 60 * 60 * 1000; // 20 dias
 const EMAIL_VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
 const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 segundos
@@ -413,6 +418,69 @@ export class AuthService {
     this.sendPasswordChangedNotification(user);
 
     return { message: 'Contrasena actualizada exitosamente' };
+  }
+
+  /** Issues (or re-issues, invalidating whatever was outstanding) the token an admin-created
+   * placeholder owner uses to view/claim their venue — see the owner-invite phone-onboarding
+   * flow. Returns the raw token; only its hash is ever persisted. */
+  async issueOwnerInviteToken(userId: string): Promise<string> {
+    await this.authRepository.invalidateActiveOwnerInviteTokens(userId);
+
+    const token = this.tokenService.generateOwnerInviteToken();
+    await this.authRepository.createOwnerInviteToken({
+      userId,
+      tokenHash: this.tokenService.hashToken(token),
+      expiresAt: new Date(Date.now() + OWNER_INVITE_TOKEN_TTL_MS),
+    });
+
+    return token;
+  }
+
+  /** Read-only lookup used by the public venue preview route — deliberately does NOT check
+   * `usedAt` (or consume anything): viewing the preview is repeatable and never spends the
+   * token, only claimInvite() below does. Returns null (never throws) for anything invalid so
+   * the caller can 404 generically, same spirit as getVenueBySlug. */
+  async validateOwnerInviteToken(rawToken: string): Promise<string | null> {
+    const tokenHash = this.tokenService.hashToken(rawToken);
+    const storedToken = await this.authRepository.findOwnerInviteToken(tokenHash);
+    if (!storedToken || storedToken.expiresAt <= new Date()) {
+      return null;
+    }
+    return storedToken.userId;
+  }
+
+  /** Activates a placeholder owner account: sets its first password, flips it to ACTIVE (it
+   * cannot log in until this happens — see IAuthRepository.create's `status` param), marks the
+   * email verified (clicking a link sent to that address is reasonable proof of control, same
+   * logic Google OAuth linking uses), and logs the owner straight in. */
+  async claimInvite(dto: ClaimInviteDto): Promise<AuthResponseDto> {
+    const tokenHash = this.tokenService.hashToken(dto.token);
+    const storedToken = await this.authRepository.findOwnerInviteToken(tokenHash);
+
+    if (!storedToken || storedToken.usedAt || storedToken.expiresAt <= new Date()) {
+      throw new BadRequestException('El enlace de invitacion es invalido o expiro');
+    }
+
+    const user = await this.authRepository.findById(storedToken.userId);
+    if (!user) {
+      throw new BadRequestException('El enlace de invitacion es invalido o expiro');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    await this.authRepository.updatePassword(user.id, passwordHash);
+    await this.authRepository.updateStatus(user.id, UserStatus.ACTIVE);
+    if (!user.isVerified()) {
+      await this.authRepository.markEmailVerified(user.id);
+    }
+    await this.authRepository.markOwnerInviteTokenUsed(storedToken.id);
+
+    const activatedUser = await this.authRepository.findById(user.id);
+    if (!activatedUser) {
+      throw new BadRequestException('El enlace de invitacion es invalido o expiro');
+    }
+
+    const tokens = await this.issueTokens(activatedUser);
+    return this.buildAuthResponse(activatedUser, tokens);
   }
 
   private async issueTokens(user: UserEntity): Promise<{

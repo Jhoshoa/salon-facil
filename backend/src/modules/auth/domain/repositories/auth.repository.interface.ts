@@ -26,6 +26,10 @@ export interface IAuthRepository {
     /** Set for OAuth accounts whose provider already proved the address (e.g. Google) — skips
      * the code-verification step for them. Omit for password-based registration. */
     emailVerifiedAt?: Date;
+    /** Defaults to ACTIVE (every existing caller relies on this). Admin-created placeholder
+     * owner accounts (see owner-invite flow) pass PENDING_VERIFICATION explicitly so the account
+     * can't log in — and has no password to log in with anyway — until the owner claims it. */
+    status?: UserStatus;
   }): Promise<UserEntity>;
   updateLastLogin(id: string): Promise<void>;
   updateProfile(
@@ -110,4 +114,24 @@ export interface IAuthRepository {
    * deleted (see invalidateActiveEmailVerificationCodes), so this doubles as a resend-attempt
    * counter regardless of whether earlier codes were used, expired, or superseded. */
   countEmailVerificationCodesSince(userId: string, since: Date): Promise<number>;
+
+  // --- Owner invite tokens (admin phone-onboarding claim flow) ---
+  createOwnerInviteToken(data: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void>;
+  /** Looked up by both validate (view, doesn't consume) and claim (activate, consumes) —
+   * `usedAt` is checked by the caller, not filtered out here, since a used token must still be
+   * distinguishable from a never-existed one for the right error message. */
+  findOwnerInviteToken(tokenHash: string): Promise<{
+    id: string;
+    userId: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+  } | null>;
+  markOwnerInviteTokenUsed(id: string): Promise<void>;
+  /** Same idea as invalidateActivePasswordResetTokens — called right before issuing a fresh
+   * token so a resent invite immediately supersedes any earlier one. */
+  invalidateActiveOwnerInviteTokens(userId: string): Promise<void>;
 }

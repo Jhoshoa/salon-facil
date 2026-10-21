@@ -59,6 +59,11 @@ describe('AuthService', () => {
     markEmailVerificationCodeUsed: jest.Mock;
     invalidateActiveEmailVerificationCodes: jest.Mock;
     countEmailVerificationCodesSince: jest.Mock;
+    createOwnerInviteToken: jest.Mock;
+    findOwnerInviteToken: jest.Mock;
+    markOwnerInviteTokenUsed: jest.Mock;
+    invalidateActiveOwnerInviteTokens: jest.Mock;
+    updateStatus: jest.Mock;
   };
   let mockTokenService: {
     generateTokens: jest.Mock;
@@ -66,6 +71,7 @@ describe('AuthService', () => {
     hashToken: jest.Mock;
     getRefreshTokenExpiresAt: jest.Mock;
     generatePasswordResetToken: jest.Mock;
+    generateOwnerInviteToken: jest.Mock;
     generateEmailVerificationCode: jest.Mock;
     signOAuthState: jest.Mock;
     verifyOAuthState: jest.Mock;
@@ -98,6 +104,11 @@ describe('AuthService', () => {
       markEmailVerificationCodeUsed: jest.fn(),
       invalidateActiveEmailVerificationCodes: jest.fn(),
       countEmailVerificationCodesSince: jest.fn().mockResolvedValue(0),
+      createOwnerInviteToken: jest.fn(),
+      findOwnerInviteToken: jest.fn(),
+      markOwnerInviteTokenUsed: jest.fn(),
+      invalidateActiveOwnerInviteTokens: jest.fn(),
+      updateStatus: jest.fn(),
     };
 
     mockTokenService = {
@@ -110,6 +121,7 @@ describe('AuthService', () => {
       hashToken: jest.fn().mockReturnValue('mock-refresh-token-hash'),
       getRefreshTokenExpiresAt: jest.fn().mockReturnValue(new Date('2030-01-01T00:00:00.000Z')),
       generatePasswordResetToken: jest.fn().mockReturnValue('mock-reset-token'),
+      generateOwnerInviteToken: jest.fn().mockReturnValue('mock-invite-token'),
       generateEmailVerificationCode: jest.fn().mockReturnValue('123456'),
       signOAuthState: jest.fn().mockReturnValue('mock-oauth-state'),
       verifyOAuthState: jest.fn().mockReturnValue({}),
@@ -432,6 +444,137 @@ describe('AuthService', () => {
 
       await expect(
         service.resetPassword({ token: 'expired-token', newPassword: 'NewPassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('issueOwnerInviteToken', () => {
+    it('invalidates prior tokens and stores the new hash with a 20-day expiry', async () => {
+      const token = await service.issueOwnerInviteToken('user-123');
+
+      expect(token).toBe('mock-invite-token');
+      expect(mockAuthRepository.invalidateActiveOwnerInviteTokens).toHaveBeenCalledWith('user-123');
+      expect(mockAuthRepository.createOwnerInviteToken).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123', tokenHash: 'mock-refresh-token-hash' }),
+      );
+    });
+  });
+
+  describe('validateOwnerInviteToken', () => {
+    it('returns the userId for a token that exists and has not expired', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+
+      await expect(service.validateOwnerInviteToken('raw-token')).resolves.toBe('user-123');
+    });
+
+    it('returns the userId even when the token was already used (viewing never consumes it)', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+
+      await expect(service.validateOwnerInviteToken('raw-token')).resolves.toBe('user-123');
+    });
+
+    it('returns null for an expired token', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+
+      await expect(service.validateOwnerInviteToken('raw-token')).resolves.toBeNull();
+    });
+
+    it('returns null for an unknown token', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue(null);
+
+      await expect(service.validateOwnerInviteToken('raw-token')).resolves.toBeNull();
+    });
+  });
+
+  describe('claimInvite', () => {
+    it('sets the password, activates the account, verifies the email, and logs in', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+      mockAuthRepository.findById
+        .mockResolvedValueOnce(
+          activeUser({ passwordHash: null, status: UserStatus.PENDING_VERIFICATION }),
+        )
+        .mockResolvedValueOnce(
+          activeUser({ status: UserStatus.ACTIVE, emailVerifiedAt: new Date() }),
+        );
+
+      const result = await service.claimInvite({ token: 'raw-token', password: 'NewPassword123!' });
+
+      expect(result.accessToken).toBe('mock-access-token');
+      expect(mockAuthRepository.updatePassword).toHaveBeenCalledWith(
+        'user-123',
+        expect.any(String),
+      );
+      expect(mockAuthRepository.updateStatus).toHaveBeenCalledWith('user-123', UserStatus.ACTIVE);
+      expect(mockAuthRepository.markEmailVerified).toHaveBeenCalledWith('user-123');
+      expect(mockAuthRepository.markOwnerInviteTokenUsed).toHaveBeenCalledWith('invite-token-123');
+    });
+
+    it('does not re-mark an already-verified email', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+      mockAuthRepository.findById.mockResolvedValue(activeUser({ emailVerifiedAt: new Date() }));
+
+      await service.claimInvite({ token: 'raw-token', password: 'NewPassword123!' });
+
+      expect(mockAuthRepository.markEmailVerified).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown token', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue(null);
+
+      await expect(
+        service.claimInvite({ token: 'unknown', password: 'NewPassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects an already-claimed token', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        usedAt: new Date(),
+      });
+
+      await expect(
+        service.claimInvite({ token: 'used-token', password: 'NewPassword123!' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockAuthRepository.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired token', async () => {
+      mockAuthRepository.findOwnerInviteToken.mockResolvedValue({
+        id: 'invite-token-123',
+        userId: 'user-123',
+        expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+        usedAt: null,
+      });
+
+      await expect(
+        service.claimInvite({ token: 'expired-token', password: 'NewPassword123!' }),
       ).rejects.toThrow(BadRequestException);
     });
   });
