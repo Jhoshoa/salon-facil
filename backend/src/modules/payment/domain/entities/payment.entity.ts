@@ -36,6 +36,9 @@ export class PaymentEntity {
   stripeChargeId: string | null = null;
   transactionReference: string | null = null;
   paidAt: Date | null = null;
+  refundedAt: Date | null = null;
+  refundReason: string | null = null;
+  refundedById: string | null = null;
   createdAt!: Date;
 
   booking?: {
@@ -67,5 +70,9 @@ export class PaymentEntity {
 
   canBeConfirmed(): boolean {
     return this.status === PaymentStatus.PENDING && Boolean(this.comprobanteUrl);
+  }
+
+  canBeRefunded(): boolean {
+    return this.status === PaymentStatus.COMPLETED;
   }
 }

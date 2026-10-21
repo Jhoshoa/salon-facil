@@ -10,10 +10,11 @@ import { PAYMENT_GATEWAY } from '../domain/gateways/payment-gateway.interface';
 import { PaymentRepository } from '../infrastructure/repositories/payment.repository';
 import { ManualProofGateway } from '../infrastructure/gateways/manual-proof.gateway';
 import { PaymentController } from './payment.controller';
+import { AdminPaymentController } from './admin-payment.controller';
 
 @Module({
   imports: [PrismaModule, BookingModule, VenueModule, UploadModule, NotificationModule],
-  controllers: [PaymentController],
+  controllers: [PaymentController, AdminPaymentController],
   providers: [
     PaymentService,
     {

@@ -18,11 +18,13 @@ import { CloudinaryService } from '../../../upload/cloudinary.service';
 import { NotificationService } from '../../../notification/application/services/notification.service';
 import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 import { CreatePaymentDto } from '../dto/payment.dto';
+import { AdminPaymentQueryDto } from '../dto/admin-payment-query.dto';
 import { PaymentEntity, PaymentStatus, PaymentType } from '../../domain/entities/payment.entity';
 import {
   IPaymentRepository,
   PAYMENT_REPOSITORY,
 } from '../../domain/repositories/payment.repository.interface';
+import { IPaymentGateway, PAYMENT_GATEWAY } from '../../domain/gateways/payment-gateway.interface';
 
 const PAYABLE_BOOKING_STATUSES = [BookingStatus.APPROVED, BookingStatus.DEPOSIT_PAID];
 const ALLOWED_PROOF_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -41,6 +43,8 @@ export class PaymentService {
     private readonly paymentRepository: IPaymentRepository,
     @Inject(BOOKING_REPOSITORY)
     private readonly bookingRepository: IBookingRepository,
+    @Inject(PAYMENT_GATEWAY)
+    private readonly paymentGateway: IPaymentGateway,
     private readonly venueService: VenueService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly notificationService: NotificationService,
@@ -297,6 +301,87 @@ export class PaymentService {
     }
 
     return updated;
+  }
+
+  /** ADMIN-only dispute resolution: marks a COMPLETED payment as REFUNDED. No payment gateway is
+   * wired in today (see ManualProofGateway.refund()) -- the gateway call is still made so a real
+   * provider can short-circuit this later, but the record is written either way, since the owner
+   * returning the money manually (same channel they collected it through) is the actual process
+   * today, not something the gateway call result gates. */
+  async refundPayment(paymentId: string, adminId: string, reason: string): Promise<PaymentEntity> {
+    const payment = await this.getPaymentOrThrow(paymentId);
+
+    if (!payment.canBeRefunded()) {
+      throw new BadRequestException('Solo se pueden reembolsar pagos confirmados');
+    }
+
+    await this.paymentGateway.refund(payment.transactionReference ?? payment.id, payment.amount);
+
+    const updated = await this.paymentRepository.refund(paymentId, adminId, reason);
+
+    if (payment.booking) {
+      const venueName = payment.booking.venue?.name ?? 'el local';
+      const paymentTypeLabel = PAYMENT_TYPE_LABELS[payment.paymentType];
+
+      if (payment.booking.client) {
+        this.notify({
+          userId: payment.booking.client.id,
+          type: NotificationType.PAYMENT_REFUNDED,
+          title: `Tu pago en ${venueName} fue reembolsado`,
+          content: `Un administrador aprobo el reembolso de tu ${paymentTypeLabel} de Bs ${payment.amount}. Motivo: ${reason}. El propietario se va a contactar para devolverte el dinero.`,
+          recipientEmail: payment.booking.client.email,
+          metadata: {
+            kind: 'paymentRefunded',
+            recipient: 'client',
+            venueName,
+            paymentTypeLabel,
+            amount: payment.amount,
+            reason,
+            bookingId: payment.booking.id,
+          } satisfies NotificationEmailMetadata,
+        });
+      }
+
+      const ownerContact = await this.venueService.getOwnerContact(payment.booking.venueId);
+      if (ownerContact) {
+        this.notify({
+          userId: ownerContact.id,
+          type: NotificationType.PAYMENT_REFUNDED,
+          title: `Un pago de ${venueName} fue marcado como reembolsado`,
+          content: `Un administrador marco tu ${paymentTypeLabel} de Bs ${payment.amount} como reembolsado. Motivo: ${reason}. Devolvele el dinero al cliente por fuera del sistema.`,
+          recipientEmail: ownerContact.email,
+          metadata: {
+            kind: 'paymentRefunded',
+            recipient: 'owner',
+            venueName,
+            paymentTypeLabel,
+            amount: payment.amount,
+            reason,
+            bookingId: payment.booking.id,
+          } satisfies NotificationEmailMetadata,
+        });
+      }
+    }
+
+    return updated;
+  }
+
+  async listPaymentsForAdmin(dto: AdminPaymentQueryDto) {
+    const { items, total } = await this.paymentRepository.findAllForAdmin({
+      search: dto.search,
+      status: dto.status,
+      venueId: dto.venueId,
+      page: dto.page,
+      limit: dto.limit,
+    });
+
+    return {
+      data: items,
+      total,
+      page: dto.page,
+      limit: dto.limit,
+      totalPages: Math.max(1, Math.ceil(total / dto.limit)),
+    };
   }
 
   async getOwnerEarnings(ownerId: string, monthsBack = 6, venueId?: string) {
