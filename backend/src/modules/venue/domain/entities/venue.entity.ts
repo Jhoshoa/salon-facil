@@ -10,8 +10,11 @@ import {
 
 /** Business rule, not an infra/upload concern -- lives in domain so both the controller (single
  * upload batch) and the service (running total across every addMedia call ever made) enforce the
- * exact same number. Also drives the "X/20 fotos" label in the owner-facing media manager. */
-export const MAX_VENUE_PHOTOS = 20;
+ * exact same number. Also drives the "X/10 fotos" label in the owner-facing media manager.
+ * Kept low deliberately -- Cloudinary's free plan shares 25 credits/month across storage,
+ * bandwidth and transformations (1 credit = 1k transformations, or 1GB of either storage or
+ * bandwidth), and bandwidth is spent on every venue page view, not just on upload. */
+export const MAX_VENUE_PHOTOS = 10;
 
 /** Shared shape for the admin-managed catalogs (space types, use types). */
 export interface CatalogItemEntity {

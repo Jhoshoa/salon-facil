@@ -4,7 +4,10 @@ import { SlugService } from '../../../src/modules/venue/application/services/slu
 import { VENUE_REPOSITORY } from '../../../src/modules/venue/domain/repositories/venue.repository.interface';
 import { CloudinaryService } from '../../../src/modules/upload/cloudinary.service';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { VenueStatus } from '../../../src/modules/venue/domain/entities/venue.entity';
+import {
+  MAX_VENUE_PHOTOS,
+  VenueStatus,
+} from '../../../src/modules/venue/domain/entities/venue.entity';
 import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity';
 import { AuditLogService } from '../../../src/modules/audit-log/audit-log.service';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../src/modules/audit-log/audit-log-actions';
@@ -445,7 +448,7 @@ describe('VenueService', () => {
     it('should throw BadRequestException when the total would exceed MAX_VENUE_PHOTOS', async () => {
       mockRepository.findById.mockResolvedValue({
         ...mockVenue,
-        media: Array.from({ length: 19 }, (_, i) => ({ id: `existing-${i}` })),
+        media: Array.from({ length: MAX_VENUE_PHOTOS - 1 }, (_, i) => ({ id: `existing-${i}` })),
       });
       mockVenue.canBeEditedBy.mockReturnValue(true);
       const uploads = [
@@ -462,7 +465,7 @@ describe('VenueService', () => {
     it('should allow adding photos that land exactly on MAX_VENUE_PHOTOS', async () => {
       mockRepository.findById.mockResolvedValue({
         ...mockVenue,
-        media: Array.from({ length: 19 }, (_, i) => ({ id: `existing-${i}` })),
+        media: Array.from({ length: MAX_VENUE_PHOTOS - 1 }, (_, i) => ({ id: `existing-${i}` })),
       });
       mockVenue.canBeEditedBy.mockReturnValue(true);
       const uploads = [{ url: 'https://cdn/a.jpg', publicId: 'a' }];
