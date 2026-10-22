@@ -16,7 +16,7 @@ import type { Venue } from '@/types/api';
 // sync if this ever changes. The backend is the real source of truth (it rejects a request that
 // would push the venue's TOTAL photo count over this, not just a single oversized batch); this
 // copy only drives the owner-facing counter/label so they see the limit before hitting it.
-const MAX_VENUE_PHOTOS = 20;
+const MAX_VENUE_PHOTOS = 10;
 
 interface VenueMediaManagerProps {
   venue: Venue;
