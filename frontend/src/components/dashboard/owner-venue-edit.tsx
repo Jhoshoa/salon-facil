@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Eye, UserPlus } from 'lucide-react';
-import { getVenueById } from '@/lib/api/venues.api';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Eye, Share2, UserPlus } from 'lucide-react';
+import { createVenuePreviewLink, getVenueById } from '@/lib/api/venues.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { VenueForm, tabs, type TabKey } from './venue-form';
 import { VenueMediaManager } from './venue-media-manager';
@@ -23,6 +24,22 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>('general');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const isAdmin = useAuthStore((state) => state.role) === 'ADMIN';
+
+  const previewLinkMutation = useMutation({
+    mutationFn: (id: string) => createVenuePreviewLink(id),
+    onSuccess: async ({ token }) => {
+      const url = `${window.location.origin}/share-preview/${token}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link de preview copiado', { description: 'Vence en 7 dias' });
+      } catch {
+        toast.success('Link de preview generado', { description: url });
+      }
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo generar el link de preview', { description: error.message });
+    },
+  });
   // By id (not getMyVenues + find) so this also works for an ADMIN editing a venue they don't
   // literally own -- e.g. completing a placeholder venue from the phone-onboarding flow. The
   // backend's canBeEditedBy already permits this; getMyVenues only ever returns the caller's
@@ -74,6 +91,19 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
             <p className="text-sm text-muted-foreground">Edita la informacion de tu local.</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            {isAdmin ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title="Link temporal de solo lectura -- vence en 7 dias, no activa ninguna cuenta"
+                disabled={previewLinkMutation.isPending}
+                onClick={() => previewLinkMutation.mutate(venue.id)}
+              >
+                <Share2 className="h-4 w-4" />
+                Compartir preview
+              </Button>
+            ) : null}
             {isAdmin ? (
               <Button
                 type="button"
