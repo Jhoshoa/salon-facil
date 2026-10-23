@@ -5,7 +5,10 @@ import type {
   AdminUserCounts,
   AdminUserDetail,
   AuditLogEntry,
+  CreateOwnerInvitePayload,
+  CreateOwnerInviteResult,
   PaginatedResponse,
+  PendingOwnerInvite,
 } from '@/types/api';
 
 export const getAdminAnalyticsDashboard = async (): Promise<AdminAnalyticsDashboard> => {
@@ -66,5 +69,37 @@ export const getAuditLog = async (
 ): Promise<PaginatedResponse<AuditLogEntry>> => {
   return apiRequest<PaginatedResponse<AuditLogEntry>>(
     `/admin/audit-log${buildQueryString(params)}`,
+  );
+};
+
+/** Registro de local por telefono -- crea (o reusa) la cuenta placeholder del dueno y el local
+ * en DRAFT. No manda la invitacion todavia, eso es sendOwnerInvite aparte, para que el admin
+ * pueda seguir completando el local (fotos, comodidades) antes de que el dueno lo vea. */
+export const createOwnerInvite = async (
+  payload: CreateOwnerInvitePayload,
+): Promise<CreateOwnerInviteResult> => {
+  return apiRequest<CreateOwnerInviteResult>('/admin/owner-invites', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const sendOwnerInvite = async (venueId: string): Promise<{ resent: boolean }> => {
+  return apiRequest<{ resent: boolean }>(`/admin/owner-invites/${venueId}/send`, {
+    method: 'POST',
+  });
+};
+
+export interface AdminOwnerInvitesParams {
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const getAdminOwnerInvites = async (
+  params: AdminOwnerInvitesParams = {},
+): Promise<PaginatedResponse<PendingOwnerInvite>> => {
+  return apiRequest<PaginatedResponse<PendingOwnerInvite>>(
+    `/admin/owner-invites${buildQueryString(params)}`,
   );
 };

@@ -307,6 +307,22 @@ describe('Venues (e2e)', () => {
         .field('name', 'Client Hacked Venue')
         .expect(403);
     });
+
+    // Motivated by the owner-invite phone-onboarding flow: an admin manages a placeholder
+    // venue (ownerId belongs to an account that hasn't claimed itself yet) before the real
+    // owner ever logs in. canBeEditedBy already allows this on the backend -- this just makes
+    // sure it's exercised end-to-end through the real update endpoint, not just unit-asserted.
+    it('should allow ADMIN to update a venue they do not own', () => {
+      return adminAgent
+        .put(`/api/v1/venues/${owner1VenueId}`)
+        .field('shortDescription', 'Actualizado por un admin, no el dueno')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.shortDescription).toBe('Actualizado por un admin, no el dueno');
+          // Sanity: the edit doesn't silently reassign ownership to the admin who made it.
+          expect(res.body.ownerId).toBe(ownerUserId);
+        });
+    });
   });
 
   // ===== CA9: Soft delete =====
