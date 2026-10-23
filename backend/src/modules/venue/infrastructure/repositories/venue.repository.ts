@@ -979,6 +979,13 @@ export class VenueRepository implements IVenueRepository {
     });
   }
 
+  async reassignOwner(id: string, ownerId: string): Promise<void> {
+    await this.prisma.venue.update({
+      where: { id },
+      data: { ownerId },
+    });
+  }
+
   async findOwnerContact(
     venueId: string,
   ): Promise<{ id: string; email: string; phone: string; fullName: string } | null> {

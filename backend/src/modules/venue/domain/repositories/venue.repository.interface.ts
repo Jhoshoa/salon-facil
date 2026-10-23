@@ -108,6 +108,10 @@ export interface IVenueRepository {
   reorderMedia(venueId: string, order: string[], coverId?: string): Promise<VenueMediaEntity[]>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
+  /** Only for the admin "attach a real owner" flow -- not exposed through the generic update(),
+   * which never touches ownerId on purpose (an owner editing their own venue has no business
+   * changing who owns it). */
+  reassignOwner(id: string, ownerId: string): Promise<void>;
   existsBySlug(slug: string): Promise<boolean>;
   /** Internal use only (notifications) — never serialize this beyond the triggering service.
    * The public venue shape deliberately excludes the owner's email/phone from API responses. */

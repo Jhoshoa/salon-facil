@@ -65,6 +65,7 @@ describe('VenueService', () => {
       deleteMedia: jest.fn(),
       createPreviewToken: jest.fn(),
       findVenueIdByPreviewToken: jest.fn(),
+      reassignOwner: jest.fn(),
     };
 
     mockSlugService = {
@@ -293,6 +294,16 @@ describe('VenueService', () => {
 
       await expect(service.getVenueByPreviewToken('bad-token')).rejects.toThrow(NotFoundException);
       expect(mockRepository.findById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reassignOwner', () => {
+    it('delegates to the repository with the given venue and owner ids', async () => {
+      mockRepository.reassignOwner.mockResolvedValue(undefined);
+
+      await service.reassignOwner('venue-1', 'owner-2');
+
+      expect(mockRepository.reassignOwner).toHaveBeenCalledWith('venue-1', 'owner-2');
     });
   });
 

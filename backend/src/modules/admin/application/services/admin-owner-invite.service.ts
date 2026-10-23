@@ -14,8 +14,9 @@ import { NotificationService } from '../../../notification/application/services/
 import type { NotificationEmailMetadata } from '../../../notification/infrastructure/templates/notification-email.templates';
 import { AuditLogService } from '../../../audit-log/audit-log.service';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../audit-log/audit-log-actions';
-import { CreateOwnerInviteDto } from '../dto/create-owner-invite.dto';
+import { CreateOwnerInviteDto, OwnerInviteContactDto } from '../dto/create-owner-invite.dto';
 import { AdminOwnerInviteQueryDto } from '../dto/admin-owner-invite-query.dto';
+import { AssignVenueOwnerDto } from '../dto/assign-venue-owner.dto';
 
 @Injectable()
 export class AdminOwnerInviteService {
@@ -31,21 +32,21 @@ export class AdminOwnerInviteService {
     private readonly config: ConfigService,
   ) {}
 
-  /** Creates (or reuses) the owner account for a phone-onboarded venue and the venue itself.
-   * Does NOT send the invite — that's a separate step (sendInvite below) so the admin can keep
-   * editing the venue (photos, amenities, hours) before the owner ever sees it. */
-  async createPlaceholderOwnerAndVenue(
-    dto: CreateOwnerInviteDto,
+  /** Finds-or-creates the OWNER account a venue should belong to, given contact info collected
+   * over a call. Shared by createPlaceholderOwnerAndVenue (brand new venue) and
+   * assignOwnerAndSendInvite (existing venue, attaching a real owner to it). */
+  private async resolveOwnerAccount(
+    contact: OwnerInviteContactDto,
+    venueName: string,
     adminId: string,
-  ): Promise<{ owner: UserEntity; venue: VenueEntity }> {
-    const existing = await this.authRepository.findByEmail(dto.owner.email);
-    let owner: UserEntity;
+  ): Promise<UserEntity> {
+    const existing = await this.authRepository.findByEmail(contact.email);
 
     if (!existing) {
-      owner = await this.authRepository.create({
-        email: dto.owner.email,
-        phone: dto.owner.phone,
-        fullName: dto.owner.fullName,
+      const owner = await this.authRepository.create({
+        email: contact.email,
+        phone: contact.phone,
+        fullName: contact.fullName,
         role: UserRole.OWNER,
         status: UserStatus.PENDING_VERIFICATION,
       });
@@ -54,31 +55,68 @@ export class AdminOwnerInviteService {
         action: AUDIT_ACTION.ADMIN_CREATED_PLACEHOLDER_OWNER,
         targetType: AUDIT_TARGET_TYPE.USER,
         targetId: owner.id,
-        metadata: { email: owner.email, venueName: dto.venue.name },
+        metadata: { email: owner.email, venueName },
       });
-    } else if (existing.role === UserRole.ADMIN) {
+      return owner;
+    }
+
+    if (existing.role === UserRole.ADMIN) {
       throw new BadRequestException(
         'Ese email pertenece a una cuenta de administrador — resolvelo manualmente',
       );
-    } else if (existing.role === UserRole.CLIENT) {
+    }
+
+    if (existing.role === UserRole.CLIENT) {
       // El dueno ya habia buscado locales como cliente antes de que lo llamaramos -- le subimos
       // el rol en vez de fallar por el email unico, pero igual tiene que confirmar por el link
       // (nunca asumimos el consentimiento solo porque el email coincide).
-      owner = await this.authRepository.updateRole(existing.id, UserRole.OWNER);
+      const owner = await this.authRepository.updateRole(existing.id, UserRole.OWNER);
       this.auditLogService.record({
         adminId,
         action: AUDIT_ACTION.OWNER_ROLE_UPGRADED_ON_INVITE,
         targetType: AUDIT_TARGET_TYPE.USER,
         targetId: owner.id,
-        metadata: { previousRole: UserRole.CLIENT, venueName: dto.venue.name },
+        metadata: { previousRole: UserRole.CLIENT, venueName },
       });
-    } else {
-      // Ya es OWNER -- mismo dueno, otro local cargado en una llamada distinta.
-      owner = existing;
+      return owner;
     }
 
+    // Ya es OWNER -- mismo dueno, otro local cargado en una llamada distinta.
+    return existing;
+  }
+
+  /** Creates (or reuses) the owner account for a phone-onboarded venue and the venue itself.
+   * Does NOT send the invite — that's a separate step (sendInvite below) so the admin can keep
+   * editing the venue (photos, amenities, hours) before the owner ever sees it. */
+  async createPlaceholderOwnerAndVenue(
+    dto: CreateOwnerInviteDto,
+    adminId: string,
+  ): Promise<{ owner: UserEntity; venue: VenueEntity }> {
+    const owner = await this.resolveOwnerAccount(dto.owner, dto.venue.name, adminId);
     const venue = await this.venueService.createVenue(dto.venue, owner.id);
     return { owner, venue };
+  }
+
+  /** Attaches a real owner to a venue that already exists (created some other way, e.g. an
+   * admin testing something directly) and sends the claim invite in one step. Only allowed
+   * while the venue is still owned by an ADMIN account -- a venue genuinely owned by a claimed
+   * OWNER is never silently reassigned out from under them from here. */
+  async assignOwnerAndSendInvite(
+    venueId: string,
+    contact: AssignVenueOwnerDto,
+    adminId: string,
+  ): Promise<{ resent: boolean }> {
+    const venue = await this.venueService.getVenueById(venueId);
+    const currentOwner = await this.authRepository.findById(venue.ownerId);
+    if (!currentOwner || currentOwner.role !== UserRole.ADMIN) {
+      throw new BadRequestException(
+        'Este local ya tiene un dueño activo — no se puede reasignar desde aca',
+      );
+    }
+
+    const owner = await this.resolveOwnerAccount(contact, venue.name, adminId);
+    await this.venueService.reassignOwner(venueId, owner.id);
+    return this.sendInvite(venueId, adminId);
   }
 
   /** Sends (or resends, invalidating whatever link was outstanding) the claim invite for a

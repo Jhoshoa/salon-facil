@@ -327,4 +327,59 @@ describe('Admin owner invites (e2e)', () => {
       expect(venueAfterClaim.ownerId).toBe(owner.id);
     });
   });
+
+  // Covers attaching a real owner to a venue that was created some other way (e.g. an admin
+  // testing something directly, so the venue's owner is the admin's own account) instead of
+  // through the phone-onboarding form above.
+  describe('POST /api/v1/admin/owner-invites/:venueId/assign-owner', () => {
+    async function createAdminOwnedVenue(offset: number) {
+      const res = await adminAgent
+        .post('/api/v1/venues')
+        .field('name', `Salon De Prueba Admin ${uniqueId}-${offset}`)
+        .field('address', 'Av. del Admin #1')
+        .field('district', 'Distrito Fixture')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .expect(201);
+      return res.body.id as string;
+    }
+
+    it('attaches a new owner and sends the invite when the venue still belongs to the admin', async () => {
+      const venueId = await createAdminOwnedVenue(40);
+
+      const res = await adminAgent
+        .post(`/api/v1/admin/owner-invites/${venueId}/assign-owner`)
+        .send({
+          fullName: 'Dueno Asignado E2E',
+          email: `dueno-asignado-${uniqueId}@email.com`,
+          phone: phoneFor(uniqueId, 41),
+        })
+        .expect(200);
+      expect(res.body.resent).toBe(false);
+
+      const venue = await prisma.venue.findUniqueOrThrow({ where: { id: venueId } });
+      const newOwner = await prisma.user.findUniqueOrThrow({
+        where: { email: `dueno-asignado-${uniqueId}@email.com` },
+      });
+      expect(venue.ownerId).toBe(newOwner.id);
+      expect(newOwner.role).toBe('OWNER');
+      expect(newOwner.passwordHash).toBeNull();
+    });
+
+    it('rejects reassigning a venue that already belongs to a real (non-ADMIN) owner', async () => {
+      const created = await adminAgent
+        .post('/api/v1/admin/owner-invites')
+        .send(ownerInviteBody(42))
+        .expect(201);
+
+      await adminAgent
+        .post(`/api/v1/admin/owner-invites/${created.body.venue.id}/assign-owner`)
+        .send({
+          fullName: 'Otro Dueno',
+          email: `otro-dueno-${uniqueId}@email.com`,
+          phone: phoneFor(uniqueId, 43),
+        })
+        .expect(400);
+    });
+  });
 });

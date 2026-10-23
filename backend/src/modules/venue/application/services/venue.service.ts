@@ -173,6 +173,13 @@ export class VenueService {
     return token;
   }
 
+  /** ADMIN-only, no ownership check here on purpose -- the caller (AdminOwnerInviteService)
+   * already decided this reassignment is safe (today: only when the current owner is an ADMIN
+   * placeholder, never a real claimed OWNER account) before calling this. */
+  async reassignOwner(venueId: string, newOwnerId: string): Promise<void> {
+    await this.venueRepository.reassignOwner(venueId, newOwnerId);
+  }
+
   /** Read-only lookup for the public share-preview route -- same non-consuming semantics as
    * getVenuesByInviteToken, just venue-scoped instead of owner-scoped. */
   async getVenueByPreviewToken(rawToken: string): Promise<VenueEntity> {

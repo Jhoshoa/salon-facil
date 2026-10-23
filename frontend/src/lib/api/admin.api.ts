@@ -7,6 +7,7 @@ import type {
   AuditLogEntry,
   CreateOwnerInvitePayload,
   CreateOwnerInviteResult,
+  OwnerInviteContact,
   PaginatedResponse,
   PendingOwnerInvite,
 } from '@/types/api';
@@ -87,6 +88,19 @@ export const createOwnerInvite = async (
 export const sendOwnerInvite = async (venueId: string): Promise<{ resent: boolean }> => {
   return apiRequest<{ resent: boolean }>(`/admin/owner-invites/${venueId}/send`, {
     method: 'POST',
+  });
+};
+
+/** Attaches a real owner to a venue that already exists (created some other way, e.g. an admin
+ * testing something directly) and sends the claim invite in one step. Only works while the
+ * venue still belongs to an ADMIN account -- fails with a clear error otherwise. */
+export const assignVenueOwner = async (
+  venueId: string,
+  owner: OwnerInviteContact,
+): Promise<{ resent: boolean }> => {
+  return apiRequest<{ resent: boolean }>(`/admin/owner-invites/${venueId}/assign-owner`, {
+    method: 'POST',
+    body: JSON.stringify(owner),
   });
 };
 

@@ -109,7 +109,12 @@ describe('AdminOwnerInviteService', () => {
     };
 
     authService = { issueOwnerInviteToken: jest.fn() };
-    venueService = { createVenue: jest.fn(), getVenueById: jest.fn(), getOwnerContact: jest.fn() };
+    venueService = {
+      createVenue: jest.fn(),
+      getVenueById: jest.fn(),
+      getOwnerContact: jest.fn(),
+      reassignOwner: jest.fn(),
+    };
     notificationService = { enqueue: jest.fn().mockResolvedValue(undefined) };
     auditLogService = { record: jest.fn() } as unknown as jest.Mocked<AuditLogService>;
 
@@ -247,6 +252,48 @@ describe('AdminOwnerInviteService', () => {
 
       await expect(service.sendInvite('venue-1', 'admin-1')).rejects.toThrow(NotFoundException);
       expect(authService.issueOwnerInviteToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('assignOwnerAndSendInvite', () => {
+    const assignDto = {
+      fullName: 'Dueno Real',
+      email: 'dueno-real@email.com',
+      phone: '+59177654321',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+
+    it('rejects when the venue already belongs to a non-ADMIN (real, claimed) owner', async () => {
+      venueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'owner-1' }));
+      authRepository.findById.mockResolvedValue(makeUser({ role: UserRole.OWNER }));
+
+      await expect(
+        service.assignOwnerAndSendInvite('venue-1', assignDto, 'admin-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(venueService.reassignOwner).not.toHaveBeenCalled();
+      expect(authRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('resolves/creates the owner, reassigns the venue, and sends the invite when the current owner is an ADMIN placeholder', async () => {
+      venueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'admin-1' }));
+      authRepository.findById.mockResolvedValue(makeUser({ id: 'admin-1', role: UserRole.ADMIN }));
+      authRepository.findByEmail.mockResolvedValue(null);
+      authRepository.create.mockResolvedValue(makeUser({ id: 'owner-2' }));
+      venueService.getOwnerContact.mockResolvedValue({
+        id: 'owner-2',
+        email: 'dueno-real@email.com',
+        phone: '+59177654321',
+        fullName: 'Dueno Real',
+      });
+      authService.issueOwnerInviteToken.mockResolvedValue({ token: 'raw-token', resent: false });
+
+      const result = await service.assignOwnerAndSendInvite('venue-1', assignDto, 'admin-1');
+
+      expect(authRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'dueno-real@email.com', role: UserRole.OWNER }),
+      );
+      expect(venueService.reassignOwner).toHaveBeenCalledWith('venue-1', 'owner-2');
+      expect(result.resent).toBe(false);
     });
   });
 

@@ -12,6 +12,7 @@ import {
   Power,
   Search,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -28,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AssignVenueOwnerModal } from '@/components/admin/assign-venue-owner-modal';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
@@ -63,6 +65,7 @@ export const AllVenuesList = () => {
   const [page, setPage] = useState(1);
   const [venueToDeactivate, setVenueToDeactivate] = useState<Venue | null>(null);
   const [venueToDelete, setVenueToDelete] = useState<Venue | null>(null);
+  const [venueToAssignOwner, setVenueToAssignOwner] = useState<Venue | null>(null);
 
   const debouncedSearch = useDebouncedValue(searchInput.trim(), 400);
   const activeQuery = debouncedSearch.length >= MIN_SEARCH_LENGTH ? debouncedSearch : '';
@@ -246,6 +249,16 @@ export const AllVenuesList = () => {
                       Ver detalle
                     </Link>
                   </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    title="Solo funciona si el local todavia no tiene un dueno real"
+                    onClick={() => setVenueToAssignOwner(venue)}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Invitar dueno
+                  </Button>
                   {venue.status === 'ACTIVE' ? (
                     <Button
                       type="button"
@@ -338,6 +351,13 @@ export const AllVenuesList = () => {
         }}
         onConfirm={() => {
           if (venueToDelete) deleteMutation.mutate(venueToDelete.id);
+        }}
+      />
+
+      <AssignVenueOwnerModal
+        venue={venueToAssignOwner}
+        onOpenChange={(open) => {
+          if (!open) setVenueToAssignOwner(null);
         }}
       />
     </div>
