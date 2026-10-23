@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Eye } from 'lucide-react';
+import { Eye, UserPlus } from 'lucide-react';
 import { getVenueById } from '@/lib/api/venues.api';
+import { useAuthStore } from '@/stores/auth.store';
 import { VenueForm, tabs, type TabKey } from './venue-form';
 import { VenueMediaManager } from './venue-media-manager';
 import { VenueCompletionCard } from './venue-completion-card';
+import { AssignVenueOwnerModal } from '@/components/admin/assign-venue-owner-modal';
 import { Breadcrumbs } from '@/components/shared/breadcrumbs';
 import { ErrorState } from '@/components/shared/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +21,8 @@ interface OwnerVenueEditProps {
 
 export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>('general');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const isAdmin = useAuthStore((state) => state.role) === 'ADMIN';
   // By id (not getMyVenues + find) so this also works for an ADMIN editing a venue they don't
   // literally own -- e.g. completing a placeholder venue from the phone-onboarding flow. The
   // backend's canBeEditedBy already permits this; getMyVenues only ever returns the caller's
@@ -69,12 +73,26 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
             <h1 className="text-2xl font-semibold">{venue.name}</h1>
             <p className="text-sm text-muted-foreground">Edita la informacion de tu local.</p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/venues/${venue.id}/preview`}>
-              <Eye className="h-4 w-4" />
-              Vista previa
-            </Link>
-          </Button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {isAdmin ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title="Solo funciona si el local todavia no tiene un dueno real"
+                onClick={() => setShowInviteModal(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                Invitar dueno
+              </Button>
+            ) : null}
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/venues/${venue.id}/preview`}>
+                <Eye className="h-4 w-4" />
+                Vista previa
+              </Link>
+            </Button>
+          </div>
         </div>
         {/* Mobile/tablet only: below `lg` the sidebar column stacks to the bottom of the
          * page (after the whole form and the photo manager), which would bury both the tab
@@ -123,6 +141,13 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
         </nav>
         <VenueCompletionCard venue={venue} />
       </div>
+
+      {isAdmin ? (
+        <AssignVenueOwnerModal
+          venue={showInviteModal ? venue : null}
+          onOpenChange={setShowInviteModal}
+        />
+      ) : null}
     </div>
   );
 };

@@ -120,6 +120,15 @@ describe('Admin owner invites (e2e)', () => {
       await adminAgent.post('/api/v1/admin/owner-invites').send(body).expect(400);
     });
 
+    it('rejects a new email whose phone already belongs to a different account', async () => {
+      await adminAgent.post('/api/v1/admin/owner-invites').send(ownerInviteBody(23)).expect(201);
+
+      const second = ownerInviteBody(24);
+      second.owner.phone = phoneFor(uniqueId, 23);
+
+      await adminAgent.post('/api/v1/admin/owner-invites').send(second).expect(409);
+    });
+
     it('returns 403 for a non-admin caller', async () => {
       const ownerAgent = request.agent(app.getHttpServer());
       await ownerAgent.post('/api/v1/auth/register').send({
@@ -260,15 +269,21 @@ describe('Admin owner invites (e2e)', () => {
   describe('approve-then-invite (venue goes public before the owner is ever invited)', () => {
     /** The real raw token is never returned by any API response (only its hash is persisted) --
      * the only place it legitimately appears is in the body of the notification we already
-     * enqueued, same as a real email/WhatsApp message would contain it. */
+     * enqueued, same as a real email/WhatsApp message would contain it. sendInvite() fires the
+     * enqueue without awaiting it (a notification hiccup shouldn't fail the HTTP response), so
+     * the row can land a beat after the request already returned -- a few retries absorbs that
+     * instead of flaking under load. */
     async function extractRawTokenFromLatestInvite(ownerId: string): Promise<string> {
-      const notification = await prisma.notification.findFirst({
-        where: { userId: ownerId, type: 'VENUE_OWNER_INVITE', channel: 'EMAIL' },
-        orderBy: { createdAt: 'desc' },
-      });
-      const match = notification?.content.match(/\/preview\/([a-f0-9]+)/);
-      if (!match) throw new Error('No invite token found in the notification content');
-      return match[1];
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const notification = await prisma.notification.findFirst({
+          where: { userId: ownerId, type: 'VENUE_OWNER_INVITE', channel: 'EMAIL' },
+          orderBy: { createdAt: 'desc' },
+        });
+        const match = notification?.content.match(/\/preview\/([a-f0-9]+)/);
+        if (match) return match[1];
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      throw new Error('No invite token found in the notification content');
     }
 
     it('lets the admin approve/publish the venue first and invite the owner long after', async () => {

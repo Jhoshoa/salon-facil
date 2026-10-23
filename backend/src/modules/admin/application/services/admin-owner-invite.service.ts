@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotificationChannel, NotificationType } from '@prisma/client';
 import {
@@ -43,6 +50,13 @@ export class AdminOwnerInviteService {
     const existing = await this.authRepository.findByEmail(contact.email);
 
     if (!existing) {
+      // The email is free, but the phone column is unique too -- a bare .create() would throw a
+      // raw Prisma P2002 (surfaced as an unhandled 500) if it already belongs to someone else.
+      const phoneTaken = await this.authRepository.findByPhone(contact.phone);
+      if (phoneTaken) {
+        throw new ConflictException('Ese telefono ya esta en uso por otra cuenta');
+      }
+
       const owner = await this.authRepository.create({
         email: contact.email,
         phone: contact.phone,

@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminOwnerInviteService } from '../../../src/modules/admin/application/services/admin-owner-invite.service';
 import {
@@ -191,6 +191,17 @@ describe('AdminOwnerInviteService', () => {
       await expect(service.createPlaceholderOwnerAndVenue(createDto, 'admin-1')).rejects.toThrow(
         BadRequestException,
       );
+      expect(venueService.createVenue).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the email is new but the phone already belongs to another account', async () => {
+      authRepository.findByEmail.mockResolvedValue(null);
+      authRepository.findByPhone.mockResolvedValue(makeUser({ id: 'someone-else' }));
+
+      await expect(service.createPlaceholderOwnerAndVenue(createDto, 'admin-1')).rejects.toThrow(
+        ConflictException,
+      );
+      expect(authRepository.create).not.toHaveBeenCalled();
       expect(venueService.createVenue).not.toHaveBeenCalled();
     });
   });
