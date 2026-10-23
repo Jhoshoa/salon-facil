@@ -608,6 +608,46 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+export interface OwnerInviteContact {
+  fullName: string;
+  email: string;
+  phone: string;
+}
+
+export interface CreateOwnerInvitePayload {
+  owner: OwnerInviteContact;
+  venue: {
+    name: string;
+    address: string;
+    district: string;
+    departamento: Departamento;
+    capacityMax: number;
+    description?: string;
+    contactPhone?: string;
+  };
+}
+
+export interface CreateOwnerInviteResult {
+  owner: AdminUser;
+  venue: Venue;
+}
+
+export interface PendingOwnerInviteVenue {
+  id: string;
+  name: string;
+  status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+}
+
+export interface PendingOwnerInvite {
+  id: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  createdAt: string;
+  venues: PendingOwnerInviteVenue[];
+  latestInvite: { sentAt: string; expiresAt: string } | null;
+}
+
 export interface AdminAnalyticsDashboard {
   summary: {
     revenueThisMonth: number;

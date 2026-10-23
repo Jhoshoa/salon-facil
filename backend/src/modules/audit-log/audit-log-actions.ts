@@ -9,6 +9,10 @@ export const AUDIT_ACTION = {
   REVIEW_DELETED: 'review.deleted',
   REVIEW_RESPONDED: 'review.responded',
   PAYMENT_REFUNDED: 'payment.refunded',
+  ADMIN_CREATED_PLACEHOLDER_OWNER: 'owner_invite.placeholder_created',
+  OWNER_ROLE_UPGRADED_ON_INVITE: 'owner_invite.role_upgraded',
+  OWNER_INVITE_SENT: 'owner_invite.sent',
+  OWNER_INVITE_RESENT: 'owner_invite.resent',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];

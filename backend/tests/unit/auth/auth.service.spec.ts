@@ -450,13 +450,23 @@ describe('AuthService', () => {
 
   describe('issueOwnerInviteToken', () => {
     it('invalidates prior tokens and stores the new hash with a 20-day expiry', async () => {
-      const token = await service.issueOwnerInviteToken('user-123');
+      mockAuthRepository.invalidateActiveOwnerInviteTokens.mockResolvedValue(0);
 
-      expect(token).toBe('mock-invite-token');
+      const result = await service.issueOwnerInviteToken('user-123');
+
+      expect(result).toEqual({ token: 'mock-invite-token', resent: false });
       expect(mockAuthRepository.invalidateActiveOwnerInviteTokens).toHaveBeenCalledWith('user-123');
       expect(mockAuthRepository.createOwnerInviteToken).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-123', tokenHash: 'mock-refresh-token-hash' }),
       );
+    });
+
+    it('reports resent:true when an earlier active token was invalidated', async () => {
+      mockAuthRepository.invalidateActiveOwnerInviteTokens.mockResolvedValue(1);
+
+      const result = await service.issueOwnerInviteToken('user-123');
+
+      expect(result.resent).toBe(true);
     });
   });
 
