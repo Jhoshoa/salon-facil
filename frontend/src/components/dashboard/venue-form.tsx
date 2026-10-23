@@ -22,7 +22,7 @@ import {
   type VenueFormValues,
 } from '@/lib/validators/venue.schema';
 import { departamentoLabels, priceUnitLabels } from '@/components/venues/venue-filter-labels';
-import { formatDate } from '@/lib/formatters';
+import { formatDate, formatTime12h } from '@/lib/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -222,8 +222,8 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
       return {
         dayOfWeek,
         opensAt: existing?.opensAt ?? '09:00',
-        closesAt: existing?.closesAt ?? '18:00',
-        isClosed: existing?.isClosed ?? dayOfWeek === 0,
+        closesAt: existing?.closesAt ?? '23:59',
+        isClosed: existing?.isClosed ?? false,
       };
     }),
   };
@@ -1517,23 +1517,33 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
                   </label>
                   {!day.isClosed ? (
                     <>
-                      <Input
-                        type="time"
-                        value={day.opensAt}
-                        onChange={(e) =>
-                          updateOpeningHour(day.dayOfWeek, { opensAt: e.target.value })
-                        }
-                        className="w-32"
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="time"
+                          value={day.opensAt}
+                          onChange={(e) =>
+                            updateOpeningHour(day.dayOfWeek, { opensAt: e.target.value })
+                          }
+                          className="w-32"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          ({formatTime12h(day.opensAt)})
+                        </span>
+                      </div>
                       <span className="text-sm text-muted-foreground">a</span>
-                      <Input
-                        type="time"
-                        value={day.closesAt}
-                        onChange={(e) =>
-                          updateOpeningHour(day.dayOfWeek, { closesAt: e.target.value })
-                        }
-                        className="w-32"
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="time"
+                          value={day.closesAt}
+                          onChange={(e) =>
+                            updateOpeningHour(day.dayOfWeek, { closesAt: e.target.value })
+                          }
+                          className="w-32"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          ({formatTime12h(day.closesAt)})
+                        </span>
+                      </div>
                     </>
                   ) : null}
                 </div>

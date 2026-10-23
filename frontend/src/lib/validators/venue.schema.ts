@@ -107,8 +107,8 @@ export const dayLabels = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', '
 export const defaultOpeningHours = Array.from({ length: 7 }).map((_, dayOfWeek) => ({
   dayOfWeek,
   opensAt: '09:00',
-  closesAt: '18:00',
-  isClosed: dayOfWeek === 0,
+  closesAt: '23:59',
+  isClosed: false,
 }));
 
 export const venueFormDefaults: VenueFormValues = {
