@@ -696,7 +696,7 @@ export class VenueRepository implements IVenueRepository {
         create: rawOpeningHours.map((h) => ({
           dayOfWeek: h.dayOfWeek as number,
           opensAt: this.timeToDate((h.opensAt as string) ?? '09:00'),
-          closesAt: this.timeToDate((h.closesAt as string) ?? '18:00'),
+          closesAt: this.timeToDate((h.closesAt as string) ?? '23:59'),
           isClosed: (h.isClosed as boolean) ?? false,
         })),
       };
@@ -793,7 +793,7 @@ export class VenueRepository implements IVenueRepository {
         create: rawOpeningHours.map((h: Record<string, unknown>) => ({
           dayOfWeek: h.dayOfWeek as number,
           opensAt: this.timeToDate((h.opensAt as string) ?? '09:00'),
-          closesAt: this.timeToDate((h.closesAt as string) ?? '18:00'),
+          closesAt: this.timeToDate((h.closesAt as string) ?? '23:59'),
           isClosed: (h.isClosed as boolean) ?? false,
         })),
       };
