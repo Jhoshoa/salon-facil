@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Mail, Search, Send, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Mail, Search, Send, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAdminOwnerInvites, sendOwnerInvite } from '@/lib/api/admin.api';
+import { createVenuePreviewLink } from '@/lib/api/venues.api';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,22 @@ export const AdminPendingOwnerInvites = () => {
     },
     onError: (error: { message?: string }) => {
       toast.error('No se pudo enviar la invitacion', { description: error.message });
+    },
+  });
+
+  const previewLinkMutation = useMutation({
+    mutationFn: (venueId: string) => createVenuePreviewLink(venueId),
+    onSuccess: async ({ token }) => {
+      const url = `${window.location.origin}/share-preview/${token}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link de preview copiado', { description: 'Vence en 7 dias' });
+      } catch {
+        toast.success('Link de preview generado', { description: url });
+      }
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo generar el link de preview', { description: error.message });
     },
   });
 
@@ -131,16 +148,28 @@ export const AdminPendingOwnerInvites = () => {
                       )}
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!invite.venues.length || sendMutation.isPending}
-                    onClick={() => sendMutation.mutate(invite.venues[0].id)}
-                  >
-                    <Send className="h-4 w-4" />
-                    {invite.latestInvite ? 'Reenviar invitacion' : 'Enviar invitacion'}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={!invite.venues.length || previewLinkMutation.isPending}
+                      onClick={() => previewLinkMutation.mutate(invite.venues[0].id)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver preview
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!invite.venues.length || sendMutation.isPending}
+                      onClick={() => sendMutation.mutate(invite.venues[0].id)}
+                    >
+                      <Send className="h-4 w-4" />
+                      {invite.latestInvite ? 'Reenviar invitacion' : 'Enviar invitacion'}
+                    </Button>
+                  </div>
                 </article>
               );
             })}

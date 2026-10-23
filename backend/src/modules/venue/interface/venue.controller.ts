@@ -157,6 +157,15 @@ export class VenueController {
     return this.venueService.getVenuesByInviteToken(token);
   }
 
+  @Get('share-preview/:token')
+  @Public()
+  @ApiOperation({ summary: 'Ver un local por un link de preview temporal (ADMIN), sin login' })
+  @ApiResponse({ status: 200, description: 'El local del link' })
+  @ApiResponse({ status: 404, description: 'Token invalido o expirado' })
+  async getBySharePreviewToken(@Param('token') token: string) {
+    return this.venueService.getVenueByPreviewToken(token);
+  }
+
   @Get(':slug/similar')
   @Public()
   @ApiOperation({ summary: 'Obtener locales similares a uno dado' })
@@ -402,6 +411,16 @@ export class VenueController {
     @CurrentUser() user: { id: string },
   ) {
     return this.venueService.verifyVenue(id, user.id, dto.approve, dto.rejectionReason);
+  }
+
+  @Post(':id/preview-link')
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generar un link temporal de preview (ADMIN, 7 dias, sin claim)' })
+  @ApiResponse({ status: 200, description: 'Token del link generado' })
+  async createPreviewLink(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    const token = await this.venueService.createVenuePreviewLink(id, user.id);
+    return { token };
   }
 
   @Get('admin/pending')

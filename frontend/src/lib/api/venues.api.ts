@@ -87,6 +87,14 @@ export const getVenuesByInviteToken = async (token: string): Promise<Venue[]> =>
   return apiRequest<Venue[]>(`/venues/preview/${token}`, { auth: false });
 };
 
+export const getVenueBySharePreviewToken = async (token: string): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/share-preview/${token}`, { auth: false });
+};
+
+export const createVenuePreviewLink = async (venueId: string): Promise<{ token: string }> => {
+  return apiRequest<{ token: string }>(`/venues/${venueId}/preview-link`, { method: 'POST' });
+};
+
 export const createVenue = async (
   payload: VenueFormPayload,
   files: File[] = [],

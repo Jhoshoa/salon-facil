@@ -6,6 +6,7 @@ import { UserRole } from '../../auth/domain/entities/user.entity';
 import { AdminOwnerInviteService } from '../application/services/admin-owner-invite.service';
 import { CreateOwnerInviteDto } from '../application/dto/create-owner-invite.dto';
 import { AdminOwnerInviteQueryDto } from '../application/dto/admin-owner-invite-query.dto';
+import { AssignVenueOwnerDto } from '../application/dto/assign-venue-owner.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -36,6 +37,24 @@ export class AdminOwnerInviteController {
   @ApiResponse({ status: 404, description: 'Local o propietario no encontrado' })
   async sendInvite(@Param('venueId') venueId: string, @CurrentUser('id') adminId: string) {
     return this.adminOwnerInviteService.sendInvite(venueId, adminId);
+  }
+
+  @Post(':venueId/assign-owner')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Atar un dueno real a un local existente (creado de otra forma) y mandarle la invitacion (ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Invitacion enviada' })
+  @ApiResponse({ status: 400, description: 'El local ya tiene un dueno activo' })
+  @ApiResponse({ status: 404, description: 'Local no encontrado' })
+  async assignOwner(
+    @Param('venueId') venueId: string,
+    @Body() dto: AssignVenueOwnerDto,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminOwnerInviteService.assignOwnerAndSendInvite(venueId, dto, adminId);
   }
 
   @Get()
