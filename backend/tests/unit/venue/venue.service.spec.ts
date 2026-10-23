@@ -12,6 +12,7 @@ import { UserRole } from '../../../src/modules/auth/domain/entities/user.entity'
 import { AuditLogService } from '../../../src/modules/audit-log/audit-log.service';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../src/modules/audit-log/audit-log-actions';
 import { AuthService } from '../../../src/modules/auth/application/services/auth.service';
+import { TokenService } from '../../../src/modules/auth/application/services/token.service';
 
 describe('VenueService', () => {
   let service: VenueService;
@@ -20,6 +21,7 @@ describe('VenueService', () => {
   let mockCloudinaryService: Record<string, jest.Mock>;
   let mockAuditLogService: Record<string, jest.Mock>;
   let mockAuthService: Record<string, jest.Mock>;
+  let mockTokenService: Record<string, jest.Mock>;
 
   const mockVenue = {
     id: 'venue-1',
@@ -61,6 +63,8 @@ describe('VenueService', () => {
       existsBySlug: jest.fn(),
       addMedia: jest.fn(),
       deleteMedia: jest.fn(),
+      createPreviewToken: jest.fn(),
+      findVenueIdByPreviewToken: jest.fn(),
     };
 
     mockSlugService = {
@@ -79,6 +83,11 @@ describe('VenueService', () => {
       validateOwnerInviteToken: jest.fn(),
     };
 
+    mockTokenService = {
+      generateVenuePreviewToken: jest.fn().mockReturnValue('raw-preview-token'),
+      hashToken: jest.fn().mockReturnValue('hashed-token'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VenueService,
@@ -87,6 +96,7 @@ describe('VenueService', () => {
         { provide: CloudinaryService, useValue: mockCloudinaryService },
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: TokenService, useValue: mockTokenService },
       ],
     }).compile();
 
@@ -242,6 +252,47 @@ describe('VenueService', () => {
 
       await expect(service.getVenuesByInviteToken('bad-token')).rejects.toThrow(NotFoundException);
       expect(mockRepository.findByOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createVenuePreviewLink / getVenueByPreviewToken', () => {
+    it('creates a preview token and returns the raw value, and audits it', async () => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockRepository.createPreviewToken.mockResolvedValue(undefined);
+
+      const token = await service.createVenuePreviewLink('venue-1', 'admin-1');
+
+      expect(token).toBe('raw-preview-token');
+      expect(mockRepository.createPreviewToken).toHaveBeenCalledWith(
+        'venue-1',
+        'hashed-token',
+        expect.any(Date),
+      );
+      expect(mockAuditLogService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminId: 'admin-1',
+          action: AUDIT_ACTION.VENUE_PREVIEW_LINK_CREATED,
+          targetType: AUDIT_TARGET_TYPE.VENUE,
+          targetId: 'venue-1',
+        }),
+      );
+    });
+
+    it('returns the venue for a valid preview token', async () => {
+      mockRepository.findVenueIdByPreviewToken.mockResolvedValue('venue-1');
+      mockRepository.findById.mockResolvedValue(mockVenue);
+
+      const result = await service.getVenueByPreviewToken('raw-token');
+
+      expect(result).toBe(mockVenue);
+      expect(mockRepository.findVenueIdByPreviewToken).toHaveBeenCalledWith('hashed-token');
+    });
+
+    it('throws NotFoundException for an invalid or expired preview token', async () => {
+      mockRepository.findVenueIdByPreviewToken.mockResolvedValue(null);
+
+      await expect(service.getVenueByPreviewToken('bad-token')).rejects.toThrow(NotFoundException);
+      expect(mockRepository.findById).not.toHaveBeenCalled();
     });
   });
 

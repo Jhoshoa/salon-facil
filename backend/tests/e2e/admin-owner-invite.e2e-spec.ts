@@ -223,6 +223,34 @@ describe('Admin owner invites (e2e)', () => {
         res.body.data.find((item: { id: string }) => item.id === created.body.owner.id),
       ).toBeUndefined();
     });
+
+    // A Google-only account also has passwordHash: null forever -- a real, active owner who
+    // never needed a password, not an unclaimed admin placeholder. Only a linked identity (what
+    // loginOrRegisterWithGoogle creates on signup) reliably tells the two apart.
+    it('does not list an owner who registered themselves with Google', async () => {
+      const created = await adminAgent
+        .post('/api/v1/admin/owner-invites')
+        .send(ownerInviteBody(22))
+        .expect(201);
+
+      await prisma.userIdentity.create({
+        data: {
+          userId: created.body.owner.id,
+          provider: 'google',
+          providerId: `google-${created.body.owner.id}`,
+          email: created.body.owner.email,
+        },
+      });
+
+      const res = await adminAgent
+        .get('/api/v1/admin/owner-invites')
+        .query({ search: created.body.owner.email })
+        .expect(200);
+
+      expect(
+        res.body.data.find((item: { id: string }) => item.id === created.body.owner.id),
+      ).toBeUndefined();
+    });
   });
 
   // Covers the "manage it ourselves first, invite the owner later" scenario: the admin never

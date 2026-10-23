@@ -429,6 +429,10 @@ export class AuthRepository implements IAuthRepository {
     const where: Prisma.UserWhereInput = {
       role: UserRole.OWNER,
       passwordHash: null,
+      // passwordHash is also null forever for an owner who signed up with Google and never set
+      // one -- a real, active account, not an unclaimed placeholder. What actually distinguishes
+      // "never claimed" is having no linked identity at all (Google creates one on signup).
+      identities: { none: {} },
       ...(params.search
         ? {
             OR: [

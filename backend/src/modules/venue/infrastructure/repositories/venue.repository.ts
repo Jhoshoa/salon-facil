@@ -1028,6 +1028,21 @@ export class VenueRepository implements IVenueRepository {
     return favorites.map((f) => f.venueId);
   }
 
+  async createPreviewToken(venueId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.prisma.venuePreviewToken.create({ data: { venueId, tokenHash, expiresAt } });
+  }
+
+  async findVenueIdByPreviewToken(tokenHash: string): Promise<string | null> {
+    const token = await this.prisma.venuePreviewToken.findUnique({
+      where: { tokenHash },
+      select: { venueId: true, expiresAt: true },
+    });
+    if (!token || token.expiresAt <= new Date()) {
+      return null;
+    }
+    return token.venueId;
+  }
+
   private applyPostSort(
     entities: VenueEntity[],
     rawVenues: Record<string, unknown>[],

@@ -105,6 +105,13 @@ export class TokenService {
     return randomBytes(32).toString('hex');
   }
 
+  /** Opaque token for the admin "share a preview" link — same mechanics as the tokens above,
+   * kept separate because it's scoped to a venue (not a user) and never grants any claim
+   * ability, only a read of VenuePreviewToken. */
+  generateVenuePreviewToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
   /** Opaque, single-use code for the email-verification flow — same shape as
    * generatePasswordResetToken, just shorter (this one gets typed by hand into a modal, not
    * clicked from a link) and numeric-only so it's easy to read off an email on a phone. */

@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Eye, KeyRound, LinkIcon, MapPin, Users } from 'lucide-react';
-import { getVenuesByInviteToken } from '@/lib/api/venues.api';
+import { getVenuesByInviteToken, getVenueBySharePreviewToken } from '@/lib/api/venues.api';
 import { claimInvite } from '@/lib/api/auth.api';
 import {
   claimInviteSchema,
@@ -38,41 +38,64 @@ const getVenuePhotos = (venue: Venue) => {
   return mediaPhotos.length ? mediaPhotos : venue.photos;
 };
 
-const VenueCard = ({ venue }: { venue: Venue }) => {
+interface VenueCardProps {
+  venue: Venue;
+  /** 'full' (default): everything, used by the standalone share-preview link. 'summary': just
+   * enough to identify the local (stamp, name, one photo) -- used on the claim page, where the
+   * point is activating the account, not re-showing the whole listing. */
+  variant?: 'full' | 'summary';
+}
+
+const VenueCard = ({ venue, variant = 'full' }: VenueCardProps) => {
   const photos = getVenuePhotos(venue);
   const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
   const includedAmenities = (venue.amenities ?? []).filter((item) => item.isIncluded);
+  const isSummary = variant === 'summary';
 
   return (
     <article className="sf-card overflow-hidden">
       {photos.length ? (
-        <div className="grid grid-cols-3 gap-0.5 sm:h-72">
-          <div className="relative col-span-3 h-56 sm:col-span-2 sm:h-full">
+        isSummary ? (
+          <div className="relative h-48 w-full sm:h-56">
             <Image
               src={photos[0]}
               alt={venue.name}
               fill
               className="object-cover"
               loader={cloudinaryImageLoader}
-              sizes="(min-width: 640px) 66vw, 100vw"
+              sizes="(min-width: 640px) 50vw, 100vw"
               priority
             />
           </div>
-          <div className="col-span-3 hidden grid-rows-2 gap-0.5 sm:col-span-1 sm:grid">
-            {photos.slice(1, 3).map((photo, index) => (
-              <div key={photo} className="relative h-full min-h-[8.75rem]">
-                <Image
-                  src={photo}
-                  alt={`${venue.name} ${index + 2}`}
-                  fill
-                  className="object-cover"
-                  loader={cloudinaryImageLoader}
-                  sizes="33vw"
-                />
-              </div>
-            ))}
+        ) : (
+          <div className="grid grid-cols-3 gap-0.5 sm:h-72">
+            <div className="relative col-span-3 h-56 sm:col-span-2 sm:h-full">
+              <Image
+                src={photos[0]}
+                alt={venue.name}
+                fill
+                className="object-cover"
+                loader={cloudinaryImageLoader}
+                sizes="(min-width: 640px) 66vw, 100vw"
+                priority
+              />
+            </div>
+            <div className="col-span-3 hidden grid-rows-2 gap-0.5 sm:col-span-1 sm:grid">
+              {photos.slice(1, 3).map((photo, index) => (
+                <div key={photo} className="relative h-full min-h-[8.75rem]">
+                  <Image
+                    src={photo}
+                    alt={`${venue.name} ${index + 2}`}
+                    fill
+                    className="object-cover"
+                    loader={cloudinaryImageLoader}
+                    sizes="33vw"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <div className="sf-gradient-subtle flex h-48 w-full items-center justify-center text-sm text-muted-foreground">
           Todavia sin fotos
@@ -83,44 +106,48 @@ const VenueCard = ({ venue }: { venue: Venue }) => {
         <div>
           <span className="sf-stamp mb-2 inline-block">borrador</span>
           <h2 className="font-serif text-2xl font-semibold">{venue.name}</h2>
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0" />
-            {venue.address ? `${venue.address}, ` : ''}
-            {venue.district}, {departamentoLabels[venue.departamento]}
-          </p>
+          {!isSummary ? (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4 shrink-0" />
+              {venue.address ? `${venue.address}, ` : ''}
+              {venue.district}, {departamentoLabels[venue.departamento]}
+            </p>
+          ) : null}
         </div>
 
-        {venue.description ? (
+        {!isSummary && venue.description ? (
           <p className="font-serif text-base italic leading-7 text-foreground/80">
             {venue.description}
           </p>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-3">
-          <div>
-            <p className="flex items-center gap-1.5 font-serif text-xl font-semibold text-primary">
-              <Users className="h-4 w-4" />
-              {venue.capacityMin}-{venue.capacityMax}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">personas</p>
-          </div>
-          <div>
-            <p className="font-serif text-xl font-semibold text-primary">
-              {basePrice > 0 ? formatCurrency(basePrice) : 'A coordinar'}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">precio referencial</p>
-          </div>
-          {includedAmenities.length ? (
+        {!isSummary ? (
+          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-3">
+            <div>
+              <p className="flex items-center gap-1.5 font-serif text-xl font-semibold text-primary">
+                <Users className="h-4 w-4" />
+                {venue.capacityMin}-{venue.capacityMax}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">personas</p>
+            </div>
             <div>
               <p className="font-serif text-xl font-semibold text-primary">
-                {includedAmenities.length}
+                {basePrice > 0 ? formatCurrency(basePrice) : 'A coordinar'}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">comodidades incluidas</p>
+              <p className="mt-1 text-xs text-muted-foreground">precio referencial</p>
             </div>
-          ) : null}
-        </div>
+            {includedAmenities.length ? (
+              <div>
+                <p className="font-serif text-xl font-semibold text-primary">
+                  {includedAmenities.length}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">comodidades incluidas</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
-        {includedAmenities.length ? (
+        {!isSummary && includedAmenities.length ? (
           <div className="flex flex-wrap gap-2 border-t border-border pt-4">
             {includedAmenities.map((item) => (
               <span
@@ -251,15 +278,67 @@ export const VenueInvitePreview = ({ token }: VenueInvitePreviewProps) => {
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1 space-y-6">
+        <div className="order-2 min-w-0 flex-1 space-y-6 lg:order-1">
           {venues.map((venue) => (
-            <VenueCard key={venue.id} venue={venue} />
+            <VenueCard key={venue.id} venue={venue} variant="summary" />
           ))}
         </div>
-        <div className="w-full shrink-0 lg:w-[360px]">
+        <div className="order-1 w-full shrink-0 lg:order-2 lg:w-[360px]">
           <ClaimSection token={token} />
         </div>
       </div>
+    </div>
+  );
+};
+
+interface VenueSharePreviewProps {
+  token: string;
+}
+
+/** Read-only counterpart to VenueInvitePreview: no ClaimSection, no account-activation ability
+ * at all -- just the full venue card, for an ADMIN to show someone how the page looks without
+ * handing out any claim power (see VenuePreviewToken). */
+export const VenueSharePreview = ({ token }: VenueSharePreviewProps) => {
+  const query = useQuery<Venue, ApiError>({
+    queryKey: ['venue-share-preview', token],
+    queryFn: () => getVenueBySharePreviewToken(token),
+  });
+
+  if (query.isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  if (query.isError) {
+    if (query.error?.statusCode === 404) {
+      return (
+        <EmptyState
+          icon={LinkIcon}
+          title="Este enlace ya no es valido"
+          description="Puede que haya vencido (dura 7 dias) o que ya no exista. Pedile a quien te lo mando que te pase uno nuevo."
+        />
+      );
+    }
+    return <ErrorState onRetry={() => query.refetch()} />;
+  }
+
+  if (!query.data) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 rounded-[var(--radius)] border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <Eye className="h-4 w-4 shrink-0 text-primary" />
+        Vista previa temporal — este enlace solo sirve para ver el local, no activa ninguna cuenta.
+      </div>
+
+      <VenueCard venue={query.data} variant="full" />
     </div>
   );
 };

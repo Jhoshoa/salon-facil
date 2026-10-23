@@ -120,4 +120,8 @@ export interface IVenueRepository {
   removeFavorite(userId: string, venueId: string): Promise<void>;
   findFavoritedByUser(userId: string): Promise<VenueEntity[]>;
   findFavoritedVenueIds(userId: string): Promise<string[]>;
+
+  // --- Preview links (ADMIN sharing a read-only venue preview, see VenuePreviewToken) ---
+  createPreviewToken(venueId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+  findVenueIdByPreviewToken(tokenHash: string): Promise<string | null>;
 }
