@@ -105,11 +105,18 @@ export class TokenService {
     return randomBytes(32).toString('hex');
   }
 
-  /** Opaque token for the admin "share a preview" link — same mechanics as the tokens above,
-   * kept separate because it's scoped to a venue (not a user) and never grants any claim
-   * ability, only a read of VenuePreviewToken. */
+  /** Opaque token for the admin "share a preview" link — unlike the tokens above, this one is
+   * meant to be hand-shared over WhatsApp/SMS, so it's deliberately much shorter: 8 random bytes
+   * (64 bits of entropy, ~2*10^19 possible values) base64url-encoded into 11 URL-safe characters,
+   * instead of the 32-byte/64-hex-char shape the others use. That's still effectively unguessable
+   * against the app's global rate limit (100 req/min/IP, see ThrottlerModule in app.module.ts) --
+   * brute-forcing the full space at that rate would take on the order of 10^11 years -- and the
+   * worst case of a correct guess is seeing a venue that's about to go public anyway (no claim
+   * ability, no booking ability beyond what any logged-out visitor already gets from
+   * VenueDetail's own auth checks). The other tokens above protect real account access and stay
+   * at full strength on purpose -- don't shorten those the same way. */
   generateVenuePreviewToken(): string {
-    return randomBytes(32).toString('hex');
+    return randomBytes(8).toString('base64url');
   }
 
   /** Opaque, single-use code for the email-verification flow — same shape as
