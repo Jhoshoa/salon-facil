@@ -1,13 +1,22 @@
 'use client';
 
-import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, parse, startOfMonth } from 'date-fns';
+import {
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  getDay,
+  parse,
+  startOfMonth,
+} from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-export type DayVariant = 'available' | 'booked' | 'blocked' | 'past' | 'closed';
+export type DayVariant =
+  'available' | 'pending' | 'booked' | 'blocked' | 'past' | 'pastEvent' | 'closed';
 export type RangePosition = 'start' | 'middle' | 'end' | 'single';
 
 export interface DayCellData {
@@ -39,19 +48,28 @@ const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
 
 const cellVariantClasses: Record<DayVariant, string> = {
   available: 'border-border bg-background text-foreground hover:border-primary/50',
+  pending: 'border-sky-200 bg-sky-50 text-sky-800',
   booked: 'border-amber-200 bg-amber-50 text-amber-800',
   blocked: 'border-border bg-muted text-muted-foreground',
   past: 'border-transparent bg-muted/30 text-muted-foreground/40',
+  pastEvent: 'border-transparent bg-amber-50/70 text-amber-700/60',
   closed: 'border-transparent bg-muted/50 text-muted-foreground/50',
 };
 
 const legendDotClasses: Record<DayVariant, string> = {
   available: 'border border-border bg-background',
+  pending: 'bg-sky-400',
   booked: 'bg-amber-400',
   blocked: 'bg-muted-foreground/60',
   past: 'bg-muted-foreground/20',
+  pastEvent: 'bg-amber-200',
   closed: 'bg-muted-foreground/40',
 };
+
+/** Distinct from the variant's own border/background (CSS `outline`, not `border` or the
+ * `ring-*` box-shadow used for selected-range edges) so it never fights either for the same
+ * cell -- outline is its own box, independent of both. */
+const TODAY_OUTLINE_CLASS = 'outline outline-2 outline-offset-0 outline-foreground';
 
 const monthToDate = (month: string) => parse(month, 'yyyy-MM', new Date());
 const dateToMonth = (date: Date) => format(date, 'yyyy-MM');
@@ -69,6 +87,7 @@ export const MonthCalendarGrid = ({
   const monthDate = monthToDate(month);
   const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthDate);
+  const today = format(new Date(), 'yyyy-MM-dd');
 
   const leadingBlanks = (getDay(monthStart) + 6) % 7;
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -135,7 +154,11 @@ export const MonthCalendarGrid = ({
             };
             const clickable =
               Boolean(onDayClick) && cell.variant !== 'past' && cell.variant !== 'closed';
-            const isRangeEdge = cell.rangePosition === 'start' || cell.rangePosition === 'end' || cell.rangePosition === 'single';
+            const isRangeEdge =
+              cell.rangePosition === 'start' ||
+              cell.rangePosition === 'end' ||
+              cell.rangePosition === 'single';
+            const isToday = cell.date === today;
 
             return (
               <button
@@ -143,12 +166,14 @@ export const MonthCalendarGrid = ({
                 type="button"
                 disabled={!clickable}
                 onClick={() => onDayClick?.(cell)}
-                aria-label={`${cell.day} de ${format(monthDate, 'MMMM', { locale: es })}${cell.label ? `: ${cell.label}` : ''}`}
+                aria-current={isToday ? 'date' : undefined}
+                aria-label={`${cell.day} de ${format(monthDate, 'MMMM', { locale: es })}${cell.label ? `: ${cell.label}` : ''}${isToday ? ' (hoy)' : ''}`}
                 className={cn(
                   'flex min-h-14 flex-col items-center justify-start rounded-md border p-1.5 transition-colors',
                   cellVariantClasses[cell.variant],
                   cell.rangePosition ? 'border-primary/30 bg-primary/15' : null,
                   isRangeEdge ? 'ring-2 ring-primary/50' : null,
+                  isToday ? TODAY_OUTLINE_CLASS : null,
                   clickable ? 'cursor-pointer' : 'cursor-default',
                 )}
               >
@@ -172,6 +197,12 @@ export const MonthCalendarGrid = ({
               {item.label}
             </span>
           ))}
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className={cn('h-2.5 w-2.5 rounded-full border border-border', TODAY_OUTLINE_CLASS)}
+            />
+            Hoy
+          </span>
         </div>
       ) : null}
     </div>
