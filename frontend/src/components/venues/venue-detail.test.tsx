@@ -137,17 +137,16 @@ describe('VenueDetail - modo shareToken (link de "Compartir preview")', () => {
     expect(screen.getAllByText(/Zona Sur/).length).toBeGreaterThan(0);
   });
 
-  it('no muestra el boton de favoritos ni nada de reserva', async () => {
+  it('muestra favoritos, calendario y reserva igual que la pagina publica real -- ambos ya se autoprotegen con su propio chequeo de login', async () => {
     mockGetVenueBySharePreviewToken.mockResolvedValue(venue);
 
     renderDetail({ shareToken: 'abc123' });
 
     await screen.findByText('Salon de prueba');
-    expect(screen.queryByTestId('favorite-button')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('availability-calendar')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('booking-form')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('mobile-booking-sheet')).not.toBeInTheDocument();
-    expect(screen.queryByText('Solicitar reserva')).not.toBeInTheDocument();
+    expect(screen.getByTestId('favorite-button')).toBeInTheDocument();
+    expect(screen.getByTestId('availability-calendar')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-booking-sheet')).toBeInTheDocument();
+    expect(screen.getByText('Solicitar reserva')).toBeInTheDocument();
   });
 
   it('un token invalido o vencido muestra el mensaje especifico del link, no el generico de "local no disponible"', async () => {

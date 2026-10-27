@@ -48,11 +48,11 @@ interface VenueDetailProps {
   venueId?: string;
   /** Public, unauthenticated lookup by a time-limited admin-issued share token (see
    * VenuePreviewToken) -- resolves a venue in any status, same as `venueId`, but for a visitor
-   * who isn't logged in at all. Takes precedence over both `venueId` and `slug`. Booking
-   * (favorite button, availability calendar, booking form/sheet) is hidden in this mode: the
-   * point of this link is "see what your page would look like," not taking a real reservation
-   * on a venue that may not even be live yet. "Similar venues" is skipped too, same as
-   * `venueId` mode. */
+   * who isn't logged in at all. Takes precedence over both `venueId` and `slug`. Everything else
+   * renders exactly as it would for a real visitor, booking form included: FavoriteButton and
+   * BookingForm already prompt a login instead of acting when there's no authenticated CLIENT
+   * (see their own `isAuthenticated` checks), so there's nothing extra to guard here. "Similar
+   * venues" is skipped, same as `venueId` mode -- not worth wiring up for a preview. */
   shareToken?: string;
   initialStartDate?: string;
   initialEndDate?: string;
@@ -171,11 +171,6 @@ export const VenueDetail = ({
     enabled: !venueId && !shareToken && Boolean(slug),
   });
 
-  // The point of a share-preview link is "see what your page would look like" for a venue that
-  // may not even be live yet, to a visitor who isn't logged in at all -- not taking a real
-  // reservation. Favoriting and booking both assume a real customer, so both are hidden here.
-  const hideBooking = Boolean(shareToken);
-
   const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | undefined>(
     initialStartDate
       ? { start: initialStartDate, end: initialEndDate ?? initialStartDate }
@@ -278,7 +273,7 @@ export const VenueDetail = ({
   const displayedPrice = liveTotal ?? basePrice;
 
   return (
-    <div className={`space-y-2 ${!isDesktop && !hideBooking ? 'pb-24' : ''}`}>
+    <div className={`space-y-2 ${!isDesktop ? 'pb-24' : ''}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
           {photos.length ? (
@@ -422,7 +417,7 @@ export const VenueDetail = ({
                     title={venue.name}
                     url={typeof window !== 'undefined' ? window.location.href : ''}
                   />
-                  {!hideBooking ? <FavoriteButton venueId={venue.id} variant="solid" /> : null}
+                  <FavoriteButton venueId={venue.id} variant="solid" />
                 </div>
                 {venue.isVerified ? (
                   <span className="sf-stamp">
@@ -691,17 +686,15 @@ export const VenueDetail = ({
             )}
           </section>
 
-          {!hideBooking ? (
-            <section className="sf-detail-section">
-              <AvailabilityCalendar
-                venueId={venue.id}
-                allowsMultipleDays={venue.allowsMultipleDays}
-                openingHours={venue.openingHours}
-                onRangeSelect={handleRangeChange}
-                externalRange={selectedRange}
-              />
-            </section>
-          ) : null}
+          <section className="sf-detail-section">
+            <AvailabilityCalendar
+              venueId={venue.id}
+              allowsMultipleDays={venue.allowsMultipleDays}
+              openingHours={venue.openingHours}
+              onRangeSelect={handleRangeChange}
+              externalRange={selectedRange}
+            />
+          </section>
 
           {venue.reviewCount ? (
             <section className="sf-detail-section">
@@ -715,7 +708,7 @@ export const VenueDetail = ({
           ) : null}
         </div>
 
-        {isDesktop && !hideBooking ? (
+        {isDesktop ? (
           <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
             {staleRangeNotice ? (
               <div className="border-warning bg-warning/10 flex items-start justify-between gap-2 border-l-2 p-3 text-sm text-foreground">
@@ -740,7 +733,7 @@ export const VenueDetail = ({
         ) : null}
       </div>
 
-      {!isDesktop && !hideBooking ? (
+      {!isDesktop ? (
         <>
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="mx-auto flex max-w-md items-center justify-between gap-3">
