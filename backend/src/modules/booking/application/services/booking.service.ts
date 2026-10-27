@@ -89,6 +89,15 @@ export class BookingService {
   ): Promise<{ booking: BookingEntity; priceCalculation: BookingPriceResult }> {
     const venue = await this.venueService.getVenueById(venueId);
 
+    // Draft/pending/inactive venues aren't meant to take real bookings yet -- this is the same
+    // bar the public slug lookup already uses (see VenueEntity.isPublic / getVenueBySlug), just
+    // enforced here too. Without it, anyone who learns a non-public venue's id (an owner-invite
+    // or share-preview link, for instance -- both intentionally expose it to someone who isn't
+    // the owner yet) could submit a real PENDING booking against it.
+    if (!venue.isPublic()) {
+      throw new ForbiddenException('Este local todavia no esta disponible para reservas');
+    }
+
     if (dto.guestCount > venue.capacityMax) {
       throw new BadRequestException(
         `El número de invitados (${dto.guestCount}) excede la capacidad máxima del local (${venue.capacityMax})`,
