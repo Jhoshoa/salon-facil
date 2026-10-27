@@ -7,7 +7,12 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Grid2x2, Map, MapPin, Plus, SearchX, Star, X } from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
-import { getSimilarVenues, getVenueById, getVenueBySlug } from '@/lib/api/venues.api';
+import {
+  getSimilarVenues,
+  getVenueById,
+  getVenueBySharePreviewToken,
+  getVenueBySlug,
+} from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -41,6 +46,14 @@ interface VenueDetailProps {
    * precedence over `slug` when both are somehow passed. The "similar venues" section is
    * skipped in this mode (it's a public-only feature, not worth wiring up for a preview). */
   venueId?: string;
+  /** Public, unauthenticated lookup by a time-limited admin-issued share token (see
+   * VenuePreviewToken) -- resolves a venue in any status, same as `venueId`, but for a visitor
+   * who isn't logged in at all. Takes precedence over both `venueId` and `slug`. Booking
+   * (favorite button, availability calendar, booking form/sheet) is hidden in this mode: the
+   * point of this link is "see what your page would look like," not taking a real reservation
+   * on a venue that may not even be live yet. "Similar venues" is skipped too, same as
+   * `venueId` mode. */
+  shareToken?: string;
   initialStartDate?: string;
   initialEndDate?: string;
   /** Link back to the full-page map view, pre-loaded with the same search criteria the user
@@ -139,20 +152,29 @@ const groupAmenities = (
 export const VenueDetail = ({
   slug,
   venueId,
+  shareToken,
   initialStartDate,
   initialEndDate,
   mapHref,
 }: VenueDetailProps) => {
   const query = useQuery<Venue, ApiError>({
-    queryKey: ['venue', venueId ?? slug],
-    queryFn: () => (venueId ? getVenueById(venueId) : getVenueBySlug(slug!)),
+    queryKey: ['venue', venueId ?? slug ?? shareToken],
+    queryFn: () => {
+      if (shareToken) return getVenueBySharePreviewToken(shareToken);
+      return venueId ? getVenueById(venueId) : getVenueBySlug(slug!);
+    },
   });
 
   const similarQuery = useQuery({
     queryKey: ['venue', slug, 'similar'],
     queryFn: () => getSimilarVenues(slug!),
-    enabled: !venueId && Boolean(slug),
+    enabled: !venueId && !shareToken && Boolean(slug),
   });
+
+  // The point of a share-preview link is "see what your page would look like" for a venue that
+  // may not even be live yet, to a visitor who isn't logged in at all -- not taking a real
+  // reservation. Favoriting and booking both assume a real customer, so both are hidden here.
+  const hideBooking = Boolean(shareToken);
 
   const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | undefined>(
     initialStartDate
@@ -200,7 +222,13 @@ export const VenueDetail = ({
     // never help. Point the visitor back to the search instead of a "Reintentar" that only
     // implies a connection problem that isn't actually happening.
     if (query.error?.statusCode === 404) {
-      return (
+      return shareToken ? (
+        <EmptyState
+          icon={SearchX}
+          title="Este enlace ya no es valido"
+          description="Puede que haya vencido (dura 7 dias) o que ya no exista. Pedile a quien te lo mando que te pase uno nuevo."
+        />
+      ) : (
         <EmptyState
           icon={SearchX}
           title="Este local no esta disponible"
@@ -250,7 +278,7 @@ export const VenueDetail = ({
   const displayedPrice = liveTotal ?? basePrice;
 
   return (
-    <div className={`space-y-2 ${!isDesktop ? 'pb-24' : ''}`}>
+    <div className={`space-y-2 ${!isDesktop && !hideBooking ? 'pb-24' : ''}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
           {photos.length ? (
@@ -394,7 +422,7 @@ export const VenueDetail = ({
                     title={venue.name}
                     url={typeof window !== 'undefined' ? window.location.href : ''}
                   />
-                  <FavoriteButton venueId={venue.id} variant="solid" />
+                  {!hideBooking ? <FavoriteButton venueId={venue.id} variant="solid" /> : null}
                 </div>
                 {venue.isVerified ? (
                   <span className="sf-stamp">
@@ -663,15 +691,17 @@ export const VenueDetail = ({
             )}
           </section>
 
-          <section className="sf-detail-section">
-            <AvailabilityCalendar
-              venueId={venue.id}
-              allowsMultipleDays={venue.allowsMultipleDays}
-              openingHours={venue.openingHours}
-              onRangeSelect={handleRangeChange}
-              externalRange={selectedRange}
-            />
-          </section>
+          {!hideBooking ? (
+            <section className="sf-detail-section">
+              <AvailabilityCalendar
+                venueId={venue.id}
+                allowsMultipleDays={venue.allowsMultipleDays}
+                openingHours={venue.openingHours}
+                onRangeSelect={handleRangeChange}
+                externalRange={selectedRange}
+              />
+            </section>
+          ) : null}
 
           {venue.reviewCount ? (
             <section className="sf-detail-section">
@@ -685,7 +715,7 @@ export const VenueDetail = ({
           ) : null}
         </div>
 
-        {isDesktop ? (
+        {isDesktop && !hideBooking ? (
           <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[380px] lg:space-y-3">
             {staleRangeNotice ? (
               <div className="border-warning bg-warning/10 flex items-start justify-between gap-2 border-l-2 p-3 text-sm text-foreground">
@@ -710,7 +740,7 @@ export const VenueDetail = ({
         ) : null}
       </div>
 
-      {!isDesktop ? (
+      {!isDesktop && !hideBooking ? (
         <>
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="mx-auto flex max-w-md items-center justify-between gap-3">
