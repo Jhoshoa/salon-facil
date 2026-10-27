@@ -117,8 +117,13 @@ nueva de Prisma (un archivo nuevo en `backend/prisma/migrations/`), hay que apli
 despues del deploy:
 
 ```bash
-docker exec -it salonfacil-backend npx prisma migrate deploy
+docker exec -u root -it salonfacil-backend npx prisma migrate deploy
 ```
+
+**`-u root` es obligatorio aca** — a diferencia del `docker exec` interactivo de la seccion 3,
+que solo necesita root para casos raros, este comando falla corriendo como el usuario `nestjs`
+(no-root) con el que arranca el contenedor por defecto. Es un error facil de repetir porque el
+comando "se ve" igual sin el flag; si lo corriste sin `-u root` y fallo, agregalo y reintenta.
 
 Este comando es **seguro de correr siempre**, tenga o no migraciones pendientes — si no hay
 nada nuevo que aplicar, simplemente dice `No pending migrations to apply.` y no hace nada. Por
@@ -128,7 +133,7 @@ sin tener que acordarse si esta vez tocaba o no.
 Para confirmar el estado sin aplicar nada:
 
 ```bash
-docker exec -it salonfacil-backend npx prisma migrate status
+docker exec -u root -it salonfacil-backend npx prisma migrate status
 ```
 
 ### 6.2 Como creamos una migracion nueva (flujo local, antes de pushear)
@@ -175,7 +180,7 @@ Una vez que el commit con la migracion nueva ya esta en `main` y Dokploy termino
 (o justo despues de un redeploy manual):
 
 ```bash
-docker exec -it salonfacil-backend npx prisma migrate deploy
+docker exec -u root -it salonfacil-backend npx prisma migrate deploy
 ```
 
 Prisma lleva registro de que migraciones ya se aplicaron en la tabla `_prisma_migrations` de la
@@ -216,7 +221,7 @@ cada redeploy, sin pensar si hacia falta o no.
 
 1. Verifica que el deploy termino sin errores en el panel de Dokploy (o `docker logs -f
    salonfacil-backend` y busca que haya arrancado bien, sin excepciones de arranque).
-2. `docker exec -it salonfacil-backend npx prisma migrate deploy` — aplica cualquier migracion
+2. `docker exec -u root -it salonfacil-backend npx prisma migrate deploy` — aplica cualquier migracion
    nueva. Es inofensivo si no habia ninguna.
 3. Si el cambio agrego catalogos nuevos: `docker exec -it salonfacil-backend npm run
    prisma:seed:catalog:prod`.

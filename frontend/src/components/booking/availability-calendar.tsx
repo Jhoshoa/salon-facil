@@ -1,6 +1,14 @@
 'use client';
 
-import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, parse, startOfMonth } from 'date-fns';
+import {
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  getDay,
+  parse,
+  startOfMonth,
+} from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -10,7 +18,11 @@ import { formatDate, getCurrentMonth } from '@/lib/formatters';
 import type { BookingStatus, VenueOpeningHour } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/shared/error-state';
-import { type DayCellData, type DayVariant, MonthCalendarGrid } from '@/components/shared/month-calendar-grid';
+import {
+  type DayCellData,
+  type DayVariant,
+  MonthCalendarGrid,
+} from '@/components/shared/month-calendar-grid';
 
 interface AvailabilityCalendarProps {
   venueId: string;
@@ -41,9 +53,10 @@ const statusLabel: Record<BookingStatus, string> = {
 
 const legend = [
   { variant: 'available' as const, label: 'Disponible' },
+  { variant: 'pending' as const, label: 'Reservado temporalmente' },
   { variant: 'booked' as const, label: 'Reservado' },
-  { variant: 'blocked' as const, label: 'Bloqueado' },
-  { variant: 'closed' as const, label: 'Local cerrado' },
+  { variant: 'blocked' as const, label: 'No disponible' },
+  { variant: 'pastEvent' as const, label: 'Tuvo un evento' },
 ];
 
 export const AvailabilityCalendar = ({
@@ -88,16 +101,28 @@ export const AvailabilityCalendar = ({
     return set;
   }, [openingHours]);
 
-  const baseVariant = (dateKey: string, dayOfWeek: number): { variant: DayVariant; label?: string } => {
+  const baseVariant = (
+    dateKey: string,
+    dayOfWeek: number,
+  ): { variant: DayVariant; label?: string } => {
     const booking = query.data?.bookings.find((item) => item.date === dateKey);
     const block = query.data?.blocks.find((item) => item.date === dateKey);
 
     if (dateKey < today) {
-      return { variant: 'past', label: booking ? statusLabel[booking.status] : block?.reason ?? undefined };
+      if (booking) return { variant: 'pastEvent', label: statusLabel[booking.status] };
+      return { variant: 'past', label: block?.reason ?? undefined };
     }
-    if (booking) return { variant: 'booked', label: statusLabel[booking.status] };
+    if (booking) {
+      // PENDING hasn't been accepted by the owner yet -- it could still fall through, so it
+      // reads differently from an owner-approved/paid booking rather than sharing 'booked'.
+      const variant = booking.status === 'PENDING' ? 'pending' : 'booked';
+      return { variant, label: statusLabel[booking.status] };
+    }
     if (block) return { variant: 'blocked', label: block.reason ?? 'Bloqueado' };
-    if (closedWeekdays.has(dayOfWeek)) return { variant: 'closed', label: 'Local cerrado' };
+    // Same variant as an owner block -- from the renter's side both just mean "can't book this
+    // day"; the why (one-off block vs. a recurring weekly closure) only really matters to the
+    // owner, and still shows up in the cell's own label if they tap it.
+    if (closedWeekdays.has(dayOfWeek)) return { variant: 'blocked', label: 'Local cerrado' };
     return { variant: 'available' };
   };
 
@@ -217,7 +242,9 @@ export const AvailabilityCalendar = ({
       {selection.status === 'pending' ? (
         <div className="sf-surface mt-4 rounded-md border p-3 text-sm">
           <p className="font-semibold">Inicio: {formatDate(selection.start)}</p>
-          <p className="text-muted-foreground">Elegi el ultimo dia de tu evento en el calendario.</p>
+          <p className="text-muted-foreground">
+            Elegi el ultimo dia de tu evento en el calendario.
+          </p>
         </div>
       ) : null}
 

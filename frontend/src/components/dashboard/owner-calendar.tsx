@@ -36,8 +36,10 @@ const statusLabel: Record<BookingStatus, string> = {
 
 const legend = [
   { variant: 'available' as const, label: 'Disponible' },
+  { variant: 'pending' as const, label: 'Reservado temporalmente' },
   { variant: 'booked' as const, label: 'Reservado' },
   { variant: 'blocked' as const, label: 'Bloqueado' },
+  { variant: 'pastEvent' as const, label: 'Tuvo un evento' },
 ];
 
 export const OwnerCalendar = () => {
@@ -112,18 +114,28 @@ export const OwnerCalendar = () => {
         const block = blockByDate.get(dateKey);
 
         if (dateKey < today) {
+          if (booking) {
+            return {
+              date: dateKey,
+              day,
+              variant: 'pastEvent' as const,
+              label: statusLabel[booking.status],
+            };
+          }
           return {
             date: dateKey,
             day,
             variant: 'past' as const,
-            label: booking ? statusLabel[booking.status] : (block?.reason ?? undefined),
+            label: block?.reason ?? undefined,
           };
         }
         if (booking) {
+          // PENDING hasn't been accepted yet -- it could still fall through, so it reads
+          // differently from an approved/paid booking rather than sharing 'booked'.
           return {
             date: dateKey,
             day,
-            variant: 'booked' as const,
+            variant: booking.status === 'PENDING' ? ('pending' as const) : ('booked' as const),
             label: statusLabel[booking.status],
           };
         }

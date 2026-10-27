@@ -30,3 +30,8 @@ Thumbs.db
 # Prisma
 backend/prisma/dev.db
 backend/prisma/dev.db-journal
+
+# Lead-gen contact data scraped for outreach campaigns -- valuable but not project source,
+# and contains third-party contact info that shouldn't sit in git history.
+research_notes/Locales Bolivia/*.csv
+research_notes/Locales Bolivia/*.html
