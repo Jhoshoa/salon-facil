@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
-import type { VenueCalendar } from '@/types/api';
+import { render, screen, within } from '@testing-library/react';
+import type { VenueCalendar, VenueOpeningHour } from '@/types/api';
 import { AvailabilityCalendar } from './availability-calendar';
 import { getVenueCalendar } from '@/lib/api/calendar.api';
 
@@ -34,14 +34,18 @@ const calendarData: VenueCalendar = {
       eventType: 'Quince anos',
     },
   ],
-  blocks: [],
+  blocks: [{ id: 'block-1', date: '2026-06-18', type: 'block', reason: 'Mantenimiento' }],
 };
 
-const renderCalendar = () => {
+const renderCalendar = (openingHours?: VenueOpeningHour[]) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <AvailabilityCalendar venueId="venue-1" allowsMultipleDays={false} />
+      <AvailabilityCalendar
+        venueId="venue-1"
+        allowsMultipleDays={false}
+        openingHours={openingHours}
+      />
     </QueryClientProvider>,
   );
 };
@@ -93,5 +97,39 @@ describe('AvailabilityCalendar - mapeo de estados de reserva a variantes visuale
 
     const today = await screen.findByRole('button', { name: /15 de junio.*\(hoy\)/i });
     expect(today).toHaveAttribute('aria-current', 'date');
+  });
+
+  it('un bloqueo del dueno y un dia cerrado por horario se ven igual (misma variante), con una sola entrada en la leyenda', async () => {
+    const closedDate = '2026-06-24';
+    const closedDayOfWeek = new Date(`${closedDate}T00:00:00`).getDay();
+    const openingHours: VenueOpeningHour[] = [
+      {
+        id: 'oh-1',
+        dayOfWeek: closedDayOfWeek,
+        opensAt: '09:00',
+        closesAt: '18:00',
+        isClosed: true,
+      },
+    ];
+
+    renderCalendar(openingHours);
+
+    const ownerBlockedCell = await screen.findByRole('button', {
+      name: /18 de junio: Mantenimiento/i,
+    });
+    const closedWeekdayCell = await screen.findByRole('button', {
+      name: /24 de junio: Local cerrado/i,
+    });
+    // Different reason text (visible per-cell), same visual treatment -- the distinction
+    // between "owner blocked this one day" and "closed every week on this weekday" only
+    // matters to the owner, not to someone deciding whether they can book.
+    expect(ownerBlockedCell.className).toBe(closedWeekdayCell.className);
+
+    // The legend should show a single merged entry, not "Bloqueado" and "Local cerrado" apart
+    // (those two still appear as per-cell labels above -- just not duplicated in the legend).
+    const legend = within(screen.getByTestId('calendar-legend'));
+    expect(legend.getByText('No disponible')).toBeInTheDocument();
+    expect(legend.queryByText('Bloqueado')).not.toBeInTheDocument();
+    expect(legend.queryByText('Local cerrado')).not.toBeInTheDocument();
   });
 });

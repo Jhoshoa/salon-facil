@@ -15,8 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-export type DayVariant =
-  'available' | 'pending' | 'booked' | 'blocked' | 'past' | 'pastEvent' | 'closed';
+export type DayVariant = 'available' | 'pending' | 'booked' | 'blocked' | 'past' | 'pastEvent';
 export type RangePosition = 'start' | 'middle' | 'end' | 'single';
 
 export interface DayCellData {
@@ -53,7 +52,6 @@ const cellVariantClasses: Record<DayVariant, string> = {
   blocked: 'border-border bg-muted text-muted-foreground',
   past: 'border-transparent bg-muted/30 text-muted-foreground/40',
   pastEvent: 'border-transparent bg-amber-50/70 text-amber-700/60',
-  closed: 'border-transparent bg-muted/50 text-muted-foreground/50',
 };
 
 const legendDotClasses: Record<DayVariant, string> = {
@@ -63,7 +61,6 @@ const legendDotClasses: Record<DayVariant, string> = {
   blocked: 'bg-muted-foreground/60',
   past: 'bg-muted-foreground/20',
   pastEvent: 'bg-amber-200',
-  closed: 'bg-muted-foreground/40',
 };
 
 /** Distinct from the variant's own border/background (CSS `outline`, not `border` or the
@@ -152,8 +149,7 @@ export const MonthCalendarGrid = ({
               day: date.getDate(),
               variant: 'available',
             };
-            const clickable =
-              Boolean(onDayClick) && cell.variant !== 'past' && cell.variant !== 'closed';
+            const clickable = Boolean(onDayClick) && cell.variant !== 'past';
             const isRangeEdge =
               cell.rangePosition === 'start' ||
               cell.rangePosition === 'end' ||
@@ -190,7 +186,10 @@ export const MonthCalendarGrid = ({
       )}
 
       {legend?.length ? (
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <div
+          data-testid="calendar-legend"
+          className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground"
+        >
           {legend.map((item) => (
             <span key={item.variant} className="inline-flex items-center gap-1.5">
               <span className={cn('h-2.5 w-2.5 rounded-full', legendDotClasses[item.variant])} />

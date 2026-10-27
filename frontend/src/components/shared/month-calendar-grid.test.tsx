@@ -97,12 +97,29 @@ describe('MonthCalendarGrid - variantes de estado', () => {
 });
 
 describe('MonthCalendarGrid - interaccion', () => {
-  it('llama a onDayClick solo para dias clickeables (no past, no closed)', async () => {
+  it('no llama a onDayClick para un dia pasado', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    const onDayClick = jest.fn();
+    const days: DayCellData[] = [{ date: '2026-06-01', day: 1, variant: 'past' }];
+
+    render(
+      <MonthCalendarGrid
+        month="2026-06"
+        onMonthChange={jest.fn()}
+        days={days}
+        onDayClick={onDayClick}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /^1 de junio$/i }));
+    expect(onDayClick).not.toHaveBeenCalled();
+  });
+
+  it('llama a onDayClick para un dia disponible o bloqueado -- bloqueado tambien es clickeable, para que el que reserva pueda ver el motivo', async () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const onDayClick = jest.fn();
     const days: DayCellData[] = [
-      { date: '2026-06-01', day: 1, variant: 'past' },
-      { date: '2026-06-10', day: 10, variant: 'closed' },
+      { date: '2026-06-10', day: 10, variant: 'blocked', label: 'Local cerrado' },
       { date: '2026-06-20', day: 20, variant: 'available' },
     ];
 
@@ -115,9 +132,10 @@ describe('MonthCalendarGrid - interaccion', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: /^1 de junio$/i }));
-    await user.click(screen.getByRole('button', { name: /^10 de junio$/i }));
-    expect(onDayClick).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /^10 de junio: Local cerrado$/i }));
+    expect(onDayClick).toHaveBeenCalledWith(
+      expect.objectContaining({ date: '2026-06-10', variant: 'blocked' }),
+    );
 
     await user.click(screen.getByRole('button', { name: /^20 de junio$/i }));
     expect(onDayClick).toHaveBeenCalledWith(

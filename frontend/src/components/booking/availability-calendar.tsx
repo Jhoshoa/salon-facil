@@ -55,8 +55,7 @@ const legend = [
   { variant: 'available' as const, label: 'Disponible' },
   { variant: 'pending' as const, label: 'Reservado temporalmente' },
   { variant: 'booked' as const, label: 'Reservado' },
-  { variant: 'blocked' as const, label: 'Bloqueado' },
-  { variant: 'closed' as const, label: 'Local cerrado' },
+  { variant: 'blocked' as const, label: 'No disponible' },
   { variant: 'pastEvent' as const, label: 'Tuvo un evento' },
 ];
 
@@ -120,7 +119,10 @@ export const AvailabilityCalendar = ({
       return { variant, label: statusLabel[booking.status] };
     }
     if (block) return { variant: 'blocked', label: block.reason ?? 'Bloqueado' };
-    if (closedWeekdays.has(dayOfWeek)) return { variant: 'closed', label: 'Local cerrado' };
+    // Same variant as an owner block -- from the renter's side both just mean "can't book this
+    // day"; the why (one-off block vs. a recurring weekly closure) only really matters to the
+    // owner, and still shows up in the cell's own label if they tap it.
+    if (closedWeekdays.has(dayOfWeek)) return { variant: 'blocked', label: 'Local cerrado' };
     return { variant: 'available' };
   };
 
