@@ -13,6 +13,7 @@ export const AUDIT_ACTION = {
   OWNER_ROLE_UPGRADED_ON_INVITE: 'owner_invite.role_upgraded',
   OWNER_INVITE_SENT: 'owner_invite.sent',
   OWNER_INVITE_RESENT: 'owner_invite.resent',
+  VENUE_PREVIEW_LINK_CREATED: 'venue.preview_link_created',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];

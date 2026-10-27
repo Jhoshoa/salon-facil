@@ -120,6 +120,15 @@ describe('Admin owner invites (e2e)', () => {
       await adminAgent.post('/api/v1/admin/owner-invites').send(body).expect(400);
     });
 
+    it('rejects a new email whose phone already belongs to a different account', async () => {
+      await adminAgent.post('/api/v1/admin/owner-invites').send(ownerInviteBody(23)).expect(201);
+
+      const second = ownerInviteBody(24);
+      second.owner.phone = phoneFor(uniqueId, 23);
+
+      await adminAgent.post('/api/v1/admin/owner-invites').send(second).expect(409);
+    });
+
     it('returns 403 for a non-admin caller', async () => {
       const ownerAgent = request.agent(app.getHttpServer());
       await ownerAgent.post('/api/v1/auth/register').send({
@@ -223,6 +232,34 @@ describe('Admin owner invites (e2e)', () => {
         res.body.data.find((item: { id: string }) => item.id === created.body.owner.id),
       ).toBeUndefined();
     });
+
+    // A Google-only account also has passwordHash: null forever -- a real, active owner who
+    // never needed a password, not an unclaimed admin placeholder. Only a linked identity (what
+    // loginOrRegisterWithGoogle creates on signup) reliably tells the two apart.
+    it('does not list an owner who registered themselves with Google', async () => {
+      const created = await adminAgent
+        .post('/api/v1/admin/owner-invites')
+        .send(ownerInviteBody(22))
+        .expect(201);
+
+      await prisma.userIdentity.create({
+        data: {
+          userId: created.body.owner.id,
+          provider: 'google',
+          providerId: `google-${created.body.owner.id}`,
+          email: created.body.owner.email,
+        },
+      });
+
+      const res = await adminAgent
+        .get('/api/v1/admin/owner-invites')
+        .query({ search: created.body.owner.email })
+        .expect(200);
+
+      expect(
+        res.body.data.find((item: { id: string }) => item.id === created.body.owner.id),
+      ).toBeUndefined();
+    });
   });
 
   // Covers the "manage it ourselves first, invite the owner later" scenario: the admin never
@@ -232,15 +269,21 @@ describe('Admin owner invites (e2e)', () => {
   describe('approve-then-invite (venue goes public before the owner is ever invited)', () => {
     /** The real raw token is never returned by any API response (only its hash is persisted) --
      * the only place it legitimately appears is in the body of the notification we already
-     * enqueued, same as a real email/WhatsApp message would contain it. */
+     * enqueued, same as a real email/WhatsApp message would contain it. sendInvite() fires the
+     * enqueue without awaiting it (a notification hiccup shouldn't fail the HTTP response), so
+     * the row can land a beat after the request already returned -- a few retries absorbs that
+     * instead of flaking under load. */
     async function extractRawTokenFromLatestInvite(ownerId: string): Promise<string> {
-      const notification = await prisma.notification.findFirst({
-        where: { userId: ownerId, type: 'VENUE_OWNER_INVITE', channel: 'EMAIL' },
-        orderBy: { createdAt: 'desc' },
-      });
-      const match = notification?.content.match(/\/preview\/([a-f0-9]+)/);
-      if (!match) throw new Error('No invite token found in the notification content');
-      return match[1];
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const notification = await prisma.notification.findFirst({
+          where: { userId: ownerId, type: 'VENUE_OWNER_INVITE', channel: 'EMAIL' },
+          orderBy: { createdAt: 'desc' },
+        });
+        const match = notification?.content.match(/\/preview\/([a-f0-9]+)/);
+        if (match) return match[1];
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      throw new Error('No invite token found in the notification content');
     }
 
     it('lets the admin approve/publish the venue first and invite the owner long after', async () => {
@@ -297,6 +340,61 @@ describe('Admin owner invites (e2e)', () => {
       const venueAfterClaim = await prisma.venue.findUniqueOrThrow({ where: { id: venue.id } });
       expect(venueAfterClaim.status).toBe('ACTIVE');
       expect(venueAfterClaim.ownerId).toBe(owner.id);
+    });
+  });
+
+  // Covers attaching a real owner to a venue that was created some other way (e.g. an admin
+  // testing something directly, so the venue's owner is the admin's own account) instead of
+  // through the phone-onboarding form above.
+  describe('POST /api/v1/admin/owner-invites/:venueId/assign-owner', () => {
+    async function createAdminOwnedVenue(offset: number) {
+      const res = await adminAgent
+        .post('/api/v1/venues')
+        .field('name', `Salon De Prueba Admin ${uniqueId}-${offset}`)
+        .field('address', 'Av. del Admin #1')
+        .field('district', 'Distrito Fixture')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .expect(201);
+      return res.body.id as string;
+    }
+
+    it('attaches a new owner and sends the invite when the venue still belongs to the admin', async () => {
+      const venueId = await createAdminOwnedVenue(40);
+
+      const res = await adminAgent
+        .post(`/api/v1/admin/owner-invites/${venueId}/assign-owner`)
+        .send({
+          fullName: 'Dueno Asignado E2E',
+          email: `dueno-asignado-${uniqueId}@email.com`,
+          phone: phoneFor(uniqueId, 41),
+        })
+        .expect(200);
+      expect(res.body.resent).toBe(false);
+
+      const venue = await prisma.venue.findUniqueOrThrow({ where: { id: venueId } });
+      const newOwner = await prisma.user.findUniqueOrThrow({
+        where: { email: `dueno-asignado-${uniqueId}@email.com` },
+      });
+      expect(venue.ownerId).toBe(newOwner.id);
+      expect(newOwner.role).toBe('OWNER');
+      expect(newOwner.passwordHash).toBeNull();
+    });
+
+    it('rejects reassigning a venue that already belongs to a real (non-ADMIN) owner', async () => {
+      const created = await adminAgent
+        .post('/api/v1/admin/owner-invites')
+        .send(ownerInviteBody(42))
+        .expect(201);
+
+      await adminAgent
+        .post(`/api/v1/admin/owner-invites/${created.body.venue.id}/assign-owner`)
+        .send({
+          fullName: 'Otro Dueno',
+          email: `otro-dueno-${uniqueId}@email.com`,
+          phone: phoneFor(uniqueId, 43),
+        })
+        .expect(400);
     });
   });
 });

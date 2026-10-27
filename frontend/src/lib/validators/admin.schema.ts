@@ -22,3 +22,14 @@ export const ownerInviteFormSchema = z.object({
 });
 
 export type OwnerInviteFormValues = z.infer<typeof ownerInviteFormSchema>;
+
+/** For attaching a real owner to a venue that already exists (e.g. one an admin created
+ * directly) -- same contact fields as ownerInviteFormSchema, without any venue fields since the
+ * venue is already there. */
+export const assignVenueOwnerFormSchema = z.object({
+  ownerFullName: z.string().min(2, 'Ingresa el nombre del propietario').max(100),
+  ownerEmail: z.string().email('Email invalido'),
+  ownerPhone: z.string().regex(PHONE_REGEX, PHONE_HINT),
+});
+
+export type AssignVenueOwnerFormValues = z.infer<typeof assignVenueOwnerFormSchema>;

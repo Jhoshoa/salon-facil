@@ -22,6 +22,9 @@ import { CloudinaryService } from '../../../upload/cloudinary.service';
 import { AuditLogService } from '../../../audit-log/audit-log.service';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../../audit-log/audit-log-actions';
 import { AuthService } from '../../../auth/application/services/auth.service';
+import { TokenService } from '../../../auth/application/services/token.service';
+
+const VENUE_PREVIEW_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
 export interface VenueCompletion {
   score: number;
@@ -40,6 +43,7 @@ export class VenueService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly auditLogService: AuditLogService,
     private readonly authService: AuthService,
+    private readonly tokenService: TokenService,
   ) {}
 
   async createVenue(dto: CreateVenueDto, ownerId: string): Promise<VenueEntity> {
@@ -147,6 +151,45 @@ export class VenueService {
       throw new NotFoundException('El enlace de vista previa es invalido o expiro');
     }
     return this.venueRepository.findByOwner(userId);
+  }
+
+  /** ADMIN-only: a temporary, read-only link to show someone the venue's page without granting
+   * any ability to claim/activate the owner account -- see VenuePreviewToken. */
+  async createVenuePreviewLink(venueId: string, adminId: string): Promise<string> {
+    const venue = await this.getVenueById(venueId);
+    const token = this.tokenService.generateVenuePreviewToken();
+    await this.venueRepository.createPreviewToken(
+      venue.id,
+      this.tokenService.hashToken(token),
+      new Date(Date.now() + VENUE_PREVIEW_TOKEN_TTL_MS),
+    );
+    this.auditLogService.record({
+      adminId,
+      action: AUDIT_ACTION.VENUE_PREVIEW_LINK_CREATED,
+      targetType: AUDIT_TARGET_TYPE.VENUE,
+      targetId: venue.id,
+      metadata: { venueName: venue.name },
+    });
+    return token;
+  }
+
+  /** ADMIN-only, no ownership check here on purpose -- the caller (AdminOwnerInviteService)
+   * already decided this reassignment is safe (today: only when the current owner is an ADMIN
+   * placeholder, never a real claimed OWNER account) before calling this. */
+  async reassignOwner(venueId: string, newOwnerId: string): Promise<void> {
+    await this.venueRepository.reassignOwner(venueId, newOwnerId);
+  }
+
+  /** Read-only lookup for the public share-preview route -- same non-consuming semantics as
+   * getVenuesByInviteToken, just venue-scoped instead of owner-scoped. */
+  async getVenueByPreviewToken(rawToken: string): Promise<VenueEntity> {
+    const venueId = await this.venueRepository.findVenueIdByPreviewToken(
+      this.tokenService.hashToken(rawToken),
+    );
+    if (!venueId) {
+      throw new NotFoundException('El enlace de vista previa es invalido o expiro');
+    }
+    return this.getVenueById(venueId);
   }
 
   /** Favoriting a venue that doesn't exist (or no longer does) fails loudly rather than
