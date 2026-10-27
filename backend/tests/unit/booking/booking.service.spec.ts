@@ -248,6 +248,27 @@ describe('BookingService', () => {
       expect(mockBookingRepository.create).toHaveBeenCalled();
     });
 
+    it('should throw ForbiddenException when the venue is not ACTIVE yet (e.g. still DRAFT)', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({ status: VenueStatus.DRAFT, isVerified: false }),
+      );
+
+      await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mockBookingRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when the venue is ACTIVE but not yet verified', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({ status: VenueStatus.ACTIVE, isVerified: false }),
+      );
+
+      await expect(service.requestBooking('venue-1', 'client-1', bookingDto)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
     it('should throw BadRequestException when guest count exceeds capacity', async () => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue({ capacityMax: 50 }));
 
