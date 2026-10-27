@@ -7,7 +7,12 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Grid2x2, Map, MapPin, Plus, SearchX, Star, X } from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
-import { getSimilarVenues, getVenueById, getVenueBySlug } from '@/lib/api/venues.api';
+import {
+  getSimilarVenues,
+  getVenueById,
+  getVenueBySharePreviewToken,
+  getVenueBySlug,
+} from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -41,6 +46,14 @@ interface VenueDetailProps {
    * precedence over `slug` when both are somehow passed. The "similar venues" section is
    * skipped in this mode (it's a public-only feature, not worth wiring up for a preview). */
   venueId?: string;
+  /** Public, unauthenticated lookup by a time-limited admin-issued share token (see
+   * VenuePreviewToken) -- resolves a venue in any status, same as `venueId`, but for a visitor
+   * who isn't logged in at all. Takes precedence over both `venueId` and `slug`. Everything else
+   * renders exactly as it would for a real visitor, booking form included: FavoriteButton and
+   * BookingForm already prompt a login instead of acting when there's no authenticated CLIENT
+   * (see their own `isAuthenticated` checks), so there's nothing extra to guard here. "Similar
+   * venues" is skipped, same as `venueId` mode -- not worth wiring up for a preview. */
+  shareToken?: string;
   initialStartDate?: string;
   initialEndDate?: string;
   /** Link back to the full-page map view, pre-loaded with the same search criteria the user
@@ -139,19 +152,23 @@ const groupAmenities = (
 export const VenueDetail = ({
   slug,
   venueId,
+  shareToken,
   initialStartDate,
   initialEndDate,
   mapHref,
 }: VenueDetailProps) => {
   const query = useQuery<Venue, ApiError>({
-    queryKey: ['venue', venueId ?? slug],
-    queryFn: () => (venueId ? getVenueById(venueId) : getVenueBySlug(slug!)),
+    queryKey: ['venue', venueId ?? slug ?? shareToken],
+    queryFn: () => {
+      if (shareToken) return getVenueBySharePreviewToken(shareToken);
+      return venueId ? getVenueById(venueId) : getVenueBySlug(slug!);
+    },
   });
 
   const similarQuery = useQuery({
     queryKey: ['venue', slug, 'similar'],
     queryFn: () => getSimilarVenues(slug!),
-    enabled: !venueId && Boolean(slug),
+    enabled: !venueId && !shareToken && Boolean(slug),
   });
 
   const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | undefined>(
@@ -200,7 +217,13 @@ export const VenueDetail = ({
     // never help. Point the visitor back to the search instead of a "Reintentar" that only
     // implies a connection problem that isn't actually happening.
     if (query.error?.statusCode === 404) {
-      return (
+      return shareToken ? (
+        <EmptyState
+          icon={SearchX}
+          title="Este enlace ya no es valido"
+          description="Puede que haya vencido (dura 7 dias) o que ya no exista. Pedile a quien te lo mando que te pase uno nuevo."
+        />
+      ) : (
         <EmptyState
           icon={SearchX}
           title="Este local no esta disponible"
