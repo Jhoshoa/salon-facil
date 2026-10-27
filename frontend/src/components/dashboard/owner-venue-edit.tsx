@@ -82,7 +82,7 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <Breadcrumbs
               items={[{ label: 'Mis locales', href: '/dashboard/venues' }, { label: venue.name }]}
@@ -90,7 +90,7 @@ export const OwnerVenueEdit = ({ venueId }: OwnerVenueEditProps) => {
             <h1 className="text-2xl font-semibold">{venue.name}</h1>
             <p className="text-sm text-muted-foreground">Edita la informacion de tu local.</p>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             {isAdmin ? (
               <Button
                 type="button"
