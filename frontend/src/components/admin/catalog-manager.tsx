@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import { amenityCategoryLabels } from '@/components/venues/venue-filter-labels';
 import type { AmenityCategory } from '@/types/api';
 
 interface CatalogRow {
@@ -45,17 +46,6 @@ const emptyForm: CatalogItemFormValues = {
   icon: '',
   sortOrder: '0',
   category: '',
-};
-
-const categoryLabels: Record<AmenityCategory, string> = {
-  FACILITY: 'Instalaciones',
-  COMFORT: 'Confort',
-  AUDIO_VISUAL: 'Audio y video',
-  CATERING_DRINKS: 'Catering y bebidas',
-  PARKING: 'Parqueo',
-  ACCESSIBILITY: 'Accesibilidad',
-  SAFETY: 'Seguridad',
-  SERVICES: 'Servicios',
 };
 
 interface CatalogManagerProps {
@@ -206,7 +196,10 @@ export const CatalogManager = ({
       ) : null}
 
       {query.isError ? (
-        <ErrorState title={`No se pudo cargar ${title.toLowerCase()}`} onRetry={() => query.refetch()} />
+        <ErrorState
+          title={`No se pudo cargar ${title.toLowerCase()}`}
+          onRetry={() => query.refetch()}
+        />
       ) : null}
 
       {query.data && query.data.length === 0 ? (
@@ -222,7 +215,7 @@ export const CatalogManager = ({
                   <p className="font-medium">{item.name}</p>
                   {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
                   {item.category ? (
-                    <Badge variant="outline">{categoryLabels[item.category]}</Badge>
+                    <Badge variant="outline">{amenityCategoryLabels[item.category]}</Badge>
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -291,7 +284,7 @@ export const CatalogManager = ({
                   }
                 >
                   <option value="">Selecciona una categoria</option>
-                  {Object.entries(categoryLabels).map(([value, label]) => (
+                  {Object.entries(amenityCategoryLabels).map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
                     </option>
