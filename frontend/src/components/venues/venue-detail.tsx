@@ -17,7 +17,7 @@ import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
-import { departamentoLabels } from './venue-filter-labels';
+import { amenityCategoryLabels, departamentoLabels } from './venue-filter-labels';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
@@ -79,17 +79,6 @@ const VenueDetailSkeleton = () => (
     <Skeleton className="h-96 w-full shrink-0 lg:w-[380px]" />
   </div>
 );
-
-const amenityCategoryLabels: Record<AmenityCategory, string> = {
-  FACILITY: 'Facilities',
-  COMFORT: 'Comodidad',
-  AUDIO_VISUAL: 'Audio y visual',
-  CATERING_DRINKS: 'Catering y bebidas',
-  PARKING: 'Parking',
-  ACCESSIBILITY: 'Accesibilidad',
-  SAFETY: 'Seguridad',
-  SERVICES: 'Servicios',
-};
 
 const dayLabels = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
 
