@@ -39,10 +39,28 @@ const calendarData: VenueCalendar = {
       id: 'block-1',
       date: '2026-06-18',
       type: 'block',
-      status: 'CONFIRMED',
+      status: 'BLOCKED',
       useTypeId: null,
       useTypeName: null,
       reason: 'Mantenimiento',
+    },
+    {
+      id: 'block-2',
+      date: '2026-06-26',
+      type: 'block',
+      status: 'CONFIRMED',
+      useTypeId: 'use-wedding',
+      useTypeName: 'Boda',
+      reason: null,
+    },
+    {
+      id: 'block-3',
+      date: '2026-06-27',
+      type: 'block',
+      status: 'TENTATIVE',
+      useTypeId: null,
+      useTypeName: null,
+      reason: null,
     },
   ],
 };
@@ -109,7 +127,29 @@ describe('AvailabilityCalendar - mapeo de estados de reserva a variantes visuale
     expect(today).toHaveAttribute('aria-current', 'date');
   });
 
-  it('un bloqueo del dueno y un dia cerrado por horario se ven igual (misma variante), con una sola entrada en la leyenda', async () => {
+  it('un bloqueo CONFIRMED del dueno se ve como "Reservado", con el mismo estilo que una reserva en firme', async () => {
+    renderCalendar();
+
+    const confirmedBlockCell = await screen.findByRole('button', { name: /26 de junio: Boda/i });
+    const approvedBookingCell = await screen.findByRole('button', {
+      name: /21 de junio: Aprobada/i,
+    });
+    expect(confirmedBlockCell.className).toBe(approvedBookingCell.className);
+  });
+
+  it('un bloqueo TENTATIVE del dueno se ve como "Reservado temporalmente", con el mismo estilo que una reserva pendiente', async () => {
+    renderCalendar();
+
+    const tentativeBlockCell = await screen.findByRole('button', {
+      name: /27 de junio: Reservado temporalmente/i,
+    });
+    const pendingBookingCell = await screen.findByRole('button', {
+      name: /20 de junio: Pendiente/i,
+    });
+    expect(tentativeBlockCell.className).toBe(pendingBookingCell.className);
+  });
+
+  it('un bloqueo BLOCKED del dueno y un dia cerrado por horario se ven igual (misma variante), con una sola entrada en la leyenda', async () => {
     const closedDate = '2026-06-24';
     const closedDayOfWeek = new Date(`${closedDate}T00:00:00`).getDay();
     const openingHours: VenueOpeningHour[] = [
