@@ -22,6 +22,7 @@ import {
   type VenueFormValues,
 } from '@/lib/validators/venue.schema';
 import { departamentoLabels, priceUnitLabels } from '@/components/venues/venue-filter-labels';
+import { VenueRentalItemsTab } from './venue-rental-items-tab';
 import { formatDate, formatTime12h } from '@/lib/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -136,12 +137,14 @@ const buildInitialPricingMode = (venue?: Venue): PricingMode => {
   return 'single';
 };
 
-export type TabKey = 'general' | 'location' | 'pricing' | 'amenities' | 'hours' | 'rules';
+export type TabKey =
+  'general' | 'location' | 'pricing' | 'amenities' | 'catalog' | 'hours' | 'rules';
 
 export const tabs: { key: TabKey; label: string }[] = [
   { key: 'general', label: 'General' },
   { key: 'location', label: 'Ubicacion' },
   { key: 'amenities', label: 'Comodidades' },
+  { key: 'catalog', label: 'Catalogo' },
   { key: 'pricing', label: 'Precios y capacidad' },
   { key: 'hours', label: 'Horarios' },
   { key: 'rules', label: 'Reglas' },
@@ -1579,14 +1582,26 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
               </div>
             </div>
           ) : null}
+
+          {activeTab === 'catalog' ? (
+            venue ? (
+              <VenueRentalItemsTab venue={venue} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Guarda el local primero para poder agregar items al catalogo de alquiler.
+              </p>
+            )
+          ) : null}
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <SubmitButton isLoading={mutation.isPending}>
-          {isEdit ? 'Guardar cambios' : 'Crear local'}
-        </SubmitButton>
-      </div>
+      {activeTab !== 'catalog' ? (
+        <div className="flex justify-end">
+          <SubmitButton isLoading={mutation.isPending}>
+            {isEdit ? 'Guardar cambios' : 'Crear local'}
+          </SubmitButton>
+        </div>
+      ) : null}
     </form>
   );
 };

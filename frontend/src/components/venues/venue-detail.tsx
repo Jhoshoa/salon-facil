@@ -35,6 +35,7 @@ import type { AmenityCategory, ApiError, Venue } from '@/types/api';
 import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
+import { VenueRentalItemCatalog } from './venue-rental-item-catalog';
 import { FavoriteButton } from './favorite-button';
 import { ShareButton } from './share-button';
 
@@ -609,6 +610,8 @@ export const VenueDetail = ({
               </div>
             </section>
           ) : null}
+
+          <VenueRentalItemCatalog venueId={venue.id} />
 
           {/* Opening Hours */}
           {venue.openingHours?.length ? (
