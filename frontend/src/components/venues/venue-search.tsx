@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import { ScrollToTopButton } from '@/components/shared/scroll-to-top-button';
 import { VenueFilterSidebar, type VenueFilterValues } from './venue-filter-sidebar';
 import { VenueCardSkeleton } from './venue-card-skeleton';
 import { VenueResultCard } from './venue-result-card';
@@ -286,7 +287,7 @@ export const VenueSearch = ({
   return (
     <div className="space-y-6">
       <form
-        className="sf-search-bar sf-search-bar-catalog sticky top-[calc(var(--header-height)+0.5rem)] z-30"
+        className="sf-search-bar sf-search-bar-catalog md:sticky md:top-[calc(var(--header-height)+0.5rem)] md:z-30"
         onSubmit={handleSubmit}
       >
         <div className="sf-search-grid">
@@ -495,6 +496,8 @@ export const VenueSearch = ({
           </Button>
         </div>
       </AppDrawer>
+
+      <ScrollToTopButton />
     </div>
   );
 };
