@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsObject,
@@ -16,6 +17,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { CalendarBlockStatus } from '@prisma/client';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -174,10 +176,15 @@ export class CreateCalendarBlockDto {
   @IsDateString({}, { message: 'La fecha debe ser valida' })
   date!: string;
 
+  @IsEnum(CalendarBlockStatus, { message: 'Estado no valido' })
+  status!: CalendarBlockStatus;
+
+  // Only meaningful for TENTATIVE/CONFIRMED (there's an actual event) -- the service layer
+  // ignores it for BLOCKED rather than rejecting it, so a client flipping the dropdown back to
+  // "Bloqueado" without clearing the field first doesn't need special-case handling.
   @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
+  @IsUUID()
+  useTypeId?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -186,4 +193,15 @@ export class CreateCalendarBlockDto {
   @IsOptional()
   @IsObject()
   recurringRule?: Record<string, unknown>;
+}
+
+/** Edits status/useType on an existing block -- no `date` field, since moving a block to a
+ * different day is delete + recreate (it needs the same availability/conflict checks a create does). */
+export class UpdateCalendarBlockDto {
+  @IsEnum(CalendarBlockStatus, { message: 'Estado no valido' })
+  status!: CalendarBlockStatus;
+
+  @IsOptional()
+  @IsUUID()
+  useTypeId?: string;
 }

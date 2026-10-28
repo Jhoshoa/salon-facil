@@ -514,10 +514,17 @@ export interface CalendarDayBooking {
   eventType: string;
 }
 
+export type CalendarBlockStatus = 'TENTATIVE' | 'CONFIRMED' | 'BLOCKED';
+
 export interface CalendarDayBlock {
   id: string;
   date: string;
   type: 'block';
+  status: CalendarBlockStatus;
+  useTypeId: string | null;
+  useTypeName: string | null;
+  /** Legacy free-text note from before status/useType existed -- only ever set on old rows that
+   * predate this, shown as a fallback label when useTypeName is null. */
   reason: string | null;
 }
 

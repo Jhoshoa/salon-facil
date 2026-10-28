@@ -1,9 +1,10 @@
 import { apiRequest } from './client';
-import type { VenueCalendar } from '@/types/api';
+import type { CalendarBlockStatus, VenueCalendar } from '@/types/api';
 
 export interface CreateCalendarBlockPayload {
   date: string;
-  reason?: string;
+  status: CalendarBlockStatus;
+  useTypeId?: string;
 }
 
 export const getVenueCalendar = async (venueId: string, month: string): Promise<VenueCalendar> => {
@@ -16,6 +17,22 @@ export const createCalendarBlock = async (
 ): Promise<unknown> => {
   return apiRequest(`/venues/${venueId}/calendar`, {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export interface UpdateCalendarBlockPayload {
+  status: CalendarBlockStatus;
+  useTypeId?: string;
+}
+
+export const updateCalendarBlock = async (
+  venueId: string,
+  blockId: string,
+  payload: UpdateCalendarBlockPayload,
+): Promise<unknown> => {
+  return apiRequest(`/venues/${venueId}/calendar/${blockId}`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 };

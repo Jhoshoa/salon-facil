@@ -15,7 +15,7 @@ import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getVenueCalendar } from '@/lib/api/calendar.api';
 import { formatDate, getCurrentMonth } from '@/lib/formatters';
-import type { BookingStatus, VenueOpeningHour } from '@/types/api';
+import type { BookingStatus, CalendarBlockStatus, VenueOpeningHour } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/shared/error-state';
 import {
@@ -49,6 +49,22 @@ const statusLabel: Record<BookingStatus, string> = {
   CANCELLED_BY_OWNER: 'Cancelada',
   COMPLETED: 'Completada',
   NO_SHOW: 'No show',
+};
+
+// Same status -> variant mapping the owner's own calendar uses, so a date the owner marked
+// "Reservado temporalmente"/"Reservado" reads with the same color here as it does for them --
+// only a plain BLOCKED (no event, just closed) shares the generic "No disponible" look with a
+// recurring weekly closure, since that's the one case where the renter has nothing more to learn.
+const blockStatusToVariant: Record<CalendarBlockStatus, 'pending' | 'booked' | 'blocked'> = {
+  TENTATIVE: 'pending',
+  CONFIRMED: 'booked',
+  BLOCKED: 'blocked',
+};
+
+const blockStatusLabel: Record<CalendarBlockStatus, string> = {
+  TENTATIVE: 'Reservado temporalmente',
+  CONFIRMED: 'Reservado',
+  BLOCKED: 'Bloqueado',
 };
 
 const legend = [
@@ -110,7 +126,7 @@ export const AvailabilityCalendar = ({
 
     if (dateKey < today) {
       if (booking) return { variant: 'pastEvent', label: statusLabel[booking.status] };
-      return { variant: 'past', label: block?.reason ?? undefined };
+      return { variant: 'past', label: block?.useTypeName ?? block?.reason ?? undefined };
     }
     if (booking) {
       // PENDING hasn't been accepted by the owner yet -- it could still fall through, so it
@@ -118,7 +134,12 @@ export const AvailabilityCalendar = ({
       const variant = booking.status === 'PENDING' ? 'pending' : 'booked';
       return { variant, label: statusLabel[booking.status] };
     }
-    if (block) return { variant: 'blocked', label: block.reason ?? 'Bloqueado' };
+    if (block) {
+      return {
+        variant: blockStatusToVariant[block.status],
+        label: block.useTypeName ?? block.reason ?? blockStatusLabel[block.status],
+      };
+    }
     // Same variant as an owner block -- from the renter's side both just mean "can't book this
     // day"; the why (one-off block vs. a recurring weekly closure) only really matters to the
     // owner, and still shows up in the cell's own label if they tap it.
