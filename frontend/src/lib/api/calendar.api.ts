@@ -21,6 +21,22 @@ export const createCalendarBlock = async (
   });
 };
 
+export interface UpdateCalendarBlockPayload {
+  status: CalendarBlockStatus;
+  useTypeId?: string;
+}
+
+export const updateCalendarBlock = async (
+  venueId: string,
+  blockId: string,
+  payload: UpdateCalendarBlockPayload,
+): Promise<unknown> => {
+  return apiRequest(`/venues/${venueId}/calendar/${blockId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+};
+
 export const deleteCalendarBlock = async (venueId: string, blockId: string): Promise<void> => {
   return apiRequest<void>(`/venues/${venueId}/calendar/${blockId}`, { method: 'DELETE' });
 };

@@ -813,6 +813,7 @@ export class BookingService {
       date: string;
       type: 'block';
       status: CalendarBlockStatus;
+      useTypeId: string | null;
       useTypeName: string | null;
       reason: string | null;
     }[];
@@ -840,10 +841,36 @@ export class BookingService {
         date: this.toDateOnly(block.date),
         type: 'block',
         status: block.status,
+        useTypeId: block.useTypeId,
         useTypeName: block.useType?.name ?? null,
         reason: block.reason,
       })),
     };
+  }
+
+  async updateCalendarBlock(
+    blockId: string,
+    data: { status: CalendarBlockStatus; useTypeId?: string },
+    userId: string,
+    userRole: UserRole,
+  ): Promise<CalendarBlockEntity> {
+    const block = await this.bookingRepository.findCalendarBlockById(blockId);
+    if (!block) {
+      throw new NotFoundException(`Fecha marcada con ID '${blockId}' no encontrada`);
+    }
+
+    const venue = await this.venueService.getVenueById(block.venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar esta fecha');
+    }
+
+    // Same rule as creating a block -- the dropdown only ever offers this venue's own "Ideal
+    // para" use types, so anything else means a stale selection or a client bypassing the UI.
+    if (data.useTypeId && !venue.uses?.some((use) => use.useTypeId === data.useTypeId)) {
+      throw new BadRequestException('Ese tipo de evento no esta configurado para este local');
+    }
+
+    return this.bookingRepository.updateCalendarBlock(blockId, data);
   }
 
   async deleteCalendarBlock(blockId: string, userId: string, userRole: UserRole): Promise<void> {

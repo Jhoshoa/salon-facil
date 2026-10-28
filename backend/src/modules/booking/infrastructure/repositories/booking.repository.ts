@@ -6,6 +6,7 @@ import {
   CreateCalendarBlockData,
   OccupiedDateEntry,
   ReminderField,
+  UpdateCalendarBlockData,
 } from '../../domain/repositories/booking.repository.interface';
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
@@ -325,6 +326,27 @@ export class BookingRepository implements IBookingRepository {
       },
     });
     return block ? this.toCalendarBlockEntity(block) : null;
+  }
+
+  async updateCalendarBlock(
+    id: string,
+    data: UpdateCalendarBlockData,
+  ): Promise<CalendarBlockEntity> {
+    const block = await this.prisma.calendarBlock.update({
+      where: { id },
+      data: {
+        status: data.status,
+        // Explicit null (not undefined) so switching to BLOCKED, or clearing the dropdown back
+        // to "Sin especificar", actually drops a previously-set useTypeId instead of leaving it
+        // in place -- Prisma's update treats `undefined` as "don't touch this field".
+        useTypeId: data.status === 'BLOCKED' ? null : (data.useTypeId ?? null),
+      },
+      include: {
+        venue: { select: { id: true, name: true } },
+        useType: { select: { id: true, name: true } },
+      },
+    });
+    return this.toCalendarBlockEntity(block);
   }
 
   async deleteCalendarBlock(id: string): Promise<void> {

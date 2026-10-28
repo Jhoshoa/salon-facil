@@ -40,6 +40,7 @@ const calendarData: VenueCalendar = {
       date: '2026-06-18',
       type: 'block',
       status: 'CONFIRMED',
+      useTypeId: null,
       useTypeName: null,
       reason: 'Mantenimiento',
     },

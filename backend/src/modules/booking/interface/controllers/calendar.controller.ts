@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -15,7 +16,7 @@ import { Public } from '../../../../shared/decorators/public.decorator';
 import { Roles } from '../../../../shared/decorators/roles.decorator';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { BookingService } from '../../application/services/booking.service';
-import { CreateCalendarBlockDto } from '../../application/dto/booking.dto';
+import { CreateCalendarBlockDto, UpdateCalendarBlockDto } from '../../application/dto/booking.dto';
 
 @ApiTags('Calendar')
 @Controller('venues/:venueId/calendar')
@@ -57,6 +58,24 @@ export class CalendarController {
         isRecurring: dto.isRecurring,
         recurringRule: dto.recurringRule,
       },
+      user.id,
+      user.role,
+    );
+  }
+
+  @Patch(':blockId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar estado/tipo de evento de una fecha marcada (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Fecha marcada actualizada' })
+  async updateCalendarBlock(
+    @Param('blockId') blockId: string,
+    @Body() dto: UpdateCalendarBlockDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.bookingService.updateCalendarBlock(
+      blockId,
+      { status: dto.status, useTypeId: dto.useTypeId },
       user.id,
       user.role,
     );

@@ -521,6 +521,7 @@ export interface CalendarDayBlock {
   date: string;
   type: 'block';
   status: CalendarBlockStatus;
+  useTypeId: string | null;
   useTypeName: string | null;
   /** Legacy free-text note from before status/useType existed -- only ever set on old rows that
    * predate this, shown as a fallback label when useTypeName is null. */

@@ -1,14 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Venue, VenueCalendar } from '@/types/api';
 import { OwnerCalendar } from './owner-calendar';
-import { createCalendarBlock, getVenueCalendar } from '@/lib/api/calendar.api';
+import { createCalendarBlock, getVenueCalendar, updateCalendarBlock } from '@/lib/api/calendar.api';
 import { getMyVenues } from '@/lib/api/venues.api';
 
 jest.mock('@/lib/api/calendar.api', () => ({
   getVenueCalendar: jest.fn(),
   createCalendarBlock: jest.fn(),
+  updateCalendarBlock: jest.fn(),
   deleteCalendarBlock: jest.fn(),
 }));
 jest.mock('@/lib/api/venues.api', () => ({
@@ -19,6 +20,9 @@ const mockGetVenueCalendar = getVenueCalendar as jest.MockedFunction<typeof getV
 const mockGetMyVenues = getMyVenues as jest.MockedFunction<typeof getMyVenues>;
 const mockCreateCalendarBlock = createCalendarBlock as jest.MockedFunction<
   typeof createCalendarBlock
+>;
+const mockUpdateCalendarBlock = updateCalendarBlock as jest.MockedFunction<
+  typeof updateCalendarBlock
 >;
 
 const FIXED_TODAY = new Date('2026-06-15T12:00:00');
@@ -63,6 +67,7 @@ const calendarData: VenueCalendar = {
       date: '2026-06-22',
       type: 'block',
       status: 'CONFIRMED',
+      useTypeId: 'use-wedding',
       useTypeName: 'Boda',
       reason: null,
     },
@@ -71,6 +76,7 @@ const calendarData: VenueCalendar = {
       date: '2026-06-23',
       type: 'block',
       status: 'BLOCKED',
+      useTypeId: null,
       useTypeName: null,
       reason: null,
     },
@@ -92,6 +98,7 @@ beforeEach(() => {
   mockGetMyVenues.mockResolvedValue([venue]);
   mockGetVenueCalendar.mockResolvedValue(calendarData);
   mockCreateCalendarBlock.mockResolvedValue(undefined);
+  mockUpdateCalendarBlock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -201,5 +208,58 @@ describe('OwnerCalendar - formulario "Agregar al calendario"', () => {
       'venue-1',
       expect.objectContaining({ status: 'BLOCKED', useTypeId: undefined }),
     );
+  });
+});
+
+describe('OwnerCalendar - editar una fecha marcada existente', () => {
+  const findBodaRow = async () => {
+    const section = (await screen.findByRole('heading', { name: 'Fechas marcadas' })).closest(
+      'section',
+    ) as HTMLElement;
+    return within(section).getByText(/Boda/).closest('div.flex') as HTMLElement;
+  };
+
+  it('el boton Editar abre el drawer precargado con el estado y tipo actuales, con la fecha deshabilitada', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    renderCalendar();
+
+    const [editButton] = within(await findBodaRow()).getAllByRole('button');
+    await user.click(editButton);
+
+    expect(await screen.findByText('Editar fecha marcada')).toBeInTheDocument();
+    expect(screen.getByLabelText('Estado')).toHaveValue('CONFIRMED');
+    expect(screen.getByLabelText(/Tipo de evento/i)).toHaveValue('use-wedding');
+    expect(screen.getByLabelText('Fecha')).toBeDisabled();
+  });
+
+  it('al guardar una edicion llama a updateCalendarBlock con el id del bloqueo y los valores nuevos', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    renderCalendar();
+
+    const [editButton] = within(await findBodaRow()).getAllByRole('button');
+    await user.click(editButton);
+
+    // De "Reservado · Boda" a "Reservado temporalmente" sin tipo de evento.
+    await user.selectOptions(await screen.findByLabelText('Estado'), 'TENTATIVE');
+    await user.selectOptions(await screen.findByLabelText(/Tipo de evento/i), '');
+    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => expect(mockUpdateCalendarBlock).toHaveBeenCalled());
+    expect(mockUpdateCalendarBlock).toHaveBeenCalledWith('venue-1', 'block-1', {
+      status: 'TENTATIVE',
+      useTypeId: undefined,
+    });
+  });
+
+  it('el dialogo para quitar una fecha marcada usa titulo y boton genericos, no "bloqueo"', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    renderCalendar();
+
+    const [, deleteButton] = within(await findBodaRow()).getAllByRole('button');
+    await user.click(deleteButton);
+
+    expect(await screen.findByText('Eliminar fecha marcada')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eliminar' })).toBeInTheDocument();
+    expect(screen.queryByText(/bloqueo/i)).not.toBeInTheDocument();
   });
 });

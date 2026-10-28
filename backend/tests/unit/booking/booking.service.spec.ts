@@ -113,6 +113,7 @@ describe('BookingService', () => {
     createCalendarBlock: jest.Mock;
     getCalendarBlocks: jest.Mock;
     findCalendarBlockById: jest.Mock;
+    updateCalendarBlock: jest.Mock;
     deleteCalendarBlock: jest.Mock;
     isDateBlocked: jest.Mock;
     countByVenueAndStatus: jest.Mock;
@@ -156,6 +157,7 @@ describe('BookingService', () => {
       createCalendarBlock: jest.fn(),
       getCalendarBlocks: jest.fn().mockResolvedValue([]),
       findCalendarBlockById: jest.fn(),
+      updateCalendarBlock: jest.fn(),
       deleteCalendarBlock: jest.fn(),
       isDateBlocked: jest.fn(),
       countByVenueAndStatus: jest.fn(),
@@ -988,6 +990,114 @@ describe('BookingService', () => {
     });
   });
 
+  describe('updateCalendarBlock', () => {
+    it('updates status and useTypeId on an existing block owned by this venue', async () => {
+      mockBookingRepository.findCalendarBlockById.mockResolvedValue({
+        id: 'block-1',
+        venueId: 'venue-1',
+        date: new Date('2026-09-15'),
+        status: CalendarBlockStatus.TENTATIVE,
+      });
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({
+          uses: [
+            {
+              id: 'vu-1',
+              useTypeId: 'use-wedding',
+              useType: { id: 'use-wedding', key: 'WEDDING', name: 'Boda', icon: null },
+              isPrimary: true,
+            },
+          ],
+        }),
+      );
+      mockBookingRepository.updateCalendarBlock.mockResolvedValue({
+        id: 'block-1',
+        venueId: 'venue-1',
+        date: new Date('2026-09-15'),
+        status: CalendarBlockStatus.CONFIRMED,
+        useTypeId: 'use-wedding',
+      });
+
+      const result = await service.updateCalendarBlock(
+        'block-1',
+        { status: CalendarBlockStatus.CONFIRMED, useTypeId: 'use-wedding' },
+        'owner-1',
+        UserRole.OWNER,
+      );
+
+      expect(result.status).toBe(CalendarBlockStatus.CONFIRMED);
+      expect(mockBookingRepository.updateCalendarBlock).toHaveBeenCalledWith('block-1', {
+        status: CalendarBlockStatus.CONFIRMED,
+        useTypeId: 'use-wedding',
+      });
+    });
+
+    it('throws NotFoundException when the block does not exist', async () => {
+      mockBookingRepository.findCalendarBlockById.mockResolvedValue(null);
+
+      await expect(
+        service.updateCalendarBlock(
+          'missing-block',
+          { status: CalendarBlockStatus.BLOCKED },
+          'owner-1',
+          UserRole.OWNER,
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockBookingRepository.updateCalendarBlock).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the caller does not own the venue', async () => {
+      mockBookingRepository.findCalendarBlockById.mockResolvedValue({
+        id: 'block-1',
+        venueId: 'venue-1',
+        date: new Date('2026-09-15'),
+        status: CalendarBlockStatus.TENTATIVE,
+      });
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ ownerId: 'other-owner' }));
+
+      await expect(
+        service.updateCalendarBlock(
+          'block-1',
+          { status: CalendarBlockStatus.CONFIRMED },
+          'owner-1',
+          UserRole.OWNER,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockBookingRepository.updateCalendarBlock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a useTypeId that isn't one of the venue's own use types", async () => {
+      mockBookingRepository.findCalendarBlockById.mockResolvedValue({
+        id: 'block-1',
+        venueId: 'venue-1',
+        date: new Date('2026-09-15'),
+        status: CalendarBlockStatus.TENTATIVE,
+      });
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({
+          uses: [
+            {
+              id: 'vu-1',
+              useTypeId: 'use-wedding',
+              useType: { id: 'use-wedding', key: 'WEDDING', name: 'Boda', icon: null },
+              isPrimary: true,
+            },
+          ],
+        }),
+      );
+
+      await expect(
+        service.updateCalendarBlock(
+          'block-1',
+          { status: CalendarBlockStatus.CONFIRMED, useTypeId: 'use-not-on-this-venue' },
+          'owner-1',
+          UserRole.OWNER,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockBookingRepository.updateCalendarBlock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getCalendar', () => {
     it('should return bookings and blocks mapped to date-only entries', async () => {
       mockBookingRepository.findActiveByVenueInRange.mockResolvedValue([
@@ -1003,6 +1113,7 @@ describe('BookingService', () => {
           id: 'block-1',
           date: new Date('2026-09-20T00:00:00.000Z'),
           status: CalendarBlockStatus.CONFIRMED,
+          useTypeId: 'use-wedding',
           useType: { id: 'use-wedding', name: 'Boda' },
           reason: null,
         },
@@ -1029,6 +1140,7 @@ describe('BookingService', () => {
           date: '2026-09-20',
           type: 'block',
           status: CalendarBlockStatus.CONFIRMED,
+          useTypeId: 'use-wedding',
           useTypeName: 'Boda',
           reason: null,
         },

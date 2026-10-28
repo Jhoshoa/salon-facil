@@ -194,3 +194,14 @@ export class CreateCalendarBlockDto {
   @IsObject()
   recurringRule?: Record<string, unknown>;
 }
+
+/** Edits status/useType on an existing block -- no `date` field, since moving a block to a
+ * different day is delete + recreate (it needs the same availability/conflict checks a create does). */
+export class UpdateCalendarBlockDto {
+  @IsEnum(CalendarBlockStatus, { message: 'Estado no valido' })
+  status!: CalendarBlockStatus;
+
+  @IsOptional()
+  @IsUUID()
+  useTypeId?: string;
+}
