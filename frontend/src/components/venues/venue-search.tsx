@@ -287,7 +287,7 @@ export const VenueSearch = ({
   return (
     <div className="space-y-6">
       <form
-        className="sf-search-bar sf-search-bar-catalog md:sticky md:top-[calc(var(--header-height)+0.5rem)] md:z-30"
+        className="sf-search-bar sf-search-bar-catalog lg:sticky lg:top-[calc(var(--header-height)+0.5rem)] lg:z-30"
         onSubmit={handleSubmit}
       >
         <div className="sf-search-grid">
