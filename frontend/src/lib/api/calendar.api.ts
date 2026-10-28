@@ -1,9 +1,10 @@
 import { apiRequest } from './client';
-import type { VenueCalendar } from '@/types/api';
+import type { CalendarBlockStatus, VenueCalendar } from '@/types/api';
 
 export interface CreateCalendarBlockPayload {
   date: string;
-  reason?: string;
+  status: CalendarBlockStatus;
+  useTypeId?: string;
 }
 
 export const getVenueCalendar = async (venueId: string, month: string): Promise<VenueCalendar> => {

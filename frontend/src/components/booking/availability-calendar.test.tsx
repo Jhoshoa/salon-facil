@@ -34,7 +34,16 @@ const calendarData: VenueCalendar = {
       eventType: 'Quince anos',
     },
   ],
-  blocks: [{ id: 'block-1', date: '2026-06-18', type: 'block', reason: 'Mantenimiento' }],
+  blocks: [
+    {
+      id: 'block-1',
+      date: '2026-06-18',
+      type: 'block',
+      status: 'CONFIRMED',
+      useTypeName: null,
+      reason: 'Mantenimiento',
+    },
+  ],
 };
 
 const renderCalendar = (openingHours?: VenueOpeningHour[]) => {

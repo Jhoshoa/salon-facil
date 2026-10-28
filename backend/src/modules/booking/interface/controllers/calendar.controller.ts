@@ -52,7 +52,8 @@ export class CalendarController {
       venueId,
       {
         date: new Date(dto.date),
-        reason: dto.reason,
+        status: dto.status,
+        useTypeId: dto.useTypeId,
         isRecurring: dto.isRecurring,
         recurringRule: dto.recurringRule,
       },

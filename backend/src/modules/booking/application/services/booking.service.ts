@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, PriceUnit } from '@prisma/client';
+import { CalendarBlockStatus, NotificationType, PriceUnit } from '@prisma/client';
 import {
   BOOKING_REPOSITORY,
   IBookingRepository,
@@ -774,6 +774,14 @@ export class BookingService {
       throw new ConflictException('No se puede bloquear una fecha con una reserva activa');
     }
 
+    // The dropdown only ever offers the venue's own "Ideal para" use types -- a useTypeId from
+    // anywhere else means either a stale selection (the venue's uses changed after the form
+    // loaded) or a client bypassing the UI, neither of which should silently get attached to a
+    // use type this venue doesn't actually claim to host.
+    if (data.useTypeId && !venue.uses?.some((use) => use.useTypeId === data.useTypeId)) {
+      throw new BadRequestException('Ese tipo de evento no esta configurado para este local');
+    }
+
     return this.bookingRepository.createCalendarBlock({ ...data, venueId });
   }
 
@@ -804,6 +812,8 @@ export class BookingService {
       id: string;
       date: string;
       type: 'block';
+      status: CalendarBlockStatus;
+      useTypeName: string | null;
       reason: string | null;
     }[];
   }> {
@@ -829,6 +839,8 @@ export class BookingService {
         id: block.id,
         date: this.toDateOnly(block.date),
         type: 'block',
+        status: block.status,
+        useTypeName: block.useType?.name ?? null,
         reason: block.reason,
       })),
     };

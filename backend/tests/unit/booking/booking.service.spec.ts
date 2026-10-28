@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PaymentPolicy } from '@prisma/client';
+import { CalendarBlockStatus, PaymentPolicy } from '@prisma/client';
 import { BookingService } from '../../../src/modules/booking/application/services/booking.service';
 import { PriceCalculatorService } from '../../../src/modules/booking/application/services/price-calculator.service';
 import { AvailabilityService } from '../../../src/modules/booking/application/services/availability.service';
@@ -858,12 +858,12 @@ describe('BookingService', () => {
         id: 'block-1',
         venueId: 'venue-1',
         date: new Date('2026-09-15'),
-        reason: 'Maintenance',
+        status: CalendarBlockStatus.BLOCKED,
       });
 
       const result = await service.createCalendarBlock(
         'venue-1',
-        { date: new Date('2026-09-15'), reason: 'Maintenance' },
+        { date: new Date('2026-09-15'), status: CalendarBlockStatus.BLOCKED },
         'owner-1',
         UserRole.OWNER,
       );
@@ -878,7 +878,7 @@ describe('BookingService', () => {
       await expect(
         service.createCalendarBlock(
           'venue-1',
-          { date: new Date('2026-09-15') },
+          { date: new Date('2026-09-15'), status: CalendarBlockStatus.BLOCKED },
           'owner-1',
           UserRole.OWNER,
         ),
@@ -893,7 +893,7 @@ describe('BookingService', () => {
       await expect(
         service.createCalendarBlock(
           'venue-1',
-          { date: new Date('2026-09-15') },
+          { date: new Date('2026-09-15'), status: CalendarBlockStatus.BLOCKED },
           'owner-1',
           UserRole.OWNER,
         ),
@@ -906,11 +906,85 @@ describe('BookingService', () => {
       await expect(
         service.createCalendarBlock(
           'venue-1',
-          { date: new Date('2026-09-15') },
+          { date: new Date('2026-09-15'), status: CalendarBlockStatus.BLOCKED },
           'owner-1',
           UserRole.OWNER,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('creates a TENTATIVE block with a useTypeId that belongs to the venue\'s own "Ideal para"', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({
+          uses: [
+            {
+              id: 'vu-1',
+              useTypeId: 'use-wedding',
+              useType: { id: 'use-wedding', key: 'WEDDING', name: 'Boda', icon: null },
+              isPrimary: true,
+            },
+          ],
+        }),
+      );
+      mockBookingRepository.isDateBlocked.mockResolvedValue(false);
+      mockBookingRepository.hasConflict.mockResolvedValue(false);
+      mockBookingRepository.createCalendarBlock.mockResolvedValue({
+        id: 'block-2',
+        venueId: 'venue-1',
+        date: new Date('2026-09-15'),
+        status: CalendarBlockStatus.TENTATIVE,
+        useTypeId: 'use-wedding',
+      });
+
+      const result = await service.createCalendarBlock(
+        'venue-1',
+        {
+          date: new Date('2026-09-15'),
+          status: CalendarBlockStatus.TENTATIVE,
+          useTypeId: 'use-wedding',
+        },
+        'owner-1',
+        UserRole.OWNER,
+      );
+
+      expect(result.id).toBe('block-2');
+      expect(mockBookingRepository.createCalendarBlock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          useTypeId: 'use-wedding',
+          status: CalendarBlockStatus.TENTATIVE,
+        }),
+      );
+    });
+
+    it("rejects a useTypeId that isn't one of the venue's own use types", async () => {
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({
+          uses: [
+            {
+              id: 'vu-1',
+              useTypeId: 'use-wedding',
+              useType: { id: 'use-wedding', key: 'WEDDING', name: 'Boda', icon: null },
+              isPrimary: true,
+            },
+          ],
+        }),
+      );
+      mockBookingRepository.isDateBlocked.mockResolvedValue(false);
+      mockBookingRepository.hasConflict.mockResolvedValue(false);
+
+      await expect(
+        service.createCalendarBlock(
+          'venue-1',
+          {
+            date: new Date('2026-09-15'),
+            status: CalendarBlockStatus.CONFIRMED,
+            useTypeId: 'use-not-on-this-venue',
+          },
+          'owner-1',
+          UserRole.OWNER,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockBookingRepository.createCalendarBlock).not.toHaveBeenCalled();
     });
   });
 
@@ -925,7 +999,13 @@ describe('BookingService', () => {
         },
       ]);
       mockBookingRepository.getCalendarBlocks.mockResolvedValue([
-        { id: 'block-1', date: new Date('2026-09-20T00:00:00.000Z'), reason: 'Mantenimiento' },
+        {
+          id: 'block-1',
+          date: new Date('2026-09-20T00:00:00.000Z'),
+          status: CalendarBlockStatus.CONFIRMED,
+          useType: { id: 'use-wedding', name: 'Boda' },
+          reason: null,
+        },
       ]);
 
       const result = await service.getCalendar(
@@ -944,7 +1024,14 @@ describe('BookingService', () => {
         },
       ]);
       expect(result.blocks).toEqual([
-        { id: 'block-1', date: '2026-09-20', type: 'block', reason: 'Mantenimiento' },
+        {
+          id: 'block-1',
+          date: '2026-09-20',
+          type: 'block',
+          status: CalendarBlockStatus.CONFIRMED,
+          useTypeName: 'Boda',
+          reason: null,
+        },
       ]);
     });
 

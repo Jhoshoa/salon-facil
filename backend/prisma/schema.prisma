@@ -431,7 +431,8 @@ model UseType {
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
 
-  venues VenueUse[]
+  venues         VenueUse[]
+  calendarBlocks CalendarBlock[]
 
   @@index([isActive])
   @@map("use_types")
@@ -656,20 +657,42 @@ model Payment {
   @@map("payments")
 }
 
-model CalendarBlock {
-  id            String   @id @default(uuid())
-  venueId       String   @map("venue_id")
-  date          DateTime @db.Date
-  reason        String?  @db.Text
-  isRecurring   Boolean  @default(false) @map("is_recurring")
-  recurringRule Json?    @map("recurring_rule")
-  createdAt     DateTime @default(now()) @map("created_at")
+// The owner's three explicit choices when marking a date on their own calendar (see
+// OwnerCalendar's "Estado" dropdown) -- replaces inferring booked-vs-blocked from whether
+// `reason` happened to be filled in. TENTATIVE/CONFIRMED only ever come from the owner manually
+// noting something coordinated outside the app (a phone call, a WhatsApp chat) -- an in-app
+// client booking request is a Booking row, not a CalendarBlock, and keeps its own BookingStatus.
+enum CalendarBlockStatus {
+  TENTATIVE
+  CONFIRMED
+  BLOCKED
+}
 
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+model CalendarBlock {
+  id            String              @id @default(uuid())
+  venueId       String              @map("venue_id")
+  date          DateTime            @db.Date
+  status        CalendarBlockStatus @default(BLOCKED)
+  // Nullable on purpose -- only meaningful when status is TENTATIVE/CONFIRMED (there's an actual
+  // event), not when the owner is just closing the date (BLOCKED). Deliberately scoped to one of
+  // the venue's own `uses` ("Ideal para") at the application layer, not enforced by the FK itself
+  // (a UseType is a global catalog row, not owned by a venue).
+  useTypeId     String?             @map("use_type_id")
+  // Legacy free-text note from before the status/useType dropdowns existed. No longer written by
+  // new blocks, but kept (not backfilled away) so older blocks don't lose whatever was typed
+  // there -- still shown as a fallback label when a block has no useType set.
+  reason        String?             @db.Text
+  isRecurring   Boolean             @default(false) @map("is_recurring")
+  recurringRule Json?               @map("recurring_rule")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  venue   Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  useType UseType? @relation(fields: [useTypeId], references: [id], onDelete: SetNull)
 
   @@unique([venueId, date])
   @@index([venueId])
   @@index([date])
+  @@index([useTypeId])
   @@map("calendar_blocks")
 }
 

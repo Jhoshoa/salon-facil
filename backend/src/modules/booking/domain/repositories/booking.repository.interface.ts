@@ -1,3 +1,4 @@
+import { CalendarBlockStatus } from '@prisma/client';
 import { BookingEntity, BookingStatus, SelectedExtra } from '../entities/booking.entity';
 import { CalendarBlockEntity } from '../entities/calendar-block.entity';
 
@@ -98,7 +99,8 @@ export interface CreateBookingData {
 export interface CreateCalendarBlockData {
   venueId: string;
   date: Date;
-  reason?: string;
+  status: CalendarBlockStatus;
+  useTypeId?: string;
   isRecurring?: boolean;
   recurringRule?: Record<string, unknown>;
 }

@@ -110,7 +110,7 @@ export const AvailabilityCalendar = ({
 
     if (dateKey < today) {
       if (booking) return { variant: 'pastEvent', label: statusLabel[booking.status] };
-      return { variant: 'past', label: block?.reason ?? undefined };
+      return { variant: 'past', label: block?.useTypeName ?? block?.reason ?? undefined };
     }
     if (booking) {
       // PENDING hasn't been accepted by the owner yet -- it could still fall through, so it
@@ -118,7 +118,9 @@ export const AvailabilityCalendar = ({
       const variant = booking.status === 'PENDING' ? 'pending' : 'booked';
       return { variant, label: statusLabel[booking.status] };
     }
-    if (block) return { variant: 'blocked', label: block.reason ?? 'Bloqueado' };
+    if (block) {
+      return { variant: 'blocked', label: block.useTypeName ?? block.reason ?? 'Bloqueado' };
+    }
     // Same variant as an owner block -- from the renter's side both just mean "can't book this
     // day"; the why (one-off block vs. a recurring weekly closure) only really matters to the
     // owner, and still shows up in the cell's own label if they tap it.
