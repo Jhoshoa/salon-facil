@@ -4,11 +4,18 @@ import {
   AmenityCatalogItem,
   CatalogItem,
   CatalogItemInput,
+  CreateRentalItemInput,
   IVenueRepository,
   SeasonalEventCatalogItem,
   SeasonalEventInput,
+  UpdateRentalItemInput,
 } from '../../domain/repositories/venue.repository.interface';
-import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entities/venue.entity';
+import {
+  VenueEntity,
+  VenueMediaEntity,
+  VenueRentalItemEntity,
+  VenueStatus,
+} from '../../domain/entities/venue.entity';
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
@@ -952,6 +959,120 @@ export class VenueRepository implements IVenueRepository {
       sortOrder: item.sortOrder,
       isCover: item.isCover,
     }));
+  }
+
+  async listRentalItems(
+    venueId: string,
+    options?: { activeOnly?: boolean },
+  ): Promise<VenueRentalItemEntity[]> {
+    const items = await this.prisma.venueRentalItem.findMany({
+      where: { venueId, ...(options?.activeOnly ? { isActive: true } : {}) },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    return items.map((item) => this.toRentalItemEntity(item));
+  }
+
+  async createRentalItem(
+    venueId: string,
+    data: CreateRentalItemInput,
+  ): Promise<VenueRentalItemEntity> {
+    let sortOrder = data.sortOrder;
+    if (sortOrder === undefined) {
+      const existing = await this.prisma.venueRentalItem.findMany({
+        where: { venueId },
+        select: { sortOrder: true },
+      });
+      sortOrder = existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0;
+    }
+
+    const item = await this.prisma.venueRentalItem.create({
+      data: {
+        venueId,
+        name: data.name,
+        category: data.category,
+        description: data.description,
+        photoUrl: data.photoUrl,
+        photoPublicId: data.photoPublicId,
+        pricePerUnit: new Prisma.Decimal(data.pricePerUnit),
+        unitLabel: data.unitLabel ?? 'unidad',
+        stockQty: data.stockQty,
+        sortOrder,
+      },
+    });
+    return this.toRentalItemEntity(item);
+  }
+
+  async updateRentalItem(
+    venueId: string,
+    itemId: string,
+    data: UpdateRentalItemInput,
+  ): Promise<VenueRentalItemEntity | null> {
+    const existing = await this.prisma.venueRentalItem.findFirst({
+      where: { id: itemId, venueId },
+    });
+    if (!existing) return null;
+
+    const item = await this.prisma.venueRentalItem.update({
+      where: { id: itemId },
+      data: {
+        name: data.name,
+        category: data.category,
+        description: data.description,
+        photoUrl: data.photoUrl,
+        photoPublicId: data.photoPublicId,
+        pricePerUnit: data.pricePerUnit != null ? new Prisma.Decimal(data.pricePerUnit) : undefined,
+        unitLabel: data.unitLabel,
+        stockQty: data.stockQty,
+        isActive: data.isActive,
+        sortOrder: data.sortOrder,
+      },
+    });
+    return this.toRentalItemEntity(item);
+  }
+
+  /** Returns the deleted row's `photoPublicId` (or `null`) so the caller can also remove the
+   * asset from Cloudinary — the DB delete happens either way, unconditionally. */
+  async deleteRentalItem(
+    venueId: string,
+    itemId: string,
+  ): Promise<{ photoPublicId: string | null } | null> {
+    const item = await this.prisma.venueRentalItem.findFirst({ where: { id: itemId, venueId } });
+    if (!item) return null;
+
+    await this.prisma.venueRentalItem.delete({ where: { id: itemId } });
+
+    return { photoPublicId: item.photoPublicId };
+  }
+
+  async reorderRentalItems(venueId: string, order: string[]): Promise<VenueRentalItemEntity[]> {
+    await this.prisma.$transaction(
+      order.map((itemId, index) =>
+        this.prisma.venueRentalItem.updateMany({
+          where: { id: itemId, venueId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+    return this.listRentalItems(venueId);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private toRentalItemEntity(raw: any): VenueRentalItemEntity {
+    return {
+      id: raw.id,
+      venueId: raw.venueId,
+      name: raw.name,
+      category: raw.category,
+      description: raw.description,
+      photoUrl: raw.photoUrl,
+      photoPublicId: raw.photoPublicId,
+      pricePerUnit: Number(raw.pricePerUnit),
+      unitLabel: raw.unitLabel,
+      stockQty: raw.stockQty,
+      isActive: raw.isActive,
+      sortOrder: raw.sortOrder,
+      createdAt: raw.createdAt,
+    };
   }
 
   async updateStatus(

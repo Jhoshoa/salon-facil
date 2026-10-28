@@ -11,10 +11,11 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../shared/decorators/public.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
@@ -34,6 +35,7 @@ import {
   UpdateCatalogItemDto,
   UpdateSeasonalEventDto,
 } from '../application/dto/catalog.dto';
+import { CreateRentalItemDto, UpdateRentalItemDto } from '../application/dto/rental-item.dto';
 import { VenueService } from '../application/services/venue.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
 import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slug.use-case';
@@ -66,6 +68,21 @@ function validateFiles(files: Express.Multer.File[] | undefined): void {
         `Archivo "${file.originalname}" excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB`,
       );
     }
+  }
+}
+
+function validateSingleFile(file: Express.Multer.File | undefined): void {
+  if (!file) return;
+
+  if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    throw new BadRequestException(
+      `Tipo MIME no permitido: ${file.mimetype}. Solo se aceptan: ${ALLOWED_MIME_TYPES.join(', ')}`,
+    );
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    throw new BadRequestException(
+      `Archivo "${file.originalname}" excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+    );
   }
 }
 
@@ -395,6 +412,116 @@ export class VenueController {
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
     await this.venueService.deleteVenueMedia(id, mediaId, user.id, user.role);
+  }
+
+  // ========== RENTAL ITEM CATALOG (Fase 1 -- ver docs/brainstorm/catalogo-alquiler-items.md) ==========
+
+  @Get(':id/rental-items')
+  @Public()
+  @ApiOperation({ summary: 'Catalogo de items de alquiler de un local (publico)' })
+  @ApiResponse({ status: 200, description: 'Items activos del catalogo' })
+  async getRentalItems(@Param('id') id: string) {
+    return this.venueService.listPublicRentalItems(id);
+  }
+
+  @Get(':id/rental-items/manage')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Catalogo completo de items de alquiler, incluye inactivos (OWNER/ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Todos los items del catalogo' })
+  async getRentalItemsForManage(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.listRentalItemsForOwner(id, user.id, user.role);
+  }
+
+  @Post(':id/rental-items')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: MAX_FILE_SIZE } }))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Agregar un item al catalogo de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 201, description: 'Item creado' })
+  async createRentalItem(
+    @Param('id') id: string,
+    @Body() dto: CreateRentalItemDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    validateSingleFile(file);
+    const uploaded = file
+      ? await this.cloudinaryService.uploadImage(file, `venues/${user.id}/rental-items`)
+      : undefined;
+
+    return this.venueService.createRentalItem(id, user.id, user.role, {
+      ...dto,
+      photoUrl: uploaded?.url,
+      photoPublicId: uploaded?.publicId,
+    });
+  }
+
+  // This must be registered before `PUT :id/rental-items/:itemId` -- Nest/Express match routes
+  // in registration order, and a `:itemId` param route would otherwise greedily swallow
+  // "order" as if it were an item id, so this literal path would never be reached.
+  @Put(':id/rental-items/order')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reordenar items del catalogo de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Items reordenados' })
+  async reorderRentalItems(
+    @Param('id') id: string,
+    @Body('order') order: string[],
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    if (!Array.isArray(order) || order.length === 0) {
+      throw new BadRequestException('order debe ser un arreglo con los IDs de los items');
+    }
+    return this.venueService.reorderRentalItems(id, user.id, user.role, order);
+  }
+
+  @Put(':id/rental-items/:itemId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: MAX_FILE_SIZE } }))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Editar un item del catalogo de alquiler (OWNER/ADMIN) -- la foto es opcional, si no se envia se conserva la que ya tenia',
+  })
+  @ApiResponse({ status: 200, description: 'Item actualizado' })
+  async updateRentalItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateRentalItemDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    validateSingleFile(file);
+    const uploaded = file
+      ? await this.cloudinaryService.uploadImage(file, `venues/${user.id}/rental-items`)
+      : undefined;
+
+    return this.venueService.updateRentalItem(id, itemId, user.id, user.role, {
+      ...dto,
+      ...(uploaded ? { photoUrl: uploaded.url, photoPublicId: uploaded.publicId } : {}),
+    });
+  }
+
+  @Delete(':id/rental-items/:itemId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eliminar un item del catalogo de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 204, description: 'Item eliminado' })
+  async deleteRentalItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    await this.venueService.deleteRentalItem(id, itemId, user.id, user.role);
   }
 
   // ========== ADMIN ENDPOINTS ==========

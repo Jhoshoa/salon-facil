@@ -7,7 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CreateRentalItemInput,
   IVenueRepository,
+  UpdateRentalItemInput,
   VENUE_REPOSITORY,
 } from '../../domain/repositories/venue.repository.interface';
 import { SlugService } from './slug.service';
@@ -16,7 +18,12 @@ import { UpdateVenueDto } from '../dto/update-venue.dto';
 import { VenueFilterDto } from '../dto/venue-filter.dto';
 import { AdminVenueQueryDto } from '../dto/admin-venue-query.dto';
 import { AdminVenueStatusCountsQueryDto } from '../dto/admin-venue-status-counts-query.dto';
-import { MAX_VENUE_PHOTOS, VenueEntity, VenueStatus } from '../../domain/entities/venue.entity';
+import {
+  MAX_VENUE_PHOTOS,
+  VenueEntity,
+  VenueRentalItemEntity,
+  VenueStatus,
+} from '../../domain/entities/venue.entity';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { CloudinaryService } from '../../../upload/cloudinary.service';
 import { AuditLogService } from '../../../audit-log/audit-log.service';
@@ -455,6 +462,95 @@ export class VenueService {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
     return this.venueRepository.reorderMedia(id, order, coverId);
+  }
+
+  /** Public, read-only catalog -- only active items, and only for a venue a random visitor
+   * could actually reach (same isPublic() gate as getVenueBySlug, so this can't be used to peek
+   * at a draft/unverified venue's items via a guessed id). */
+  async listPublicRentalItems(venueId: string): Promise<VenueRentalItemEntity[]> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.isPublic()) {
+      throw new NotFoundException(`Local con ID '${venueId}' no encontrado`);
+    }
+    return this.venueRepository.listRentalItems(venueId, { activeOnly: true });
+  }
+
+  /** Owner/admin view -- includes inactive items, so they can reactivate one without having to
+   * recreate it from scratch. */
+  async listRentalItemsForOwner(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<VenueRentalItemEntity[]> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para ver el catalogo de este local');
+    }
+    return this.venueRepository.listRentalItems(venueId);
+  }
+
+  async createRentalItem(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+    data: CreateRentalItemInput,
+  ): Promise<VenueRentalItemEntity> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    return this.venueRepository.createRentalItem(venueId, data);
+  }
+
+  async updateRentalItem(
+    venueId: string,
+    itemId: string,
+    userId: string,
+    userRole: UserRole,
+    data: UpdateRentalItemInput,
+  ): Promise<VenueRentalItemEntity> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    const updated = await this.venueRepository.updateRentalItem(venueId, itemId, data);
+    if (!updated) {
+      throw new NotFoundException(`Item de catalogo con ID '${itemId}' no encontrado`);
+    }
+    return updated;
+  }
+
+  async deleteRentalItem(
+    venueId: string,
+    itemId: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<void> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    const deleted = await this.venueRepository.deleteRentalItem(venueId, itemId);
+    if (!deleted) {
+      throw new NotFoundException(`Item de catalogo con ID '${itemId}' no encontrado`);
+    }
+    // Best-effort, same criteria as deleteVenueMedia: the DB row is already gone either way.
+    if (deleted.photoPublicId) {
+      await this.cloudinaryService.deleteImage(deleted.photoPublicId).catch(() => {});
+    }
+  }
+
+  async reorderRentalItems(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+    order: string[],
+  ): Promise<VenueRentalItemEntity[]> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    return this.venueRepository.reorderRentalItems(venueId, order);
   }
 
   async getVenueCompletion(
