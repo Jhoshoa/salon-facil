@@ -18,7 +18,10 @@ interface VenueResultCardProps {
   searchQueryString?: string;
 }
 
-const getBasePrice = (venue: Venue) => {
+/** The real price for the searched date when the backend resolved one (season/holiday/weekend
+ * rules already applied) -- falls back to the generic BASE price when there's no date in play. */
+const getDisplayPrice = (venue: Venue) => {
+  if (venue.effectivePrice != null) return venue.effectivePrice;
   return venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
 };
 
@@ -35,7 +38,7 @@ export const VenueResultCard = ({
 }: VenueResultCardProps) => {
   const photo =
     venue.media?.find((item) => item.isCover)?.url ?? venue.media?.[0]?.url ?? venue.photos?.[0];
-  const basePrice = getBasePrice(venue);
+  const displayPrice = getDisplayPrice(venue);
   const amenities = venue.amenities?.slice(0, 4) ?? [];
   const services = amenities.length ? [] : (venue.services?.slice(0, 3) ?? []);
 
@@ -135,7 +138,7 @@ export const VenueResultCard = ({
         <div className="sf-result-footer">
           <div>
             <p className="text-lg font-semibold leading-tight">
-              {basePrice > 0 ? formatCurrency(basePrice) : 'Consultar'}
+              {displayPrice > 0 ? formatCurrency(displayPrice) : 'Consultar'}
               <span className="ml-1 text-xs font-normal text-muted-foreground">
                 por {priceUnitLabel[venue.priceUnit] ?? 'evento'}
               </span>

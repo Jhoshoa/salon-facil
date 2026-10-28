@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentPolicy, PriceUnit } from '@prisma/client';
-import { PriceCalculatorService } from '../../../src/modules/booking/application/services/price-calculator.service';
+import { PriceCalculatorService } from '../../../src/modules/venue/application/services/price-calculator.service';
 import {
   VenuePriceEntity,
   PriceType,

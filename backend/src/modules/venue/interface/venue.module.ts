@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { VenueController } from './venue.controller';
 import { VenueService } from '../application/services/venue.service';
 import { SlugService } from '../application/services/slug.service';
+import { PriceCalculatorService } from '../application/services/price-calculator.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
 import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slug.use-case';
 import { GetSimilarVenuesUseCase } from '../application/use-cases/get-similar-venues.use-case';
@@ -21,6 +22,7 @@ import { AuthModule } from '../../auth/interface/auth.module';
   providers: [
     VenueService,
     SlugService,
+    PriceCalculatorService,
     CreateVenueUseCase,
     GetVenueBySlugUseCase,
     GetSimilarVenuesUseCase,
@@ -32,6 +34,6 @@ import { AuthModule } from '../../auth/interface/auth.module';
       useClass: VenueRepository,
     },
   ],
-  exports: [VenueService, VENUE_REPOSITORY],
+  exports: [VenueService, VENUE_REPOSITORY, PriceCalculatorService],
 })
 export class VenueModule {}

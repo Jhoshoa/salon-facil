@@ -247,6 +247,10 @@ export interface Venue {
   };
   reviewCount?: number;
   averageRating?: number;
+  /** Precio real para la fecha buscada (ya con reglas de temporada/feriado/dia de semana
+   * resueltas) -- solo viene en resultados de busqueda que incluyeron una fecha. Sin esto, usar
+   * el precio BASE de `prices`. */
+  effectivePrice?: number | null;
 }
 
 export interface VenuePriceInput {
