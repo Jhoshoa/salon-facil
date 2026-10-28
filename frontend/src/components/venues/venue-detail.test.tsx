@@ -64,6 +64,7 @@ const venue = {
   capacityMin: 50,
   capacityMax: 200,
   minimumHours: 4,
+  priceUnit: 'HOUR',
   allowsMultipleDays: false,
   instantBooking: false,
   isVerified: false,
@@ -182,5 +183,55 @@ describe('VenueDetail - otros modos no cambian de comportamiento', () => {
 
     expect(await screen.findByText('Este local no esta disponible')).toBeInTheDocument();
     expect(screen.queryByText('Este enlace ya no es valido')).not.toBeInTheDocument();
+  });
+});
+
+describe('VenueDetail - "minimo por reserva" en Resumen del espacio', () => {
+  it('con priceUnit HOUR muestra las horas minimas configuradas', async () => {
+    mockGetVenueBySlug.mockResolvedValue({ ...venue, priceUnit: 'HOUR', minimumHours: 4 });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('4h')).toBeInTheDocument();
+  });
+
+  it('con priceUnit DAY y sin reglas que usen HOUR, muestra "1 dia" en vez de las horas', async () => {
+    mockGetVenueBySlug.mockResolvedValue({ ...venue, priceUnit: 'DAY', prices: [] });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    await screen.findByText('Salon de prueba');
+    expect(screen.getByText('1 dia')).toBeInTheDocument();
+    expect(screen.queryByText('4h')).not.toBeInTheDocument();
+  });
+
+  it('con priceUnit DAY pero una regla de precio que fuerza HOUR, vuelve a mostrar las horas minimas', async () => {
+    mockGetVenueBySlug.mockResolvedValue({
+      ...venue,
+      priceUnit: 'DAY',
+      minimumHours: 3,
+      prices: [
+        {
+          id: 'price-weekend',
+          venueId: 'venue-1',
+          priceType: 'WEEKEND',
+          dayOfWeek: 6,
+          specificDate: null,
+          startDate: null,
+          endDate: null,
+          price: 100,
+          currency: 'BOB',
+          unit: 'HOUR',
+          discountPercent: null,
+          discountLabel: null,
+          isActive: true,
+        },
+      ],
+    });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('3h')).toBeInTheDocument();
+    expect(screen.queryByText('1 dia')).not.toBeInTheDocument();
   });
 });

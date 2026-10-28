@@ -271,6 +271,12 @@ export const VenueDetail = ({
   ];
   const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
   const displayedPrice = liveTotal ?? basePrice;
+  // "minimumHours" only means something where an HOUR unit is actually in play -- the venue's
+  // own default, or a specific price rule overriding it to HOUR -- same rule the owner's own
+  // venue-form uses to decide whether to show that field at all. A pure DAY-priced venue always
+  // rents by the day, so there's nothing to show there but "1 dia".
+  const anyHourPricing =
+    venue.priceUnit === 'HOUR' || (venue.prices ?? []).some((price) => price.unit === 'HOUR');
 
   return (
     <div className={`space-y-2 ${!isDesktop ? 'pb-24' : ''}`}>
@@ -502,7 +508,7 @@ export const VenueDetail = ({
               </div>
               <div>
                 <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                  {venue.minimumHours}h
+                  {anyHourPricing ? `${venue.minimumHours}h` : '1 dia'}
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">minimo por reserva</p>
               </div>
