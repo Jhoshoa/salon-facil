@@ -499,19 +499,21 @@ export const VenueDetail = ({
           {/* Summary — field-note stats */}
           <section className="sf-detail-section">
             <h2 className="sf-detail-title">Resumen del espacio</h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className={anyHourPricing ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 gap-4'}>
               <div>
                 <p className="font-serif text-2xl font-semibold leading-none text-primary">
                   {venue.capacityMin}-{venue.capacityMax}
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">personas</p>
               </div>
-              <div>
-                <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                  {anyHourPricing ? `${venue.minimumHours}h` : '1 dia'}
-                </p>
-                <p className="mt-1.5 text-xs text-muted-foreground">minimo por reserva</p>
-              </div>
+              {anyHourPricing ? (
+                <div>
+                  <p className="font-serif text-2xl font-semibold leading-none text-primary">
+                    {venue.minimumHours}h
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">minimo por reserva</p>
+                </div>
+              ) : null}
               <div>
                 <p className="font-serif text-2xl font-semibold leading-none text-primary">
                   {venue.allowsMultipleDays ? 'Multi' : '1'}
