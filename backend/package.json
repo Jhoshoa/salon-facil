@@ -28,7 +28,9 @@
     "prisma:seed:catalog": "ts-node prisma/seed-catalog.ts",
     "prisma:seed:admin": "ts-node prisma/seed-admin.ts",
     "prisma:seed:catalog:prod": "node dist/prisma/seed-catalog.js",
-    "prisma:seed:admin:prod": "node dist/prisma/seed-admin.js"
+    "prisma:seed:admin:prod": "node dist/prisma/seed-admin.js",
+    "prisma:seed:bolivia-venues": "ts-node prisma/seed-bolivia-venues.ts",
+    "prisma:seed:bolivia-venues:prod": "node dist/prisma/seed-bolivia-venues.js"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
