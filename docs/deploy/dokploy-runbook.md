@@ -217,6 +217,9 @@ Si `ADMIN_EMAIL` ya tiene una cuenta creada, `prisma:seed:admin:prod` no la toca
 una contrasena existente) — asi que tambien es seguro de correr de mas, por ejemplo despues de
 cada redeploy, sin pensar si hacia falta o no.
 
+Para cargar locales masivamente desde un CSV (copiar el archivo PC → servidor → contenedor y
+correr `seed-bolivia-venues`), ver [`importar-locales-csv.md`](./importar-locales-csv.md).
+
 ## 8. Checklist despues de cada deploy que toque el backend
 
 1. Verifica que el deploy termino sin errores en el panel de Dokploy (o `docker logs -f
