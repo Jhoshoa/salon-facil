@@ -4,7 +4,6 @@ import { BookingDetailController } from './controllers/booking-detail.controller
 import { CalendarController, CalendarPublicController } from './controllers/calendar.controller';
 import { AdminBookingController } from './controllers/admin-booking.controller';
 import { BookingService } from '../application/services/booking.service';
-import { PriceCalculatorService } from '../application/services/price-calculator.service';
 import { AvailabilityService } from '../application/services/availability.service';
 import { BookingReminderScheduler } from '../application/services/booking-reminder.scheduler';
 import { BookingRepository } from '../infrastructure/repositories/booking.repository';
@@ -24,7 +23,6 @@ import { PrismaModule } from '../../../prisma/prisma.module';
   ],
   providers: [
     BookingService,
-    PriceCalculatorService,
     AvailabilityService,
     BookingReminderScheduler,
     {

@@ -194,4 +194,22 @@ describe('TokenService', () => {
       expect(() => service.verifyOAuthState('access-as-state')).toThrow(UnauthorizedException);
     });
   });
+
+  // Deliberately much shorter than the other opaque tokens in this file (password reset, owner
+  // invite) -- see the method's own doc comment for why that's safe here specifically. These
+  // tests lock in the resulting shape so a future change notices if it drifts.
+  describe('generateVenuePreviewToken', () => {
+    it('returns an 11-character URL-safe string (8 random bytes, base64url)', () => {
+      const token = service.generateVenuePreviewToken();
+
+      expect(token).toHaveLength(11);
+      expect(token).toMatch(/^[A-Za-z0-9_-]{11}$/);
+    });
+
+    it('is not the same across calls (actually random, not a fixed string)', () => {
+      const tokens = new Set(Array.from({ length: 20 }, () => service.generateVenuePreviewToken()));
+
+      expect(tokens.size).toBe(20);
+    });
+  });
 });

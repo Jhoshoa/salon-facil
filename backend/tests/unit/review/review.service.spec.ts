@@ -120,6 +120,7 @@ describe('ReviewService', () => {
       createCalendarBlock: jest.fn(),
       getCalendarBlocks: jest.fn(),
       findCalendarBlockById: jest.fn(),
+      updateCalendarBlock: jest.fn(),
       deleteCalendarBlock: jest.fn(),
       isDateBlocked: jest.fn(),
       countByVenueAndStatus: jest.fn(),

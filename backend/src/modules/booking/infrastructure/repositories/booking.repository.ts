@@ -6,6 +6,7 @@ import {
   CreateCalendarBlockData,
   OccupiedDateEntry,
   ReminderField,
+  UpdateCalendarBlockData,
 } from '../../domain/repositories/booking.repository.interface';
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
@@ -281,12 +282,17 @@ export class BookingRepository implements IBookingRepository {
       data: {
         venueId: data.venueId,
         date: data.date,
-        reason: data.reason,
+        status: data.status,
+        // Only meaningful alongside TENTATIVE/CONFIRMED -- dropped for BLOCKED so a stale
+        // selection left over from flipping the dropdown in the UI can never persist against a
+        // block that says there's no event.
+        useTypeId: data.status === 'BLOCKED' ? undefined : data.useTypeId,
         isRecurring: data.isRecurring ?? false,
         recurringRule: data.recurringRule as Prisma.InputJsonValue | undefined,
       },
       include: {
         venue: { select: { id: true, name: true } },
+        useType: { select: { id: true, name: true } },
       },
     });
     return this.toCalendarBlockEntity(block);
@@ -304,6 +310,7 @@ export class BookingRepository implements IBookingRepository {
       },
       include: {
         venue: { select: { id: true, name: true } },
+        useType: { select: { id: true, name: true } },
       },
       orderBy: { date: 'asc' },
     });
@@ -315,9 +322,31 @@ export class BookingRepository implements IBookingRepository {
       where: { id },
       include: {
         venue: { select: { id: true, name: true } },
+        useType: { select: { id: true, name: true } },
       },
     });
     return block ? this.toCalendarBlockEntity(block) : null;
+  }
+
+  async updateCalendarBlock(
+    id: string,
+    data: UpdateCalendarBlockData,
+  ): Promise<CalendarBlockEntity> {
+    const block = await this.prisma.calendarBlock.update({
+      where: { id },
+      data: {
+        status: data.status,
+        // Explicit null (not undefined) so switching to BLOCKED, or clearing the dropdown back
+        // to "Sin especificar", actually drops a previously-set useTypeId instead of leaving it
+        // in place -- Prisma's update treats `undefined` as "don't touch this field".
+        useTypeId: data.status === 'BLOCKED' ? null : (data.useTypeId ?? null),
+      },
+      include: {
+        venue: { select: { id: true, name: true } },
+        useType: { select: { id: true, name: true } },
+      },
+    });
+    return this.toCalendarBlockEntity(block);
   }
 
   async deleteCalendarBlock(id: string): Promise<void> {
@@ -413,6 +442,9 @@ export class BookingRepository implements IBookingRepository {
       id: raw.id,
       venueId: raw.venueId,
       date: raw.date,
+      status: raw.status,
+      useTypeId: raw.useTypeId,
+      useType: raw.useType,
       reason: raw.reason,
       isRecurring: raw.isRecurring,
       recurringRule: raw.recurringRule,

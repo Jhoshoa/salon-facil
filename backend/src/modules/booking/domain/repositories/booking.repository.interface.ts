@@ -1,3 +1,4 @@
+import { CalendarBlockStatus } from '@prisma/client';
 import { BookingEntity, BookingStatus, SelectedExtra } from '../entities/booking.entity';
 import { CalendarBlockEntity } from '../entities/calendar-block.entity';
 
@@ -52,6 +53,7 @@ export interface IBookingRepository {
     endDate: Date,
   ): Promise<CalendarBlockEntity[]>;
   findCalendarBlockById(id: string): Promise<CalendarBlockEntity | null>;
+  updateCalendarBlock(id: string, data: UpdateCalendarBlockData): Promise<CalendarBlockEntity>;
   deleteCalendarBlock(id: string): Promise<void>;
   isDateBlocked(venueId: string, date: Date): Promise<boolean>;
 
@@ -98,7 +100,15 @@ export interface CreateBookingData {
 export interface CreateCalendarBlockData {
   venueId: string;
   date: Date;
-  reason?: string;
+  status: CalendarBlockStatus;
+  useTypeId?: string;
   isRecurring?: boolean;
   recurringRule?: Record<string, unknown>;
+}
+
+/** Edits status/useType on an existing block in place -- the date isn't editable this way (that's
+ * what delete + recreate is for), so there's no availability/conflict re-check to do here. */
+export interface UpdateCalendarBlockData {
+  status: CalendarBlockStatus;
+  useTypeId?: string;
 }

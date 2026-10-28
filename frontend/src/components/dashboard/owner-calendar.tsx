@@ -2,13 +2,18 @@
 
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { addMonths, eachDayOfInterval, endOfMonth, format, parse, startOfMonth } from 'date-fns';
-import { CalendarX, Trash2 } from 'lucide-react';
+import { CalendarX, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { createCalendarBlock, deleteCalendarBlock, getVenueCalendar } from '@/lib/api/calendar.api';
+import {
+  createCalendarBlock,
+  deleteCalendarBlock,
+  getVenueCalendar,
+  updateCalendarBlock,
+} from '@/lib/api/calendar.api';
 import { getMyVenues } from '@/lib/api/venues.api';
 import { formatDate, formatDateInput, getCurrentMonth } from '@/lib/formatters';
-import type { BookingStatus } from '@/types/api';
+import type { BookingStatus, CalendarBlockStatus, CalendarDayBlock } from '@/types/api';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -18,6 +23,7 @@ import { SubmitButton } from '@/components/shared/submit-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type DayCellData, MonthCalendarGrid } from '@/components/shared/month-calendar-grid';
 
@@ -34,6 +40,21 @@ const statusLabel: Record<BookingStatus, string> = {
   NO_SHOW: 'No show',
 };
 
+// Same wording everywhere a CalendarBlockStatus shows up (the "Estado" dropdown, the legend,
+// the fallback label on a block with no tipo de evento) so the owner never sees two different
+// names for the same thing.
+const blockStatusLabel: Record<CalendarBlockStatus, string> = {
+  TENTATIVE: 'Reservado temporalmente',
+  CONFIRMED: 'Reservado',
+  BLOCKED: 'Bloqueado',
+};
+
+const blockStatusToVariant: Record<CalendarBlockStatus, 'pending' | 'booked' | 'blocked'> = {
+  TENTATIVE: 'pending',
+  CONFIRMED: 'booked',
+  BLOCKED: 'blocked',
+};
+
 const legend = [
   { variant: 'available' as const, label: 'Disponible' },
   { variant: 'pending' as const, label: 'Reservado temporalmente' },
@@ -48,7 +69,11 @@ export const OwnerCalendar = () => {
   const [month, setMonth] = useState(getCurrentMonth());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [blockDate, setBlockDate] = useState(formatDateInput());
-  const [reason, setReason] = useState('');
+  const [blockStatus, setBlockStatus] = useState<CalendarBlockStatus>('BLOCKED');
+  const [blockUseTypeId, setBlockUseTypeId] = useState('');
+  // Non-null while the drawer is editing an existing marked date instead of creating a new one --
+  // same form, same fields, just a different mutation (and the date becomes read-only) on submit.
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<DayCellData | null>(null);
   const [blockToDelete, setBlockToDelete] = useState<{ id: string; date: string } | null>(null);
 
@@ -71,32 +96,64 @@ export const OwnerCalendar = () => {
     setSelectedDay(null);
   }, [venueId, month]);
 
+  // The "tipo de evento" dropdown only ever offers this venue's own "Ideal para" selections --
+  // not the full global catalog -- so it never asks the owner to re-pick something they already
+  // configured when setting up the local.
+  const selectedVenueUses = venuesQuery.data?.find((v) => v.id === venueId)?.uses ?? [];
+
   const invalidateCalendar = () =>
     queryClient.invalidateQueries({ queryKey: ['venue-calendar', venueId, month] });
 
   const createBlockMutation = useMutation({
     mutationFn: () =>
-      createCalendarBlock(venueId, { date: blockDate, reason: reason || undefined }),
+      createCalendarBlock(venueId, {
+        date: blockDate,
+        status: blockStatus,
+        // Tipo de evento only makes sense when there's an actual event (TENTATIVE/CONFIRMED) --
+        // dropped for BLOCKED so a selection left over from a previous open of the drawer can
+        // never attach itself to a "just closing the date" block.
+        useTypeId: blockStatus === 'BLOCKED' ? undefined : blockUseTypeId || undefined,
+      }),
     onSuccess: async () => {
-      toast.success('Fecha bloqueada');
+      toast.success('Fecha guardada');
       setDrawerOpen(false);
-      setReason('');
+      setBlockStatus('BLOCKED');
+      setBlockUseTypeId('');
       await invalidateCalendar();
     },
     onError: (error: { message?: string }) =>
-      toast.error('No se pudo bloquear fecha', { description: error.message }),
+      toast.error('No se pudo guardar la fecha', { description: error.message }),
+  });
+
+  const updateBlockMutation = useMutation({
+    mutationFn: () =>
+      updateCalendarBlock(venueId, editingBlockId as string, {
+        status: blockStatus,
+        useTypeId: blockStatus === 'BLOCKED' ? undefined : blockUseTypeId || undefined,
+      }),
+    onSuccess: async () => {
+      toast.success('Fecha actualizada');
+      setDrawerOpen(false);
+      setEditingBlockId(null);
+      setBlockStatus('BLOCKED');
+      setBlockUseTypeId('');
+      setSelectedDay(null);
+      await invalidateCalendar();
+    },
+    onError: (error: { message?: string }) =>
+      toast.error('No se pudo actualizar la fecha', { description: error.message }),
   });
 
   const deleteBlockMutation = useMutation({
     mutationFn: (blockId: string) => deleteCalendarBlock(venueId, blockId),
     onSuccess: async () => {
-      toast.success('Bloqueo eliminado');
+      toast.success('Fecha eliminada');
       setBlockToDelete(null);
       setSelectedDay(null);
       await invalidateCalendar();
     },
     onError: (error: { message?: string }) =>
-      toast.error('No se pudo eliminar bloqueo', { description: error.message }),
+      toast.error('No se pudo eliminar la fecha', { description: error.message }),
   });
 
   const days: DayCellData[] = useMemo(() => {
@@ -126,7 +183,7 @@ export const OwnerCalendar = () => {
             date: dateKey,
             day,
             variant: 'past' as const,
-            label: block?.reason ?? undefined,
+            label: block?.useTypeName ?? block?.reason ?? undefined,
           };
         }
         if (booking) {
@@ -140,12 +197,12 @@ export const OwnerCalendar = () => {
           };
         }
         if (block) {
-          // A block with a reason (e.g. "Boda" coordinated outside the app) reads to the owner
-          // as an actual reservation, not a mere closure -- give it the same 'booked' styling.
-          // A reason-less block (owner just closing the date) keeps the neutral 'blocked' look.
-          return block.reason
-            ? { date: dateKey, day, variant: 'booked' as const, label: block.reason }
-            : { date: dateKey, day, variant: 'blocked' as const, label: 'Bloqueado' };
+          return {
+            date: dateKey,
+            day,
+            variant: blockStatusToVariant[block.status],
+            label: block.useTypeName ?? block.reason ?? blockStatusLabel[block.status],
+          };
         }
         return { date: dateKey, day, variant: 'available' as const };
       },
@@ -179,12 +236,27 @@ export const OwnerCalendar = () => {
 
   const handleDayClick = (day: DayCellData) => {
     if (day.variant === 'available') {
+      setEditingBlockId(null);
       setBlockDate(day.date);
-      setReason('');
+      setBlockStatus('BLOCKED');
+      setBlockUseTypeId('');
       setDrawerOpen(true);
       return;
     }
     setSelectedDay(day);
+  };
+
+  const openEditDrawer = (block: CalendarDayBlock) => {
+    setEditingBlockId(block.id);
+    setBlockDate(block.date);
+    setBlockStatus(block.status);
+    setBlockUseTypeId(block.useTypeId ?? '');
+    setDrawerOpen(true);
+  };
+
+  const handleDrawerOpenChange = (open: boolean) => {
+    setDrawerOpen(open);
+    if (!open) setEditingBlockId(null);
   };
 
   const selectedBlock = selectedDay
@@ -228,16 +300,26 @@ export const OwnerCalendar = () => {
                   <p className="text-muted-foreground">{selectedDay.label}</p>
                 </div>
                 {selectedBlock ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      setBlockToDelete({ id: selectedBlock.id, date: selectedDay.date })
-                    }
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Eliminar bloqueo
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditDrawer(selectedBlock)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setBlockToDelete({ id: selectedBlock.id, date: selectedDay.date })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -271,7 +353,7 @@ export const OwnerCalendar = () => {
         </section>
 
         <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
-          <h2 className="text-base font-semibold">Fechas bloqueadas</h2>
+          <h2 className="text-base font-semibold">Fechas marcadas</h2>
           {calendarQuery.isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-14 w-full" />
@@ -279,7 +361,7 @@ export const OwnerCalendar = () => {
             </div>
           ) : null}
           {!calendarQuery.isLoading && !calendarQuery.data?.blocks.length ? (
-            <EmptyState icon={CalendarX} title="Sin bloqueos este mes" />
+            <EmptyState icon={CalendarX} title="Sin fechas marcadas este mes" />
           ) : null}
           {calendarQuery.data?.blocks.map((block) => (
             <div
@@ -288,15 +370,25 @@ export const OwnerCalendar = () => {
             >
               <div>
                 <p className="font-medium">{formatDate(block.date)}</p>
-                <p className="text-sm text-muted-foreground">{block.reason ?? 'Sin motivo'}</p>
+                <p className="text-sm text-muted-foreground">
+                  {blockStatusLabel[block.status]}
+                  {block.useTypeName || block.reason
+                    ? ` · ${block.useTypeName ?? block.reason}`
+                    : ''}
+                </p>
               </div>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => setBlockToDelete({ id: block.id, date: block.date })}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="icon" variant="outline" onClick={() => openEditDrawer(block)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setBlockToDelete({ id: block.id, date: block.date })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
         </section>
@@ -304,9 +396,13 @@ export const OwnerCalendar = () => {
 
       <AppDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        title="Bloquear fecha"
-        description="Impide nuevas reservas para este salon."
+        onOpenChange={handleDrawerOpenChange}
+        title={editingBlockId ? 'Editar fecha marcada' : 'Agregar al calendario'}
+        description={
+          editingBlockId
+            ? 'Actualiza el estado o el tipo de evento de esta fecha.'
+            : 'Marca esta fecha como reservada o bloqueala para que no se pueda pedir.'
+        }
       >
         <div className="space-y-4">
           <div className="space-y-2">
@@ -316,37 +412,72 @@ export const OwnerCalendar = () => {
               type="date"
               min={formatDateInput()}
               value={blockDate}
+              disabled={Boolean(editingBlockId)}
               onChange={(event) => setBlockDate(event.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="blockReason">Motivo</Label>
-            <Input
-              id="blockReason"
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-            />
+            <Label htmlFor="blockStatus">Estado</Label>
+            <Select
+              id="blockStatus"
+              value={blockStatus}
+              onChange={(event) => setBlockStatus(event.target.value as CalendarBlockStatus)}
+            >
+              {(Object.keys(blockStatusLabel) as CalendarBlockStatus[]).map((status) => (
+                <option key={status} value={status}>
+                  {blockStatusLabel[status]}
+                </option>
+              ))}
+            </Select>
           </div>
+          {blockStatus !== 'BLOCKED' ? (
+            <div className="space-y-2">
+              <Label htmlFor="blockUseType">Tipo de evento (opcional)</Label>
+              {selectedVenueUses.length ? (
+                <Select
+                  id="blockUseType"
+                  value={blockUseTypeId}
+                  onChange={(event) => setBlockUseTypeId(event.target.value)}
+                >
+                  <option value="">Sin especificar</option>
+                  {selectedVenueUses.map((use) => (
+                    <option key={use.useTypeId} value={use.useTypeId}>
+                      {use.useType.name}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Este local todavia no tiene tipos de evento configurados (pestaña General,
+                  &quot;Ideal para&quot;).
+                </p>
+              )}
+            </div>
+          ) : null}
           <SubmitButton
             className="w-full"
             disabled={!blockDate}
-            isLoading={createBlockMutation.isPending}
-            onClick={() => createBlockMutation.mutate()}
+            isLoading={
+              editingBlockId ? updateBlockMutation.isPending : createBlockMutation.isPending
+            }
+            onClick={() =>
+              editingBlockId ? updateBlockMutation.mutate() : createBlockMutation.mutate()
+            }
           >
-            Guardar bloqueo
+            Guardar
           </SubmitButton>
         </div>
       </AppDrawer>
 
       <ConfirmDialog
         open={Boolean(blockToDelete)}
-        title="Eliminar bloqueo"
+        title="Eliminar fecha marcada"
         description={
           blockToDelete
             ? `Se liberara el ${formatDate(blockToDelete.date)} para nuevas reservas.`
             : ''
         }
-        confirmLabel="Eliminar bloqueo"
+        confirmLabel="Eliminar"
         isLoading={deleteBlockMutation.isPending}
         onOpenChange={(open) => !open && setBlockToDelete(null)}
         onConfirm={() => blockToDelete && deleteBlockMutation.mutate(blockToDelete.id)}

@@ -271,6 +271,12 @@ export const VenueDetail = ({
   ];
   const basePrice = venue.prices?.find((price) => price.priceType === 'BASE')?.price ?? 0;
   const displayedPrice = liveTotal ?? basePrice;
+  // "minimumHours" only means something where an HOUR unit is actually in play -- the venue's
+  // own default, or a specific price rule overriding it to HOUR -- same rule the owner's own
+  // venue-form uses to decide whether to show that field at all. A pure DAY-priced venue always
+  // rents by the day, so there's nothing to show there but "1 dia".
+  const anyHourPricing =
+    venue.priceUnit === 'HOUR' || (venue.prices ?? []).some((price) => price.unit === 'HOUR');
 
   return (
     <div className={`space-y-2 ${!isDesktop ? 'pb-24' : ''}`}>
@@ -493,7 +499,11 @@ export const VenueDetail = ({
           {/* Summary — field-note stats */}
           <section className="sf-detail-section">
             <h2 className="sf-detail-title">Resumen del espacio</h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div
+              className={
+                venue.allowsMultipleDays ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 gap-4'
+              }
+            >
               <div>
                 <p className="font-serif text-2xl font-semibold leading-none text-primary">
                   {venue.capacityMin}-{venue.capacityMax}
@@ -502,18 +512,21 @@ export const VenueDetail = ({
               </div>
               <div>
                 <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                  {venue.minimumHours}h
+                  {anyHourPricing ? `${venue.minimumHours}h` : '1 dia'}
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">minimo por reserva</p>
               </div>
-              <div>
-                <p className="font-serif text-2xl font-semibold leading-none text-primary">
-                  {venue.allowsMultipleDays ? 'Multi' : '1'}
-                </p>
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {venue.allowsMultipleDays ? 'varios dias' : 'dia por reserva'}
-                </p>
-              </div>
+              {/* Only adds new information when the venue actually accepts a booking spanning
+                  more than one day -- otherwise it would just restate the "minimo" stat above
+                  ("1 dia" / "1 dia por reserva" say the same thing twice). */}
+              {venue.allowsMultipleDays ? (
+                <div>
+                  <p className="font-serif text-2xl font-semibold leading-none text-primary">
+                    Multi
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">varios dias</p>
+                </div>
+              ) : null}
             </div>
           </section>
 
