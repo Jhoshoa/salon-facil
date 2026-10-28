@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentPolicy, PriceUnit } from '@prisma/client';
-import { VenuePriceEntity, PriceType } from '../../../venue/domain/entities/venue-price.entity';
+import { VenuePriceEntity, PriceType } from '../../domain/entities/venue-price.entity';
 
 export interface PriceCalculationResult {
   basePrice: number;

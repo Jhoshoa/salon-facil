@@ -7,7 +7,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { CalendarBlockStatus, PaymentPolicy } from '@prisma/client';
 import { BookingService } from '../../../src/modules/booking/application/services/booking.service';
-import { PriceCalculatorService } from '../../../src/modules/booking/application/services/price-calculator.service';
+import { PriceCalculatorService } from '../../../src/modules/venue/application/services/price-calculator.service';
 import { AvailabilityService } from '../../../src/modules/booking/application/services/availability.service';
 import { BOOKING_REPOSITORY } from '../../../src/modules/booking/domain/repositories/booking.repository.interface';
 import {

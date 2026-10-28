@@ -19,7 +19,10 @@ import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity
 import { VenueEntity } from '../../../venue/domain/entities/venue.entity';
 import type { SelectedExtra } from '../../domain/entities/booking.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
-import { PriceCalculatorService, RangePriceCalculationResult } from './price-calculator.service';
+import {
+  PriceCalculatorService,
+  RangePriceCalculationResult,
+} from '../../../venue/application/services/price-calculator.service';
 import { AvailabilityService } from './availability.service';
 import { UserRole } from '../../../auth/domain/entities/user.entity';
 import { NotificationService } from '../../../notification/application/services/notification.service';

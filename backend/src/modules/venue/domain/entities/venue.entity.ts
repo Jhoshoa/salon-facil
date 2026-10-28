@@ -95,6 +95,11 @@ export class VenueEntity {
   };
   reviewCount?: number;
   averageRating?: number;
+  /** Precio real para la fecha buscada (reglas de temporada/feriado/dia de semana ya resueltas),
+   * solo presente cuando la busqueda incluyo una fecha y el local tiene precio BASE configurado.
+   * Sin esto, el precio base generico era lo unico que se mostraba, aunque esa fecha en concreto
+   * tuviera otro precio. */
+  effectivePrice?: number | null;
 
   constructor(partial: Partial<VenueEntity>) {
     Object.assign(this, partial);

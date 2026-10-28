@@ -12,6 +12,7 @@ import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entitie
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
+import { PriceCalculatorService } from '../../application/services/price-calculator.service';
 import {
   AmenityCategory,
   Departamento,
@@ -69,7 +70,10 @@ interface RawVenueMedia {
 
 @Injectable()
 export class VenueRepository implements IVenueRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly priceCalculator: PriceCalculatorService,
+  ) {}
 
   private readonly venueInclude = {
     services: { orderBy: { sortOrder: 'asc' as const } },
@@ -353,6 +357,27 @@ export class VenueRepository implements IVenueRepository {
     ]);
 
     let entities = venues.map((v) => this.toEntity(v));
+
+    // Resolve the real price for the searched date (season/holiday/weekend/specific-date rules,
+    // same priority a real booking's price goes through) instead of always showing the generic
+    // base price. Only over the venues actually in this result batch (bounded by `limit`, or by
+    // the 1000-candidate cap below when post-sorting) -- never a query over the whole table, and
+    // no extra DB round trip: `venueInclude.prices` already fetches every active price rule per
+    // venue for other reasons, this just resolves them in memory.
+    if (requestedStartDate) {
+      const priceDate = new Date(requestedStartDate);
+      entities = entities.map((entity) => {
+        const hasBasePrice = entity.prices?.some((p) => p.priceType === 'BASE');
+        if (!hasBasePrice) return entity;
+        entity.effectivePrice = this.priceCalculator.calculate(
+          entity.prices ?? [],
+          priceDate,
+          entity.paymentPolicy,
+          entity.depositPercentage,
+        ).appliedPrice;
+        return entity;
+      });
+    }
 
     // Post-query sort for price/rating
     if (needsPostSort) {
@@ -1075,10 +1100,11 @@ export class VenueRepository implements IVenueRepository {
           sortBy === SortField.PRICE_ASC ||
           sortBy === SortField.PRICE_DESC
         ) {
-          const prices = (raw as Record<string, unknown>).prices as
-            | Record<string, unknown>[]
-            | undefined;
-          sortValue = prices && prices.length > 0 ? Number(prices[0].price ?? 0) : 0;
+          // Prefer the price already resolved for the searched date (set above, before this
+          // runs); otherwise fall back to the venue's own BASE price -- never an arbitrary first
+          // row off the prices array, which could just as easily be a weekend/holiday override.
+          const basePrice = entity.prices?.find((p) => p.priceType === 'BASE')?.price ?? 0;
+          sortValue = entity.effectivePrice ?? basePrice;
         } else if (sortBy === SortField.RATING || sortBy === SortField.RATING_DESC) {
           const reviews = (raw as Record<string, unknown>).reviews as
             | Record<string, unknown>[]

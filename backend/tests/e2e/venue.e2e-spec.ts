@@ -719,6 +719,72 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  // ===== Search resolves the real price for the searched date (season/weekend/holiday rules) =====
+  describe('GET /api/v1/venues — effectivePrice segun la fecha buscada', () => {
+    let priceVenueId: string;
+    let saturdayDate: string;
+    let mondayDate: string;
+
+    const toISODate = (date: Date) => date.toISOString().slice(0, 10);
+    const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86400000);
+    const nextWeekday = (from: Date, targetDay: number) =>
+      addDays(from, (((targetDay - from.getUTCDay()) % 7) + 7) % 7 || 7);
+
+    beforeAll(async () => {
+      // Comfortably in the future so this never risks landing in the past, and a real Saturday
+      // so the WEEKEND rule below has something concrete to match against.
+      const anchor = addDays(new Date(), 90);
+      const saturday = nextWeekday(anchor, 6);
+      saturdayDate = toISODate(saturday);
+      mondayDate = toISODate(nextWeekday(saturday, 1));
+
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Effective Price Venue ${uniqueId}`)
+        .field('description', 'Venue para probar el precio real segun la fecha buscada.')
+        .field('address', 'Price Test Address 12345')
+        .field('district', 'Distrito Precio')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .field(
+          'prices',
+          JSON.stringify([
+            { priceType: 'BASE', price: 1500 },
+            { priceType: 'WEEKEND', price: 1800, dayOfWeek: 6 },
+          ]),
+        )
+        .expect(201);
+      priceVenueId = res.body.id;
+
+      await adminAgent
+        .put(`/api/v1/venues/${priceVenueId}/verify`)
+        .send({ approve: true })
+        .expect(200);
+    });
+
+    it('muestra el precio de la regla de fin de semana cuando se busca para ese sabado', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/venues?startDate=${saturdayDate}&guestCount=50`)
+        .expect(200)
+        .then((res) => {
+          const found = res.body.venues.find((v: { id: string }) => v.id === priceVenueId);
+          expect(found).toBeDefined();
+          expect(found.effectivePrice).toBe(1800);
+        });
+    });
+
+    it('muestra el precio base cuando se busca para un dia sin regla propia', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/venues?startDate=${mondayDate}&guestCount=50`)
+        .expect(200)
+        .then((res) => {
+          const found = res.body.venues.find((v: { id: string }) => v.id === priceVenueId);
+          expect(found).toBeDefined();
+          expect(found.effectivePrice).toBe(1500);
+        });
+    });
+  });
+
   // ===== Admin pending queue =====
   describe('GET /api/v1/venues/admin/pending', () => {
     it('should return only PENDING venues and be reachable by ADMIN', async () => {
