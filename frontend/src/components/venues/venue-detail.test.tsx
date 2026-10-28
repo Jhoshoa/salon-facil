@@ -64,6 +64,7 @@ const venue = {
   capacityMin: 50,
   capacityMax: 200,
   minimumHours: 4,
+  priceUnit: 'HOUR',
   allowsMultipleDays: false,
   instantBooking: false,
   isVerified: false,
@@ -182,5 +183,100 @@ describe('VenueDetail - otros modos no cambian de comportamiento', () => {
 
     expect(await screen.findByText('Este local no esta disponible')).toBeInTheDocument();
     expect(screen.queryByText('Este enlace ya no es valido')).not.toBeInTheDocument();
+  });
+});
+
+describe('VenueDetail - "minimo por reserva" en Resumen del espacio', () => {
+  it('con priceUnit HOUR y un solo dia por reserva, muestra las horas minimas sin el dato de "Multi"', async () => {
+    mockGetVenueBySlug.mockResolvedValue({
+      ...venue,
+      priceUnit: 'HOUR',
+      minimumHours: 4,
+      allowsMultipleDays: false,
+    });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('4h')).toBeInTheDocument();
+    expect(screen.getByText('minimo por reserva')).toBeInTheDocument();
+    expect(screen.queryByText('Multi')).not.toBeInTheDocument();
+    expect(screen.queryByText('varios dias')).not.toBeInTheDocument();
+  });
+
+  it('con priceUnit HOUR y el local acepta varios dias, muestra las horas minimas junto a "Multi"', async () => {
+    mockGetVenueBySlug.mockResolvedValue({
+      ...venue,
+      priceUnit: 'HOUR',
+      minimumHours: 4,
+      allowsMultipleDays: true,
+    });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('4h')).toBeInTheDocument();
+    expect(screen.getByText('Multi')).toBeInTheDocument();
+    expect(screen.getByText('varios dias')).toBeInTheDocument();
+  });
+
+  it('con priceUnit DAY y sin reglas que usen HOUR, muestra "1 dia" en vez de horas', async () => {
+    mockGetVenueBySlug.mockResolvedValue({
+      ...venue,
+      priceUnit: 'DAY',
+      prices: [],
+      allowsMultipleDays: false,
+    });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('1 dia')).toBeInTheDocument();
+    expect(screen.getByText('minimo por reserva')).toBeInTheDocument();
+    expect(screen.queryByText('4h')).not.toBeInTheDocument();
+    expect(screen.queryByText('Multi')).not.toBeInTheDocument();
+  });
+
+  it('con priceUnit DAY y el local acepta varios dias, muestra "1 dia" junto a "Multi" (no se repiten)', async () => {
+    mockGetVenueBySlug.mockResolvedValue({
+      ...venue,
+      priceUnit: 'DAY',
+      prices: [],
+      allowsMultipleDays: true,
+    });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('1 dia')).toBeInTheDocument();
+    expect(screen.getByText('Multi')).toBeInTheDocument();
+    expect(screen.getByText('varios dias')).toBeInTheDocument();
+  });
+
+  it('con priceUnit DAY pero una regla de precio que fuerza HOUR, vuelve a mostrar las horas minimas', async () => {
+    mockGetVenueBySlug.mockResolvedValue({
+      ...venue,
+      priceUnit: 'DAY',
+      minimumHours: 3,
+      allowsMultipleDays: false,
+      prices: [
+        {
+          id: 'price-weekend',
+          venueId: 'venue-1',
+          priceType: 'WEEKEND',
+          dayOfWeek: 6,
+          specificDate: null,
+          startDate: null,
+          endDate: null,
+          price: 100,
+          currency: 'BOB',
+          unit: 'HOUR',
+          discountPercent: null,
+          discountLabel: null,
+          isActive: true,
+        },
+      ],
+    });
+
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    expect(await screen.findByText('3h')).toBeInTheDocument();
+    expect(screen.queryByText('1 dia')).not.toBeInTheDocument();
   });
 });
