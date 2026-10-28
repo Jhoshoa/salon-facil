@@ -64,3 +64,30 @@ describe('VenueResultCard - que precio muestra la tarjeta', () => {
     expect(screen.getByText('Consultar')).toBeInTheDocument();
   });
 });
+
+describe('VenueResultCard - fila compacta para celular (oculta por CSS en pantallas grandes)', () => {
+  it('tiene un favorito y un enlace "Ver detalles" aparte de los de escritorio, para el layout compacto', () => {
+    render(<VenueResultCard venue={venue} startDate="2026-10-30" />);
+
+    // Un FavoriteButton superpuesto en la foto (solo visible en md:+) y otro en la fila de
+    // contenido (solo visible en mobile, md:hidden) -- ambos existen en el DOM, la visibilidad
+    // la decide el CSS responsive, que jsdom no evalua.
+    expect(screen.getAllByTestId('favorite-button')).toHaveLength(2);
+
+    // One is the mobile-only icon-only link (md:hidden), the other the desktop button
+    // (hidden md:inline-flex) -- both point to the same place, only one is ever visible at a time.
+    const detailLinks = screen.getAllByRole('link', { name: 'Ver detalles' });
+    expect(detailLinks).toHaveLength(2);
+    detailLinks.forEach((link) =>
+      expect(link).toHaveAttribute('href', '/venues/salon-de-prueba?startDate=2026-10-30'),
+    );
+  });
+
+  it('muestra la capacidad junto al precio para el pie compacto de mobile', () => {
+    render(<VenueResultCard venue={venue} />);
+
+    // Aparece dos veces: una en el badge de escritorio (hidden en mobile) y otra en el pie
+    // compacto del layout de mobile (md:hidden en escritorio) -- mismo texto, dos lugares.
+    expect(screen.getAllByText('50-200 personas')).toHaveLength(2);
+  });
+});
