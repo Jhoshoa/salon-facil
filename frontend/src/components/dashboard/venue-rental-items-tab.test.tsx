@@ -40,6 +40,10 @@ const mockCreateRentalItemCategory = createRentalItemCategory as jest.MockedFunc
   typeof createRentalItemCategory
 >;
 
+// jsdom doesn't implement these -- the photo preview effect calls them whenever a file is picked.
+global.URL.createObjectURL = jest.fn(() => 'blob:mock-preview-url');
+global.URL.revokeObjectURL = jest.fn();
+
 const venue = { id: 'venue-1', name: 'Salon de prueba' } as unknown as Venue;
 
 const makeCategory = (overrides: Partial<VenueRentalItemCategory>): VenueRentalItemCategory => ({
@@ -185,6 +189,83 @@ describe('VenueRentalItemsTab', () => {
         'item-1',
         expect.objectContaining({ name: 'Mesa rectangular', categoryId: 'cat-mobiliario' }),
         undefined,
+      ),
+    );
+  });
+
+  it('previsualiza una foto nueva y permite quitarla antes de guardar', async () => {
+    const user = userEvent.setup();
+    mockGetOwnerRentalItems.mockResolvedValue([]);
+    renderTab();
+
+    await screen.findByText('Sin items todavia');
+    await user.click(screen.getByRole('button', { name: /agregar item/i }));
+
+    expect(screen.getByRole('button', { name: 'Agregar' })).toBeInTheDocument();
+
+    const fileInput = screen.getByLabelText('Foto (opcional)');
+    const file = new File(['fake-bytes'], 'mesa.jpg', { type: 'image/jpeg' });
+    await user.upload(fileInput, file);
+
+    expect(await screen.findByRole('button', { name: 'Cambiar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Quitar' }));
+
+    expect(screen.getByRole('button', { name: 'Agregar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cambiar' })).not.toBeInTheDocument();
+  });
+
+  it('permite eliminar la foto de un item sin subir una nueva', async () => {
+    const user = userEvent.setup();
+    const item = makeItem({ id: 'item-1', name: 'Mesa redonda', photoUrl: 'https://cdn/mesa.jpg' });
+    mockGetOwnerRentalItems.mockResolvedValue([item]);
+    mockUpdateRentalItem.mockResolvedValue(item);
+    renderTab();
+
+    await screen.findByText('Mesa redonda');
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+
+    expect(await screen.findByRole('button', { name: 'Eliminar foto' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Eliminar foto' }));
+
+    expect(screen.getByRole('button', { name: 'Agregar' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(mockUpdateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        'item-1',
+        expect.objectContaining({ removePhoto: true }),
+        undefined,
+      ),
+    );
+  });
+
+  it('cambiar la foto de un item envia el archivo nuevo, no removePhoto', async () => {
+    const user = userEvent.setup();
+    const item = makeItem({ id: 'item-1', name: 'Mesa redonda', photoUrl: 'https://cdn/mesa.jpg' });
+    mockGetOwnerRentalItems.mockResolvedValue([item]);
+    mockUpdateRentalItem.mockResolvedValue(item);
+    renderTab();
+
+    await screen.findByText('Mesa redonda');
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+
+    await screen.findByRole('button', { name: 'Cambiar foto' });
+    const fileInput = screen.getByLabelText('Foto (opcional)');
+    const file = new File(['fake-bytes'], 'nueva.jpg', { type: 'image/jpeg' });
+    await user.upload(fileInput, file);
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(mockUpdateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        'item-1',
+        expect.objectContaining({ removePhoto: undefined }),
+        file,
       ),
     );
   });

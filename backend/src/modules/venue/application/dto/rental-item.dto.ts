@@ -102,6 +102,13 @@ export class UpdateRentalItemDto {
   @IsBoolean()
   isActive?: boolean;
 
+  // Clears the current photo without uploading a replacement. Ignored if a new photo is also
+  // sent in the same request -- the new upload wins.
+  @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  removePhoto?: boolean;
+
   @IsOptional()
   @IsInt()
   @Min(0)

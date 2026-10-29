@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -87,11 +87,25 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
   const [categoriesDialogOpen, setCategoriesDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<VenueRentalItem | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [itemToDelete, setItemToDelete] = useState<VenueRentalItem | null>(null);
   const [creatingCategoryInline, setCreatingCategoryInline] = useState(false);
   const [inlineCategoryName, setInlineCategoryName] = useState('');
+
+  // Local preview of a newly picked (not-yet-uploaded) photo -- revoked whenever the file
+  // changes or the component unmounts, so these object URLs don't leak.
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
 
   const query = useQuery({
     queryKey: ['venue-rental-items', venue.id],
@@ -205,6 +219,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     setEditingItem(null);
     setForm(emptyForm);
     setPhotoFile(null);
+    setRemovePhoto(false);
     setFieldErrors({});
     setCreatingCategoryInline(false);
     setDialogOpen(true);
@@ -222,9 +237,28 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
       isActive: item.isActive,
     });
     setPhotoFile(null);
+    setRemovePhoto(false);
     setFieldErrors({});
     setCreatingCategoryInline(false);
     setDialogOpen(true);
+  };
+
+  const pickPhoto = () => fileInputRef.current?.click();
+
+  const handlePhotoFileChange = (file: File | null) => {
+    setPhotoFile(file);
+    if (file) setRemovePhoto(false);
+  };
+
+  const handleCancelNewPhoto = () => {
+    setPhotoFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveExistingPhoto = () => {
+    setPhotoFile(null);
+    setRemovePhoto(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleCategorySelectChange = (value: string) => {
@@ -270,6 +304,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           unitLabel: form.unitLabel.trim() || undefined,
           stockQty: form.stockQty.trim() ? Number(form.stockQty) : undefined,
           isActive: form.isActive,
+          removePhoto: !photoFile && removePhoto ? true : undefined,
         },
       });
       return;
@@ -542,15 +577,68 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                 id="rental-item-photo"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
-                className="text-sm"
+                hidden
+                onChange={(event) => handlePhotoFileChange(event.target.files?.[0] ?? null)}
               />
-              {editingItem?.photoUrl && !photoFile ? (
-                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <ImagePlus className="h-3 w-3" />
-                  Ya tiene foto -- elige una nueva solo si quieres remplazarla.
-                </p>
-              ) : null}
+
+              {photoPreviewUrl ? (
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview,
+                   * not an optimizable remote asset */}
+                  <img
+                    src={photoPreviewUrl}
+                    alt=""
+                    className="h-24 w-24 rounded-[var(--radius)] border object-cover"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <Button type="button" size="sm" variant="outline" onClick={pickPhoto}>
+                      <Pencil className="h-4 w-4" />
+                      Cambiar
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={handleCancelNewPhoto}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                      Quitar
+                    </Button>
+                  </div>
+                </div>
+              ) : editingItem?.photoUrl && !removePhoto ? (
+                <div className="flex items-center gap-3">
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[var(--radius)] border">
+                    <Image
+                      src={editingItem.photoUrl}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      loader={cloudinaryImageLoader}
+                      sizes="96px"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Button type="button" size="sm" variant="outline" onClick={pickPhoto}>
+                      <Pencil className="h-4 w-4" />
+                      Cambiar foto
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleRemoveExistingPhoto}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                      Eliminar foto
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={pickPhoto}
+                  className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-dashed border-input text-muted-foreground transition-colors hover:bg-muted"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                  <span className="text-xs">Agregar</span>
+                </button>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">

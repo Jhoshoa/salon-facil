@@ -528,7 +528,11 @@ export class VenueService {
     if (result === 'category_not_found') {
       throw new NotFoundException(`Categoria con ID '${data.categoryId}' no encontrada`);
     }
-    return result;
+    // Best-effort, same criteria as deleteRentalItem: the DB row is already updated either way.
+    if (result.previousPhotoPublicId) {
+      await this.cloudinaryService.deleteImage(result.previousPhotoPublicId).catch(() => {});
+    }
+    return result.entity;
   }
 
   async deleteRentalItem(

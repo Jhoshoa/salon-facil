@@ -1016,7 +1016,11 @@ export class VenueRepository implements IVenueRepository {
     venueId: string,
     itemId: string,
     data: UpdateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | 'not_found' | 'category_not_found'> {
+  ): Promise<
+    | { entity: VenueRentalItemEntity; previousPhotoPublicId: string | null }
+    | 'not_found'
+    | 'category_not_found'
+  > {
     const existing = await this.prisma.venueRentalItem.findFirst({
       where: { id: itemId, venueId },
     });
@@ -1029,14 +1033,21 @@ export class VenueRepository implements IVenueRepository {
       if (!category) return 'category_not_found';
     }
 
+    // A new upload replaces the old photo; `removePhoto` clears it without a replacement. Either
+    // way, the old Cloudinary asset (if any) needs cleanup -- the caller does that best-effort
+    // using `previousPhotoPublicId` below.
+    const photoReplaced = data.photoUrl !== undefined;
+    const photoCleared = !photoReplaced && data.removePhoto === true;
+    const previousPhotoPublicId = photoReplaced || photoCleared ? existing.photoPublicId : null;
+
     const item = await this.prisma.venueRentalItem.update({
       where: { id: itemId },
       data: {
         name: data.name,
         categoryId: data.categoryId,
         description: data.description,
-        photoUrl: data.photoUrl,
-        photoPublicId: data.photoPublicId,
+        photoUrl: photoCleared ? null : data.photoUrl,
+        photoPublicId: photoCleared ? null : data.photoPublicId,
         pricePerUnit: data.pricePerUnit != null ? new Prisma.Decimal(data.pricePerUnit) : undefined,
         unitLabel: data.unitLabel,
         stockQty: data.stockQty,
@@ -1045,7 +1056,7 @@ export class VenueRepository implements IVenueRepository {
       },
       include: { category: true },
     });
-    return this.toRentalItemEntity(item);
+    return { entity: this.toRentalItemEntity(item), previousPhotoPublicId };
   }
 
   /** Returns the deleted row's `photoPublicId` (or `null`) so the caller can also remove the

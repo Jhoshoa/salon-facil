@@ -72,6 +72,7 @@ export interface UpdateRentalItemInput {
   description?: string;
   photoUrl?: string;
   photoPublicId?: string;
+  removePhoto?: boolean;
   pricePerUnit?: number;
   unitLabel?: string;
   stockQty?: number;
@@ -155,11 +156,18 @@ export interface IVenueRepository {
     venueId: string,
     data: CreateRentalItemInput,
   ): Promise<VenueRentalItemEntity | 'category_not_found'>;
+  /** `previousPhotoPublicId` is the Cloudinary id that was replaced or cleared by this update
+   * (or `null` if the photo didn't change) -- the caller best-effort-deletes it from Cloudinary,
+   * same as `deleteRentalItem` already does for a fully deleted item. */
   updateRentalItem(
     venueId: string,
     itemId: string,
     data: UpdateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | 'not_found' | 'category_not_found'>;
+  ): Promise<
+    | { entity: VenueRentalItemEntity; previousPhotoPublicId: string | null }
+    | 'not_found'
+    | 'category_not_found'
+  >;
   deleteRentalItem(
     venueId: string,
     itemId: string,

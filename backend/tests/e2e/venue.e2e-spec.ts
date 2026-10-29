@@ -459,6 +459,26 @@ describe('Venues (e2e)', () => {
         });
     });
 
+    it('uploads a photo on update (the item had none)', () => {
+      return ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .attach('photo', Buffer.from('fake-image-bytes'), 'vaso.jpg')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.photoUrl).toBe('https://example.com/fake-image.jpg');
+        });
+    });
+
+    it('removePhoto clears the photo without uploading a replacement', () => {
+      return ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('removePhoto', 'true')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.photoUrl).toBeNull();
+        });
+    });
+
     it('reorders items as the owner', () => {
       return ownerAgent
         .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)

@@ -709,7 +709,10 @@ describe('VenueService', () => {
       it('returns the updated item when the caller can edit the venue', async () => {
         mockRepository.findById.mockResolvedValue(mockVenue);
         mockVenue.canBeEditedBy.mockReturnValue(true);
-        mockRepository.updateRentalItem.mockResolvedValue({ ...rentalItem, pricePerUnit: 0.75 });
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, pricePerUnit: 0.75 },
+          previousPhotoPublicId: null,
+        });
 
         const result = await service.updateRentalItem(
           'venue-1',
@@ -720,6 +723,56 @@ describe('VenueService', () => {
         );
 
         expect(result.pricePerUnit).toBe(0.75);
+      });
+
+      it('deletes the old Cloudinary photo when a new one replaces it', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, photoUrl: 'https://cdn/new.jpg', photoPublicId: 'new-id' },
+          previousPhotoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
+        });
+
+        await service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+          photoUrl: 'https://cdn/new.jpg',
+          photoPublicId: 'new-id',
+        });
+
+        expect(mockCloudinaryService.deleteImage).toHaveBeenCalledWith(
+          'salon-facil/venues/owner-1/rental-items/vaso',
+        );
+      });
+
+      it('deletes the old Cloudinary photo when removePhoto clears it', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, photoUrl: null, photoPublicId: null },
+          previousPhotoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
+        });
+
+        await service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+          removePhoto: true,
+        });
+
+        expect(mockCloudinaryService.deleteImage).toHaveBeenCalledWith(
+          'salon-facil/venues/owner-1/rental-items/vaso',
+        );
+      });
+
+      it('does not call Cloudinary when the photo did not change', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, name: 'Vaso corto' },
+          previousPhotoPublicId: null,
+        });
+
+        await service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+          name: 'Vaso corto',
+        });
+
+        expect(mockCloudinaryService.deleteImage).not.toHaveBeenCalled();
       });
 
       it('throws ForbiddenException for a different owner', async () => {

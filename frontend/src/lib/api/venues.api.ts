@@ -193,7 +193,7 @@ export const getOwnerRentalItems = async (venueId: string): Promise<VenueRentalI
 };
 
 const buildRentalItemFormData = (
-  payload: Partial<VenueRentalItemInput> & { isActive?: boolean },
+  payload: Partial<VenueRentalItemInput> & { isActive?: boolean; removePhoto?: boolean },
   photo?: File,
 ): FormData => {
   const formData = new FormData();
@@ -219,7 +219,7 @@ export const createRentalItem = async (
 export const updateRentalItem = async (
   venueId: string,
   itemId: string,
-  payload: Partial<VenueRentalItemInput> & { isActive?: boolean },
+  payload: Partial<VenueRentalItemInput> & { isActive?: boolean; removePhoto?: boolean },
   photo?: File,
 ): Promise<VenueRentalItem> => {
   return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items/${itemId}`, {
