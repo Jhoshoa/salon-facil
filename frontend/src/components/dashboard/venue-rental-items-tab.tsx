@@ -92,6 +92,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [itemToDelete, setItemToDelete] = useState<VenueRentalItem | null>(null);
+  const [confirmRemovePhotoOpen, setConfirmRemovePhotoOpen] = useState(false);
   const [creatingCategoryInline, setCreatingCategoryInline] = useState(false);
   const [inlineCategoryName, setInlineCategoryName] = useState('');
 
@@ -220,6 +221,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     setForm(emptyForm);
     setPhotoFile(null);
     setRemovePhoto(false);
+    setConfirmRemovePhotoOpen(false);
     setFieldErrors({});
     setCreatingCategoryInline(false);
     setDialogOpen(true);
@@ -238,6 +240,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     });
     setPhotoFile(null);
     setRemovePhoto(false);
+    setConfirmRemovePhotoOpen(false);
     setFieldErrors({});
     setCreatingCategoryInline(false);
     setDialogOpen(true);
@@ -259,6 +262,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     setPhotoFile(null);
     setRemovePhoto(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setConfirmRemovePhotoOpen(false);
   };
 
   const handleCategorySelectChange = (value: string) => {
@@ -622,7 +626,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={handleRemoveExistingPhoto}
+                      onClick={() => setConfirmRemovePhotoOpen(true)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                       Eliminar foto
@@ -727,6 +731,15 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
         onConfirm={() => {
           if (itemToDelete) deleteMutation.mutate(itemToDelete.id);
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmRemovePhotoOpen}
+        title="Eliminar foto"
+        description="Esta accion no se puede deshacer una vez que guardes los cambios. La foto se eliminara del item."
+        confirmLabel="Eliminar"
+        onOpenChange={setConfirmRemovePhotoOpen}
+        onConfirm={handleRemoveExistingPhoto}
       />
 
       <VenueRentalItemCategoriesManager

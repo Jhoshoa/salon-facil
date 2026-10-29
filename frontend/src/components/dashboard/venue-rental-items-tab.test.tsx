@@ -229,6 +229,8 @@ describe('VenueRentalItemsTab', () => {
     expect(await screen.findByRole('button', { name: 'Eliminar foto' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Eliminar foto' }));
 
+    await user.click(await screen.findByRole('button', { name: 'Eliminar' }));
+
     expect(screen.getByRole('button', { name: 'Agregar' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
