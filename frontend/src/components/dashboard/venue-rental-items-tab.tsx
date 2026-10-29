@@ -301,11 +301,16 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setCategoriesDialogOpen(true)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setCategoriesDialogOpen(true)}
+          >
             <Settings2 className="h-4 w-4" />
             Gestionar categorias
           </Button>
-          <Button size="sm" onClick={openCreateDialog}>
+          <Button type="button" size="sm" onClick={openCreateDialog}>
             <Plus className="h-4 w-4" />
             Agregar item
           </Button>
@@ -407,7 +412,12 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                   >
                     <ArrowRight className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => openEditDialog(item)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openEditDialog(item)}
+                  >
                     <Pencil className="h-4 w-4" />
                     Editar
                   </Button>
@@ -609,7 +619,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           </div>
 
           <DialogFooter>
-            <Button onClick={handleSubmit} disabled={isSaving}>
+            <Button type="button" onClick={handleSubmit} disabled={isSaving}>
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {editingItem ? 'Guardar cambios' : 'Crear'}
             </Button>
