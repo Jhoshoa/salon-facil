@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Venue, VenueRentalItemCategory } from '@/types/api';
 import { VenueRentalItemCategoriesManager } from './venue-rental-item-categories-manager';
@@ -7,7 +7,6 @@ import {
   createRentalItemCategory,
   deleteRentalItemCategory,
   getRentalItemCategories,
-  reorderRentalItemCategories,
   updateRentalItemCategory,
 } from '@/lib/api/venues.api';
 
@@ -30,9 +29,6 @@ const mockUpdateRentalItemCategory = updateRentalItemCategory as jest.MockedFunc
 >;
 const mockDeleteRentalItemCategory = deleteRentalItemCategory as jest.MockedFunction<
   typeof deleteRentalItemCategory
->;
-const mockReorderRentalItemCategories = reorderRentalItemCategories as jest.MockedFunction<
-  typeof reorderRentalItemCategories
 >;
 
 const venue = { id: 'venue-1', name: 'Salon de prueba' } as unknown as Venue;
@@ -171,32 +167,27 @@ describe('VenueRentalItemCategoriesManager', () => {
 
     await user.click(screen.getByRole('button', { name: 'Eliminar categoria' }));
 
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Eliminar' }));
+    // The manager's own Dialog stays mounted (role="dialog") while the ConfirmDialog opens on
+    // top of it, so `findByRole('dialog')` alone is ambiguous -- the confirm button's exact
+    // accessible name ("Eliminar", not "Eliminar categoria") is unambiguous on its own.
+    await user.click(await screen.findByRole('button', { name: 'Eliminar' }));
 
     await waitFor(() =>
       expect(mockDeleteRentalItemCategory).toHaveBeenCalledWith('venue-1', 'cat-1'),
     );
   });
 
-  it('reordena categorias con las flechas', async () => {
-    const user = userEvent.setup();
+  it('cada categoria tiene un control de arrastre para reordenar (no flechas)', async () => {
     mockGetRentalItemCategories.mockResolvedValue([
       makeCategory({ id: 'cat-1', name: 'Mobiliario', sortOrder: 0 }),
       makeCategory({ id: 'cat-2', name: 'Decoracion', sortOrder: 1 }),
     ]);
-    mockReorderRentalItemCategories.mockResolvedValue([]);
     renderManager();
 
     await screen.findByText('Mobiliario');
 
-    const moveRightButtons = screen
-      .getAllByRole('button', { name: 'Mover despues' })
-      .filter((button) => !button.hasAttribute('disabled'));
-    await user.click(moveRightButtons[0]);
-
-    await waitFor(() =>
-      expect(mockReorderRentalItemCategories).toHaveBeenCalledWith('venue-1', ['cat-2', 'cat-1']),
-    );
+    expect(screen.getAllByRole('button', { name: 'Arrastrar para reordenar' })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Mover antes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mover despues' })).not.toBeInTheDocument();
   });
 });

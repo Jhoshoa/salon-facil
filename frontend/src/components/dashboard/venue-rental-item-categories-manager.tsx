@@ -1,8 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Check, GripVertical, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   createRentalItemCategory,
@@ -11,6 +28,7 @@ import {
   reorderRentalItemCategories,
   updateRentalItemCategory,
 } from '@/lib/api/venues.api';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,6 +57,127 @@ const SUGGESTED_CATEGORIES = [
   'Catering',
 ];
 
+interface SortableCategoryRowProps {
+  category: VenueRentalItemCategory;
+  isEditing: boolean;
+  editingName: string;
+  onEditingNameChange: (value: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onDelete: () => void;
+  isRenaming: boolean;
+}
+
+const SortableCategoryRow = ({
+  category,
+  isEditing,
+  editingName,
+  onEditingNameChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+  isRenaming,
+}: SortableCategoryRowProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+    disabled: isEditing,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center gap-2 bg-background p-3',
+        isDragging && 'relative z-10 shadow-md',
+      )}
+    >
+      {isEditing ? (
+        <>
+          <Input
+            value={editingName}
+            onChange={(event) => onEditingNameChange(event.target.value)}
+            className="h-9"
+            autoFocus
+          />
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            onClick={onSaveEdit}
+            disabled={isRenaming}
+            aria-label="Guardar nombre"
+          >
+            {isRenaming ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4" />
+            )}
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            onClick={onCancelEdit}
+            aria-label="Cancelar"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+            aria-label="Arrastrar para reordenar"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium">{category.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {category.itemCount} item{category.itemCount === 1 ? '' : 's'}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            onClick={onStartEdit}
+            aria-label="Renombrar categoria"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            onClick={onDelete}
+            disabled={category.itemCount > 0}
+            title={
+              category.itemCount > 0
+                ? `Tiene ${category.itemCount} item${category.itemCount === 1 ? '' : 's'} -- movelos o borralos primero`
+                : 'Eliminar categoria'
+            }
+            aria-label="Eliminar categoria"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const VenueRentalItemCategoriesManager = ({
   venue,
   open,
@@ -49,6 +188,9 @@ export const VenueRentalItemCategoriesManager = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<VenueRentalItemCategory | null>(null);
+  // Optimistic order applied right away on drop, cleared once the server confirms the same
+  // order -- otherwise the list would snap back to the old order until the refetch lands.
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
 
   const query = useQuery({
     queryKey: ['venue-rental-item-categories', venue.id],
@@ -56,9 +198,24 @@ export const VenueRentalItemCategoriesManager = ({
     enabled: open,
   });
 
-  const categories = [...(query.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sortedCategories = useMemo(
+    () => [...(query.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [query.data],
+  );
+
+  const categories = useMemo(() => {
+    if (!dragOrder) return sortedCategories;
+    const byId = new Map(sortedCategories.map((c) => [c.id, c]));
+    return dragOrder.map((id) => byId.get(id)).filter((c): c is VenueRentalItemCategory => !!c);
+  }, [sortedCategories, dragOrder]);
+
   const existingNames = new Set(categories.map((c) => c.name.toLowerCase()));
   const suggestions = SUGGESTED_CATEGORIES.filter((name) => !existingNames.has(name.toLowerCase()));
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['venue-rental-item-categories', venue.id] });
@@ -100,8 +257,12 @@ export const VenueRentalItemCategoriesManager = ({
 
   const reorderMutation = useMutation({
     mutationFn: (order: string[]) => reorderRentalItemCategories(venue.id, order),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      await invalidate();
+      setDragOrder(null);
+    },
     onError: (error: { message?: string }) => {
+      setDragOrder(null);
       toast.error('No se pudo actualizar el orden', { description: error.message });
     },
   });
@@ -131,13 +292,17 @@ export const VenueRentalItemCategoriesManager = ({
     renameMutation.mutate({ id: editingId, name: trimmed });
   };
 
-  const move = (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= categories.length) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const next = [...categories];
-    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-    reorderMutation.mutate(next.map((c) => c.id));
+    const oldIndex = categories.findIndex((c) => c.id === active.id);
+    const newIndex = categories.findIndex((c) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(categories, oldIndex, newIndex).map((c) => c.id);
+    setDragOrder(newOrder);
+    reorderMutation.mutate(newOrder);
   };
 
   return (
@@ -174,98 +339,33 @@ export const VenueRentalItemCategoriesManager = ({
             ) : null}
 
             {categories.length > 0 ? (
-              <div className="sf-card divide-y overflow-hidden">
-                {categories.map((category, index) => (
-                  <div key={category.id} className="flex items-center gap-2 p-3">
-                    {editingId === category.id ? (
-                      <>
-                        <Input
-                          value={editingName}
-                          onChange={(event) => setEditingName(event.target.value)}
-                          className="h-9"
-                          autoFocus
-                        />
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          onClick={saveRename}
-                          disabled={renameMutation.isPending}
-                          aria-label="Guardar nombre"
-                        >
-                          {renameMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          onClick={() => setEditingId(null)}
-                          aria-label="Cancelar"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">{category.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {category.itemCount} item{category.itemCount === 1 ? '' : 's'}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          onClick={() => move(index, -1)}
-                          disabled={index === 0 || reorderMutation.isPending}
-                          aria-label="Mover antes"
-                        >
-                          <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          onClick={() => move(index, 1)}
-                          disabled={index === categories.length - 1 || reorderMutation.isPending}
-                          aria-label="Mover despues"
-                        >
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          onClick={() => startEditing(category)}
-                          aria-label="Renombrar categoria"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          onClick={() => setCategoryToDelete(category)}
-                          disabled={category.itemCount > 0}
-                          title={
-                            category.itemCount > 0
-                              ? `Tiene ${category.itemCount} item${category.itemCount === 1 ? '' : 's'} -- movelos o borralos primero`
-                              : 'Eliminar categoria'
-                          }
-                          aria-label="Eliminar categoria"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </>
-                    )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={categories.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="sf-card divide-y overflow-hidden">
+                    {categories.map((category) => (
+                      <SortableCategoryRow
+                        key={category.id}
+                        category={category}
+                        isEditing={editingId === category.id}
+                        editingName={editingName}
+                        onEditingNameChange={setEditingName}
+                        onStartEdit={() => startEditing(category)}
+                        onCancelEdit={() => setEditingId(null)}
+                        onSaveEdit={saveRename}
+                        onDelete={() => setCategoryToDelete(category)}
+                        isRenaming={renameMutation.isPending}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             ) : null}
 
             <div className="flex gap-2">
