@@ -336,6 +336,7 @@ model Venue {
   openingHours   VenueOpeningHour[]
   media          VenueMedia[]
   prices         VenuePrice[]
+  rentalItems    VenueRentalItem[]
   bookings       Booking[]
   bookingDates   BookingDate[]
   reviews        Review[]
@@ -544,6 +545,35 @@ model VenuePrice {
   @@index([specificDate])
   @@index([startDate, endDate])
   @@map("venue_prices")
+}
+
+// Un local vende/presta sus propios items (vajilla, mobiliario, decoracion) a quien reserve el
+// espacio -- separado de Amenity/VenueAmenity (catalogo global curado por el admin, usado para
+// filtros de busqueda). `category` es texto libre elegido por el propio dueno, no un enum: el
+// punto es que cada local pueda definir sus propias categorias sin depender de que el admin las
+// registre primero. Fase 1 (ver docs/brainstorm/catalogo-alquiler-items.md): catalogo
+// informativo, sin carrito ni reserva real de stock -- stockQty es solo un numero mostrado,
+// nunca se descuenta automaticamente.
+model VenueRentalItem {
+  id            String   @id @default(uuid())
+  venueId       String   @map("venue_id")
+  name          String
+  category      String
+  description   String?  @db.Text
+  photoUrl      String?  @map("photo_url")
+  photoPublicId String?  @map("photo_public_id")
+  pricePerUnit  Decimal  @map("price_per_unit") @db.Decimal(12, 2)
+  unitLabel     String   @default("unidad") @map("unit_label")
+  stockQty      Int?     @map("stock_qty")
+  isActive      Boolean  @default(true) @map("is_active")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([venueId, category])
+  @@map("venue_rental_items")
 }
 
 model SuggestedSeasonalEvent {

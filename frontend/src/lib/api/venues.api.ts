@@ -16,6 +16,8 @@ import type {
   VenueCompletion,
   VenueFormPayload,
   VenueMedia,
+  VenueRentalItem,
+  VenueRentalItemInput,
   VenueSearchParams,
 } from '@/types/api';
 
@@ -176,6 +178,66 @@ export const reorderVenueMedia = async (
   return apiRequest<VenueMedia[]>(`/venues/${id}/media/order`, {
     method: 'PUT',
     body: JSON.stringify({ order, coverId }),
+  });
+};
+
+// ========== RENTAL ITEM CATALOG (Fase 1) ==========
+
+export const getPublicRentalItems = async (venueId: string): Promise<VenueRentalItem[]> => {
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items`, { auth: false });
+};
+
+export const getOwnerRentalItems = async (venueId: string): Promise<VenueRentalItem[]> => {
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/manage`);
+};
+
+const buildRentalItemFormData = (
+  payload: Partial<VenueRentalItemInput> & { isActive?: boolean },
+  photo?: File,
+): FormData => {
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    formData.set(key, String(value));
+  });
+  if (photo) formData.append('photo', photo);
+  return formData;
+};
+
+export const createRentalItem = async (
+  venueId: string,
+  payload: VenueRentalItemInput,
+  photo?: File,
+): Promise<VenueRentalItem> => {
+  return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items`, {
+    method: 'POST',
+    body: buildRentalItemFormData(payload, photo),
+  });
+};
+
+export const updateRentalItem = async (
+  venueId: string,
+  itemId: string,
+  payload: Partial<VenueRentalItemInput> & { isActive?: boolean },
+  photo?: File,
+): Promise<VenueRentalItem> => {
+  return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items/${itemId}`, {
+    method: 'PUT',
+    body: buildRentalItemFormData(payload, photo),
+  });
+};
+
+export const deleteRentalItem = async (venueId: string, itemId: string): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/rental-items/${itemId}`, { method: 'DELETE' });
+};
+
+export const reorderRentalItems = async (
+  venueId: string,
+  order: string[],
+): Promise<VenueRentalItem[]> => {
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ order }),
   });
 };
 

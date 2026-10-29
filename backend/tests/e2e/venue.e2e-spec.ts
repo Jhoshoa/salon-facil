@@ -4,8 +4,23 @@ import * as request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import cookieParser = require('cookie-parser');
 import { AppModule } from '../../src/app.module';
+import { CloudinaryService } from '../../src/modules/upload/cloudinary.service';
 
 type TestAgent = ReturnType<typeof request.agent>;
+
+// Cloudinary isn't configured in this environment (no CLOUDINARY_* env vars), so a real
+// multipart upload would throw -- same deliberate override payment.e2e-spec.ts/
+// review.e2e-spec.ts already use, needed here now that the rental-item tests attach a photo.
+const fakeCloudinary = {
+  uploadFile: jest
+    .fn()
+    .mockResolvedValue({ url: 'https://example.com/fake-proof.jpg', publicId: 'fake' }),
+  uploadImage: jest
+    .fn()
+    .mockResolvedValue({ url: 'https://example.com/fake-image.jpg', publicId: 'fake-public-id' }),
+  uploadMultiple: jest.fn().mockResolvedValue([]),
+  deleteImage: jest.fn().mockResolvedValue(undefined),
+};
 
 describe('Venues (e2e)', () => {
   let app: INestApplication;
@@ -27,7 +42,10 @@ describe('Venues (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CloudinaryService)
+      .useValue(fakeCloudinary)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
@@ -322,6 +340,196 @@ describe('Venues (e2e)', () => {
           // Sanity: the edit doesn't silently reassign ownership to the admin who made it.
           expect(res.body.ownerId).toBe(ownerUserId);
         });
+    });
+  });
+
+  // ===== Rental item catalog (Fase 1 -- docs/brainstorm/catalogo-alquiler-items.md) =====
+  describe('Venue rental items (e2e)', () => {
+    let rentalVenueId: string;
+    let rentalItemId: string;
+
+    beforeAll(async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Rental Items Venue ${uniqueId}`)
+        .field('description', 'Venue para probar el catalogo de items de alquiler.')
+        .field('address', 'Rental Items Address 12345')
+        .field('district', 'Rental Items District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .expect(201);
+      rentalVenueId = res.body.id;
+
+      await adminAgent
+        .put(`/api/v1/venues/${rentalVenueId}/verify`)
+        .send({ approve: true })
+        .expect(200);
+    });
+
+    it('creates an item as the owner, without a photo', () => {
+      return ownerAgent
+        .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .field('name', 'Vaso largo')
+        .field('category', 'Cristaleria')
+        .field('pricePerUnit', '0.5')
+        .field('stockQty', '325')
+        .expect(201)
+        .then((res) => {
+          expect(res.body.name).toBe('Vaso largo');
+          expect(res.body.category).toBe('Cristaleria');
+          expect(res.body.pricePerUnit).toBe(0.5);
+          expect(res.body.stockQty).toBe(325);
+          expect(res.body.unitLabel).toBe('unidad');
+          expect(res.body.isActive).toBe(true);
+          expect(res.body.photoUrl).toBeNull();
+          rentalItemId = res.body.id;
+        });
+    });
+
+    it('creates an item with a photo attached', () => {
+      return ownerAgent
+        .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .field('name', 'Mantel blanco')
+        .field('category', 'Manteleria')
+        .field('pricePerUnit', '15')
+        .attach('photo', Buffer.from('fake-image-bytes'), 'mantel.jpg')
+        .expect(201)
+        .then((res) => {
+          expect(res.body.photoUrl).toBe('https://example.com/fake-image.jpg');
+        });
+    });
+
+    it('lists the owner-created items via /manage, including defaults', () => {
+      return ownerAgent
+        .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)
+        .expect(200)
+        .then((res) => {
+          expect(res.body.length).toBeGreaterThanOrEqual(2);
+          const vaso = res.body.find((item: { id: string }) => item.id === rentalItemId);
+          expect(vaso).toBeDefined();
+        });
+    });
+
+    it('updates an item as the owner', () => {
+      return ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('pricePerUnit', '0.75')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.pricePerUnit).toBe(0.75);
+          expect(res.body.name).toBe('Vaso largo'); // unchanged fields stay as they were
+        });
+    });
+
+    it('reorders items as the owner', () => {
+      return ownerAgent
+        .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)
+        .expect(200)
+        .then((listRes) => {
+          const order = listRes.body.map((item: { id: string }) => item.id).reverse();
+          return ownerAgent
+            .put(`/api/v1/venues/${rentalVenueId}/rental-items/order`)
+            .send({ order })
+            .expect(200)
+            .then((res) => {
+              expect(res.body.map((item: { id: string }) => item.id)).toEqual(order);
+            });
+        });
+    });
+
+    it('the public catalog shows only active items, unauthenticated', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .expect(200)
+        .then((res) => {
+          expect(Array.isArray(res.body)).toBe(true);
+          expect(res.body.every((item: { isActive: boolean }) => item.isActive)).toBe(true);
+          expect(res.body.some((item: { id: string }) => item.id === rentalItemId)).toBe(true);
+        });
+    });
+
+    it('deactivating an item (isActive: false) hides it from the public catalog', async () => {
+      await ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('isActive', 'false')
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .expect(200);
+      expect(res.body.some((item: { id: string }) => item.id === rentalItemId)).toBe(false);
+
+      // Owner's own /manage view still sees it, so it can be reactivated later.
+      const manageRes = await ownerAgent
+        .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)
+        .expect(200);
+      expect(manageRes.body.some((item: { id: string }) => item.id === rentalItemId)).toBe(true);
+    });
+
+    it('a public GET on a non-verified venue 404s, same as getVenueBySlug', async () => {
+      const draftRes = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Draft Rental Venue ${uniqueId}`)
+        .field('description', 'Venue sin verificar, no deberia exponer su catalogo publico.')
+        .field('address', 'Draft Address 12345')
+        .field('district', 'Draft District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/venues/${draftRes.body.id}/rental-items`)
+        .expect(404);
+    });
+
+    it('returns 404 for a nonexistent item id', () => {
+      return ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/00000000-0000-0000-0000-000000000000`)
+        .field('name', 'No deberia existir')
+        .expect(404);
+    });
+
+    it('returns 401 without a session on owner-only routes', () => {
+      return request(app.getHttpServer())
+        .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .field('name', 'Sin sesion')
+        .field('category', 'Otros')
+        .field('pricePerUnit', '1')
+        .expect(401);
+    });
+
+    it('returns 403 for a different owner on create/update/delete/reorder', async () => {
+      await owner2Agent
+        .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .field('name', 'Ajeno')
+        .field('category', 'Otros')
+        .field('pricePerUnit', '1')
+        .expect(403);
+
+      await owner2Agent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('name', 'Hackeado')
+        .expect(403);
+
+      await owner2Agent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/order`)
+        .send({ order: [rentalItemId] })
+        .expect(403);
+
+      await owner2Agent
+        .delete(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .expect(403);
+    });
+
+    it('deletes an item as the owner', async () => {
+      await ownerAgent
+        .delete(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .expect(204);
+
+      const res = await ownerAgent
+        .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)
+        .expect(200);
+      expect(res.body.some((item: { id: string }) => item.id === rentalItemId)).toBe(false);
     });
   });
 

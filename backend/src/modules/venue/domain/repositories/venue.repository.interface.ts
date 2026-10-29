@@ -1,4 +1,9 @@
-import { VenueEntity, VenueMediaEntity, VenueStatus } from '../entities/venue.entity';
+import {
+  VenueEntity,
+  VenueMediaEntity,
+  VenueRentalItemEntity,
+  VenueStatus,
+} from '../entities/venue.entity';
 import { VenueFilterDto } from '../../application/dto/venue-filter.dto';
 import { AmenityCategory, Departamento } from '@prisma/client';
 
@@ -45,6 +50,31 @@ export interface SeasonalEventInput {
   startDate: Date;
   endDate: Date;
   note?: string;
+  sortOrder?: number;
+}
+
+export interface CreateRentalItemInput {
+  name: string;
+  category: string;
+  description?: string;
+  photoUrl?: string;
+  photoPublicId?: string;
+  pricePerUnit: number;
+  unitLabel?: string;
+  stockQty?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateRentalItemInput {
+  name?: string;
+  category?: string;
+  description?: string;
+  photoUrl?: string;
+  photoPublicId?: string;
+  pricePerUnit?: number;
+  unitLabel?: string;
+  stockQty?: number;
+  isActive?: boolean;
   sortOrder?: number;
 }
 
@@ -106,6 +136,21 @@ export interface IVenueRepository {
   ): Promise<VenueMediaEntity[]>;
   deleteMedia(venueId: string, mediaId: string): Promise<{ cloudinaryId: string | null } | null>;
   reorderMedia(venueId: string, order: string[], coverId?: string): Promise<VenueMediaEntity[]>;
+  listRentalItems(
+    venueId: string,
+    options?: { activeOnly?: boolean },
+  ): Promise<VenueRentalItemEntity[]>;
+  createRentalItem(venueId: string, data: CreateRentalItemInput): Promise<VenueRentalItemEntity>;
+  updateRentalItem(
+    venueId: string,
+    itemId: string,
+    data: UpdateRentalItemInput,
+  ): Promise<VenueRentalItemEntity | null>;
+  deleteRentalItem(
+    venueId: string,
+    itemId: string,
+  ): Promise<{ photoPublicId: string | null } | null>;
+  reorderRentalItems(venueId: string, order: string[]): Promise<VenueRentalItemEntity[]>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   /** Only for the admin "attach a real owner" flow -- not exposed through the generic update(),

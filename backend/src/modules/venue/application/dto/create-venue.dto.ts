@@ -48,7 +48,7 @@ function parseJsonArray<T extends object>(value: unknown, dtoClass?: Constructor
 // BEFORE this @Transform and coerces any non-empty string to `true` via `Boolean(value)`
 // (e.g. `Boolean('false') === true`) — which breaks multipart/form-data bodies where every
 // field arrives as a string. Read the untouched raw value from `obj` to parse it correctly.
-function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
+export function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
   const raw = obj[key];
   if (typeof raw === 'boolean') return raw;
   if (typeof raw === 'string') {

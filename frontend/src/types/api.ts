@@ -194,6 +194,30 @@ export interface VenueMedia {
   isCover: boolean;
 }
 
+export interface VenueRentalItem {
+  id: string;
+  venueId: string;
+  name: string;
+  category: string;
+  description: string | null;
+  photoUrl: string | null;
+  pricePerUnit: number;
+  unitLabel: string;
+  stockQty: number | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface VenueRentalItemInput {
+  name: string;
+  category: string;
+  description?: string;
+  pricePerUnit: number;
+  unitLabel?: string;
+  stockQty?: number;
+  sortOrder?: number;
+}
+
 export interface Venue {
   id: string;
   ownerId: string;

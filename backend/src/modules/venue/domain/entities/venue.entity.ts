@@ -84,6 +84,7 @@ export class VenueEntity {
   spaceType?: CatalogItemEntity | null;
   openingHours?: VenueOpeningHourEntity[];
   media?: VenueMediaEntity[];
+  rentalItems?: VenueRentalItemEntity[];
   owner?: {
     id: string;
     fullName: string;
@@ -162,4 +163,20 @@ export interface VenueMediaEntity {
   alt: string | null;
   sortOrder: number;
   isCover: boolean;
+}
+
+export interface VenueRentalItemEntity {
+  id: string;
+  venueId: string;
+  name: string;
+  category: string;
+  description: string | null;
+  photoUrl: string | null;
+  photoPublicId: string | null;
+  pricePerUnit: number;
+  unitLabel: string;
+  stockQty: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
 }

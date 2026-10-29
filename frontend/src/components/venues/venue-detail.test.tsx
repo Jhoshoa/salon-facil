@@ -45,6 +45,9 @@ jest.mock('./share-button', () => ({
 jest.mock('./venue-location-map', () => ({
   VenueLocationMap: () => <div data-testid="venue-location-map" />,
 }));
+jest.mock('./venue-rental-item-catalog', () => ({
+  VenueRentalItemCatalog: () => <div data-testid="venue-rental-item-catalog" />,
+}));
 
 const mockGetVenueById = getVenueById as jest.MockedFunction<typeof getVenueById>;
 const mockGetVenueBySlug = getVenueBySlug as jest.MockedFunction<typeof getVenueBySlug>;
