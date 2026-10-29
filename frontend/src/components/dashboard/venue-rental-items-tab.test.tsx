@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Venue, VenueRentalItem } from '@/types/api';
+import type { Venue, VenueRentalItem, VenueRentalItemCategory } from '@/types/api';
 import { VenueRentalItemsTab } from './venue-rental-items-tab';
 import {
   createRentalItem,
+  createRentalItemCategory,
   deleteRentalItem,
   getOwnerRentalItems,
+  getRentalItemCategories,
   reorderRentalItems,
   updateRentalItem,
 } from '@/lib/api/venues.api';
@@ -17,6 +19,11 @@ jest.mock('@/lib/api/venues.api', () => ({
   updateRentalItem: jest.fn(),
   deleteRentalItem: jest.fn(),
   reorderRentalItems: jest.fn(),
+  getRentalItemCategories: jest.fn(),
+  createRentalItemCategory: jest.fn(),
+  updateRentalItemCategory: jest.fn(),
+  deleteRentalItemCategory: jest.fn(),
+  reorderRentalItemCategories: jest.fn(),
 }));
 
 const mockGetOwnerRentalItems = getOwnerRentalItems as jest.MockedFunction<
@@ -26,14 +33,29 @@ const mockCreateRentalItem = createRentalItem as jest.MockedFunction<typeof crea
 const mockUpdateRentalItem = updateRentalItem as jest.MockedFunction<typeof updateRentalItem>;
 const mockDeleteRentalItem = deleteRentalItem as jest.MockedFunction<typeof deleteRentalItem>;
 const mockReorderRentalItems = reorderRentalItems as jest.MockedFunction<typeof reorderRentalItems>;
+const mockGetRentalItemCategories = getRentalItemCategories as jest.MockedFunction<
+  typeof getRentalItemCategories
+>;
+const mockCreateRentalItemCategory = createRentalItemCategory as jest.MockedFunction<
+  typeof createRentalItemCategory
+>;
 
 const venue = { id: 'venue-1', name: 'Salon de prueba' } as unknown as Venue;
+
+const makeCategory = (overrides: Partial<VenueRentalItemCategory>): VenueRentalItemCategory => ({
+  id: 'cat-mobiliario',
+  venueId: 'venue-1',
+  name: 'Mobiliario',
+  sortOrder: 0,
+  itemCount: 0,
+  ...overrides,
+});
 
 const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   id: 'item-1',
   venueId: 'venue-1',
   name: 'Mesa redonda',
-  category: 'Mobiliario',
+  category: { id: 'cat-mobiliario', name: 'Mobiliario' },
   description: null,
   photoUrl: null,
   pricePerUnit: 50,
@@ -53,6 +75,10 @@ const renderTab = () => {
   );
 };
 
+beforeEach(() => {
+  mockGetRentalItemCategories.mockResolvedValue([makeCategory({})]);
+});
+
 afterEach(() => {
   jest.clearAllMocks();
 });
@@ -65,7 +91,7 @@ describe('VenueRentalItemsTab', () => {
     expect(await screen.findByText('Sin items todavia')).toBeInTheDocument();
   });
 
-  it('crea un item nuevo con los datos del formulario', async () => {
+  it('crea un item nuevo eligiendo una categoria existente', async () => {
     const user = userEvent.setup();
     mockGetOwnerRentalItems.mockResolvedValue([]);
     mockCreateRentalItem.mockResolvedValue(makeItem({}));
@@ -75,9 +101,9 @@ describe('VenueRentalItemsTab', () => {
 
     await user.click(screen.getByRole('button', { name: /agregar item/i }));
 
-    await user.type(screen.getByLabelText('Nombre'), 'Mesa redonda');
-    await user.type(screen.getByLabelText('Categoria'), 'Mobiliario');
-    await user.type(screen.getByLabelText('Precio'), '50');
+    await user.type(screen.getByLabelText(/^nombre/i), 'Mesa redonda');
+    await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
+    await user.type(screen.getByLabelText(/^precio/i), '50');
 
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -86,7 +112,7 @@ describe('VenueRentalItemsTab', () => {
         'venue-1',
         expect.objectContaining({
           name: 'Mesa redonda',
-          category: 'Mobiliario',
+          categoryId: 'cat-mobiliario',
           pricePerUnit: 50,
         }),
         undefined,
@@ -94,7 +120,35 @@ describe('VenueRentalItemsTab', () => {
     );
   });
 
-  it('no crea el item si falta el nombre', async () => {
+  it('crea una categoria nueva desde el propio formulario y la deja seleccionada', async () => {
+    const user = userEvent.setup();
+    mockGetOwnerRentalItems.mockResolvedValue([]);
+    const newCategory = makeCategory({ id: 'cat-nueva', name: 'Decoracion' });
+    mockGetRentalItemCategories
+      .mockResolvedValueOnce([makeCategory({})])
+      .mockResolvedValue([makeCategory({}), newCategory]);
+    mockCreateRentalItemCategory.mockResolvedValue(newCategory);
+    mockCreateRentalItem.mockResolvedValue(makeItem({}));
+    renderTab();
+
+    await screen.findByText('Sin items todavia');
+    await user.click(screen.getByRole('button', { name: /agregar item/i }));
+
+    await user.selectOptions(screen.getByLabelText(/^categoria/i), '__new__');
+    await user.type(screen.getByPlaceholderText('Nombre de la categoria'), 'Decoracion');
+    await user.click(screen.getByRole('button', { name: 'Crear categoria' }));
+
+    await waitFor(() =>
+      expect(mockCreateRentalItemCategory).toHaveBeenCalledWith('venue-1', {
+        name: 'Decoracion',
+      }),
+    );
+
+    // El select vuelve a aparecer con la categoria nueva ya elegida.
+    expect(await screen.findByLabelText(/^categoria/i)).toHaveValue('cat-nueva');
+  });
+
+  it('muestra errores inline y no crea el item si faltan campos obligatorios', async () => {
     const user = userEvent.setup();
     mockGetOwnerRentalItems.mockResolvedValue([]);
     renderTab();
@@ -103,6 +157,9 @@ describe('VenueRentalItemsTab', () => {
     await user.click(screen.getByRole('button', { name: /agregar item/i }));
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
+    expect(screen.getByText('El nombre es obligatorio.')).toBeInTheDocument();
+    expect(screen.getByText('Elige o crea una categoria.')).toBeInTheDocument();
+    expect(screen.getByText(/ingresa un precio valido/i)).toBeInTheDocument();
     expect(mockCreateRentalItem).not.toHaveBeenCalled();
   });
 
@@ -116,7 +173,7 @@ describe('VenueRentalItemsTab', () => {
     await screen.findByText('Mesa redonda');
     await user.click(screen.getByRole('button', { name: /editar/i }));
 
-    const nameInput = screen.getByLabelText('Nombre');
+    const nameInput = screen.getByLabelText(/^nombre/i);
     await user.clear(nameInput);
     await user.type(nameInput, 'Mesa rectangular');
 
@@ -126,7 +183,7 @@ describe('VenueRentalItemsTab', () => {
       expect(mockUpdateRentalItem).toHaveBeenCalledWith(
         'venue-1',
         'item-1',
-        expect.objectContaining({ name: 'Mesa rectangular' }),
+        expect.objectContaining({ name: 'Mesa rectangular', categoryId: 'cat-mobiliario' }),
         undefined,
       ),
     );
@@ -150,16 +207,28 @@ describe('VenueRentalItemsTab', () => {
 
   it('filtra por categoria y por nombre', async () => {
     const user = userEvent.setup();
+    mockGetRentalItemCategories.mockResolvedValue([
+      makeCategory({ id: 'cat-mobiliario', name: 'Mobiliario' }),
+      makeCategory({ id: 'cat-decoracion', name: 'Decoracion' }),
+    ]);
     mockGetOwnerRentalItems.mockResolvedValue([
-      makeItem({ id: 'item-1', name: 'Mesa redonda', category: 'Mobiliario' }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', category: 'Decoracion' }),
+      makeItem({
+        id: 'item-1',
+        name: 'Mesa redonda',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario' },
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Mantel blanco',
+        category: { id: 'cat-decoracion', name: 'Decoracion' },
+      }),
     ]);
     renderTab();
 
     await screen.findByText('Mesa redonda');
 
     const categorySelect = screen.getByDisplayValue('Todas las categorias');
-    await user.selectOptions(categorySelect, 'Decoracion');
+    await user.selectOptions(categorySelect, 'cat-decoracion');
 
     expect(screen.queryByText('Mesa redonda')).not.toBeInTheDocument();
     expect(screen.getByText('Mantel blanco')).toBeInTheDocument();

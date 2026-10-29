@@ -17,7 +17,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   id: 'item-1',
   venueId: 'venue-1',
   name: 'Mesa redonda',
-  category: 'Mobiliario',
+  category: { id: 'cat-mobiliario', name: 'Mobiliario' },
   description: null,
   photoUrl: null,
   pricePerUnit: 50,
@@ -53,7 +53,12 @@ describe('VenueRentalItemCatalog', () => {
   it('muestra los items activos con su precio', async () => {
     mockGetPublicRentalItems.mockResolvedValue([
       makeItem({ id: 'item-1', name: 'Mesa redonda', pricePerUnit: 50, unitLabel: 'unidad' }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', category: 'Decoracion', pricePerUnit: 20 }),
+      makeItem({
+        id: 'item-2',
+        name: 'Mantel blanco',
+        category: { id: 'cat-decoracion', name: 'Decoracion' },
+        pricePerUnit: 20,
+      }),
     ]);
     renderCatalog();
 
@@ -64,11 +69,31 @@ describe('VenueRentalItemCatalog', () => {
   it('filtra por categoria al hacer click en una pildora', async () => {
     const user = userEvent.setup();
     mockGetPublicRentalItems.mockResolvedValue([
-      makeItem({ id: 'item-1', name: 'Mesa redonda', category: 'Mobiliario' }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', category: 'Decoracion' }),
-      makeItem({ id: 'item-3', name: 'Silla plegable', category: 'Mobiliario' }),
-      makeItem({ id: 'item-4', name: 'Centro de mesa', category: 'Decoracion' }),
-      makeItem({ id: 'item-5', name: 'Vajilla', category: 'Mobiliario' }),
+      makeItem({
+        id: 'item-1',
+        name: 'Mesa redonda',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario' },
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Mantel blanco',
+        category: { id: 'cat-decoracion', name: 'Decoracion' },
+      }),
+      makeItem({
+        id: 'item-3',
+        name: 'Silla plegable',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario' },
+      }),
+      makeItem({
+        id: 'item-4',
+        name: 'Centro de mesa',
+        category: { id: 'cat-decoracion', name: 'Decoracion' },
+      }),
+      makeItem({
+        id: 'item-5',
+        name: 'Vajilla',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario' },
+      }),
     ]);
     renderCatalog();
 

@@ -1,6 +1,7 @@
 import {
   VenueEntity,
   VenueMediaEntity,
+  VenueRentalItemCategoryEntity,
   VenueRentalItemEntity,
   VenueStatus,
 } from '../entities/venue.entity';
@@ -55,7 +56,7 @@ export interface SeasonalEventInput {
 
 export interface CreateRentalItemInput {
   name: string;
-  category: string;
+  categoryId: string;
   description?: string;
   photoUrl?: string;
   photoPublicId?: string;
@@ -67,7 +68,7 @@ export interface CreateRentalItemInput {
 
 export interface UpdateRentalItemInput {
   name?: string;
-  category?: string;
+  categoryId?: string;
   description?: string;
   photoUrl?: string;
   photoPublicId?: string;
@@ -75,6 +76,16 @@ export interface UpdateRentalItemInput {
   unitLabel?: string;
   stockQty?: number;
   isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface CreateRentalItemCategoryInput {
+  name: string;
+  sortOrder?: number;
+}
+
+export interface UpdateRentalItemCategoryInput {
+  name?: string;
   sortOrder?: number;
 }
 
@@ -140,17 +151,40 @@ export interface IVenueRepository {
     venueId: string,
     options?: { activeOnly?: boolean },
   ): Promise<VenueRentalItemEntity[]>;
-  createRentalItem(venueId: string, data: CreateRentalItemInput): Promise<VenueRentalItemEntity>;
+  createRentalItem(
+    venueId: string,
+    data: CreateRentalItemInput,
+  ): Promise<VenueRentalItemEntity | 'category_not_found'>;
   updateRentalItem(
     venueId: string,
     itemId: string,
     data: UpdateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | null>;
+  ): Promise<VenueRentalItemEntity | 'not_found' | 'category_not_found'>;
   deleteRentalItem(
     venueId: string,
     itemId: string,
   ): Promise<{ photoPublicId: string | null } | null>;
   reorderRentalItems(venueId: string, order: string[]): Promise<VenueRentalItemEntity[]>;
+  listRentalItemCategories(venueId: string): Promise<VenueRentalItemCategoryEntity[]>;
+  createRentalItemCategory(
+    venueId: string,
+    data: CreateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name'>;
+  updateRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+    data: UpdateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity | 'not_found' | 'duplicate_name'>;
+  /** Deletes the category only when it has zero items -- otherwise leaves it untouched and
+   * reports how many items are blocking the delete, so the service can surface a clear 409. */
+  deleteRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+  ): Promise<{ itemCount: number } | 'not_found'>;
+  reorderRentalItemCategories(
+    venueId: string,
+    order: string[],
+  ): Promise<VenueRentalItemCategoryEntity[]>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   /** Only for the admin "attach a real owner" flow -- not exposed through the generic update(),

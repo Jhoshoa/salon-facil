@@ -58,6 +58,12 @@ export function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: 
   return raw;
 }
 
+/** Trims string input before length validators run, so a whitespace-only value (e.g. two
+ * spaces) can't slip past `@MinLength` just because it technically has that many characters. */
+export function trimString({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
 export class CreateVenueServiceDto {
   @IsString()
   @MinLength(1)

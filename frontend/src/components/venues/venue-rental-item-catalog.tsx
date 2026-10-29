@@ -27,13 +27,15 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
 
   const items = useMemo(() => query.data ?? [], [query.data]);
 
-  const categories = useMemo(
-    () => Array.from(new Set(items.map((item) => item.category))).sort(),
-    [items],
-  );
+  const categories = useMemo(() => {
+    const byId = new Map(items.map((item) => [item.category.id, item.category.name]));
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [items]);
 
   const filteredItems = items.filter((item) => {
-    if (categoryFilter !== ALL_CATEGORIES && item.category !== categoryFilter) return false;
+    if (categoryFilter !== ALL_CATEGORIES && item.category.id !== categoryFilter) return false;
     if (search.trim() && !item.name.toLowerCase().includes(search.trim().toLowerCase())) {
       return false;
     }
@@ -67,17 +69,17 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
             </button>
             {categories.map((category) => (
               <button
-                key={category}
+                key={category.id}
                 type="button"
-                onClick={() => setCategoryFilter(category)}
+                onClick={() => setCategoryFilter(category.id)}
                 className={cn(
                   'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  categoryFilter === category
+                  categoryFilter === category.id
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-input text-muted-foreground hover:bg-muted',
                 )}
               >
-                {category}
+                {category.name}
               </button>
             ))}
           </div>

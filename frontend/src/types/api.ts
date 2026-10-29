@@ -198,7 +198,7 @@ export interface VenueRentalItem {
   id: string;
   venueId: string;
   name: string;
-  category: string;
+  category: { id: string; name: string };
   description: string | null;
   photoUrl: string | null;
   pricePerUnit: number;
@@ -210,12 +210,20 @@ export interface VenueRentalItem {
 
 export interface VenueRentalItemInput {
   name: string;
-  category: string;
+  categoryId: string;
   description?: string;
   pricePerUnit: number;
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;
+}
+
+export interface VenueRentalItemCategory {
+  id: string;
+  venueId: string;
+  name: string;
+  sortOrder: number;
+  itemCount: number;
 }
 
 export interface Venue {

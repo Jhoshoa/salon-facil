@@ -6,12 +6,14 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  Max,
   Min,
   MinLength,
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { parseBoolean } from './create-venue.dto';
+import { parseBoolean, trimString } from './create-venue.dto';
 
 // Arrives as multipart/form-data (the photo travels alongside these fields in the same
 // request), so every field lands as a string — the global ValidationPipe's
@@ -21,26 +23,28 @@ import { parseBoolean } from './create-venue.dto';
 // coerce to `true`.
 
 export class CreateRentalItemDto {
+  @Transform(trimString)
   @IsString()
   @MinLength(2)
   @MaxLength(120)
   name!: string;
 
-  @IsString()
-  @MinLength(2)
-  @MaxLength(60)
-  category!: string;
+  @IsUUID()
+  categoryId!: string;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(1000)
   description?: string;
 
   @IsNumber()
   @Min(0)
+  @Max(999999.99)
   pricePerUnit!: number;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(30)
   unitLabel?: string;
@@ -48,6 +52,7 @@ export class CreateRentalItemDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(100000)
   stockQty?: number;
 
   @IsOptional()
@@ -58,18 +63,18 @@ export class CreateRentalItemDto {
 
 export class UpdateRentalItemDto {
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MinLength(2)
   @MaxLength(120)
   name?: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(60)
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(1000)
   description?: string;
@@ -77,9 +82,11 @@ export class UpdateRentalItemDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(999999.99)
   pricePerUnit?: number;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(30)
   unitLabel?: string;
@@ -87,6 +94,7 @@ export class UpdateRentalItemDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(100000)
   stockQty?: number;
 
   @IsOptional()

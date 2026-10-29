@@ -347,6 +347,8 @@ describe('Venues (e2e)', () => {
   describe('Venue rental items (e2e)', () => {
     let rentalVenueId: string;
     let rentalItemId: string;
+    let cristaleriaId: string;
+    let mantelerialId: string;
 
     beforeAll(async () => {
       const res = await ownerAgent
@@ -364,19 +366,31 @@ describe('Venues (e2e)', () => {
         .put(`/api/v1/venues/${rentalVenueId}/verify`)
         .send({ approve: true })
         .expect(200);
+
+      const cristaleriaRes = await ownerAgent
+        .post(`/api/v1/venues/${rentalVenueId}/rental-item-categories`)
+        .send({ name: 'Cristaleria' })
+        .expect(201);
+      cristaleriaId = cristaleriaRes.body.id;
+
+      const mantelerialRes = await ownerAgent
+        .post(`/api/v1/venues/${rentalVenueId}/rental-item-categories`)
+        .send({ name: 'Manteleria' })
+        .expect(201);
+      mantelerialId = mantelerialRes.body.id;
     });
 
     it('creates an item as the owner, without a photo', () => {
       return ownerAgent
         .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
         .field('name', 'Vaso largo')
-        .field('category', 'Cristaleria')
+        .field('categoryId', cristaleriaId)
         .field('pricePerUnit', '0.5')
         .field('stockQty', '325')
         .expect(201)
         .then((res) => {
           expect(res.body.name).toBe('Vaso largo');
-          expect(res.body.category).toBe('Cristaleria');
+          expect(res.body.category).toEqual({ id: cristaleriaId, name: 'Cristaleria' });
           expect(res.body.pricePerUnit).toBe(0.5);
           expect(res.body.stockQty).toBe(325);
           expect(res.body.unitLabel).toBe('unidad');
@@ -390,13 +404,37 @@ describe('Venues (e2e)', () => {
       return ownerAgent
         .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
         .field('name', 'Mantel blanco')
-        .field('category', 'Manteleria')
+        .field('categoryId', mantelerialId)
         .field('pricePerUnit', '15')
         .attach('photo', Buffer.from('fake-image-bytes'), 'mantel.jpg')
         .expect(201)
         .then((res) => {
           expect(res.body.photoUrl).toBe('https://example.com/fake-image.jpg');
         });
+    });
+
+    it('returns 404 when categoryId belongs to another venue', async () => {
+      const otherVenueRes = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Other Rental Venue ${uniqueId}`)
+        .field('description', 'Otro local, para probar categorias cruzadas.')
+        .field('address', 'Other Address 12345')
+        .field('district', 'Other District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+
+      const otherCategoryRes = await ownerAgent
+        .post(`/api/v1/venues/${otherVenueRes.body.id}/rental-item-categories`)
+        .send({ name: 'Ajena' })
+        .expect(201);
+
+      await ownerAgent
+        .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+        .field('name', 'No deberia crearse')
+        .field('categoryId', otherCategoryRes.body.id)
+        .field('pricePerUnit', '1')
+        .expect(404);
     });
 
     it('lists the owner-created items via /manage, including defaults', () => {
@@ -493,7 +531,7 @@ describe('Venues (e2e)', () => {
       return request(app.getHttpServer())
         .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
         .field('name', 'Sin sesion')
-        .field('category', 'Otros')
+        .field('categoryId', cristaleriaId)
         .field('pricePerUnit', '1')
         .expect(401);
     });
@@ -502,7 +540,7 @@ describe('Venues (e2e)', () => {
       await owner2Agent
         .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
         .field('name', 'Ajeno')
-        .field('category', 'Otros')
+        .field('categoryId', cristaleriaId)
         .field('pricePerUnit', '1')
         .expect(403);
 
@@ -530,6 +568,128 @@ describe('Venues (e2e)', () => {
         .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)
         .expect(200);
       expect(res.body.some((item: { id: string }) => item.id === rentalItemId)).toBe(false);
+    });
+  });
+
+  describe('Venue rental item categories (e2e)', () => {
+    let categoryVenueId: string;
+
+    beforeAll(async () => {
+      const res = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Rental Categories Venue ${uniqueId}`)
+        .field('description', 'Venue para probar las categorias del catalogo de alquiler.')
+        .field('address', 'Rental Categories Address 12345')
+        .field('district', 'Rental Categories District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .expect(201);
+      categoryVenueId = res.body.id;
+    });
+
+    it('creates a category as the owner', () => {
+      return ownerAgent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .send({ name: 'Mobiliario' })
+        .expect(201)
+        .then((res) => {
+          expect(res.body.name).toBe('Mobiliario');
+          expect(res.body.itemCount).toBe(0);
+        });
+    });
+
+    it('returns 409 for a duplicate name, case-insensitive', async () => {
+      await ownerAgent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .send({ name: 'mobiliario' })
+        .expect(409);
+    });
+
+    it('lists categories as the owner', async () => {
+      const res = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(200);
+      expect(res.body.some((c: { name: string }) => c.name === 'Mobiliario')).toBe(true);
+    });
+
+    it('renames a category', async () => {
+      const listRes = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(200);
+      const categoryId = listRes.body.find((c: { name: string }) => c.name === 'Mobiliario').id;
+
+      const res = await ownerAgent
+        .put(`/api/v1/venues/${categoryVenueId}/rental-item-categories/${categoryId}`)
+        .send({ name: 'Muebles' })
+        .expect(200);
+      expect(res.body.name).toBe('Muebles');
+    });
+
+    it('reorders categories', async () => {
+      await ownerAgent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .send({ name: 'Decoracion' })
+        .expect(201);
+
+      const listRes = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(200);
+      const order = listRes.body.map((c: { id: string }) => c.id).reverse();
+
+      const res = await ownerAgent
+        .put(`/api/v1/venues/${categoryVenueId}/rental-item-categories/order`)
+        .send({ order })
+        .expect(200);
+      expect(res.body.map((c: { id: string }) => c.id)).toEqual(order);
+    });
+
+    it('blocks deleting a category that still has items (409), then allows it once empty', async () => {
+      const categoryRes = await ownerAgent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .send({ name: 'Vajilla' })
+        .expect(201);
+      const categoryId = categoryRes.body.id;
+
+      const itemRes = await ownerAgent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-items`)
+        .field('name', 'Plato hondo')
+        .field('categoryId', categoryId)
+        .field('pricePerUnit', '2')
+        .expect(201);
+
+      await ownerAgent
+        .delete(`/api/v1/venues/${categoryVenueId}/rental-item-categories/${categoryId}`)
+        .expect(409);
+
+      await ownerAgent
+        .delete(`/api/v1/venues/${categoryVenueId}/rental-items/${itemRes.body.id}`)
+        .expect(204);
+
+      await ownerAgent
+        .delete(`/api/v1/venues/${categoryVenueId}/rental-item-categories/${categoryId}`)
+        .expect(204);
+    });
+
+    it('returns 401 without a session', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(401);
+    });
+
+    it('returns 403 for a different owner', async () => {
+      await owner2Agent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .send({ name: 'Ajena' })
+        .expect(403);
+    });
+
+    it('returns 404 for a nonexistent category id', () => {
+      return ownerAgent
+        .put(
+          `/api/v1/venues/${categoryVenueId}/rental-item-categories/00000000-0000-0000-0000-000000000000`,
+        )
+        .send({ name: 'No deberia existir' })
+        .expect(404);
     });
   });
 

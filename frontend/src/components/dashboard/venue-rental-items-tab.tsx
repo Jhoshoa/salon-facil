@@ -2,13 +2,24 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, ImagePlus, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ImagePlus,
+  Loader2,
+  Pencil,
+  Plus,
+  Settings2,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import {
   createRentalItem,
+  createRentalItemCategory,
   deleteRentalItem,
   getOwnerRentalItems,
+  getRentalItemCategories,
   reorderRentalItems,
   updateRentalItem,
 } from '@/lib/api/venues.api';
@@ -30,6 +41,7 @@ import {
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import { VenueRentalItemCategoriesManager } from './venue-rental-item-categories-manager';
 import type { Venue, VenueRentalItem } from '@/types/api';
 
 interface VenueRentalItemsTabProps {
@@ -38,7 +50,7 @@ interface VenueRentalItemsTabProps {
 
 interface FormValues {
   name: string;
-  category: string;
+  categoryId: string;
   description: string;
   pricePerUnit: string;
   unitLabel: string;
@@ -46,9 +58,16 @@ interface FormValues {
   isActive: boolean;
 }
 
+interface FieldErrors {
+  name?: string;
+  categoryId?: string;
+  pricePerUnit?: string;
+  stockQty?: string;
+}
+
 const emptyForm: FormValues = {
   name: '',
-  category: '',
+  categoryId: '',
   description: '',
   pricePerUnit: '',
   unitLabel: 'unidad',
@@ -57,6 +76,7 @@ const emptyForm: FormValues = {
 };
 
 const ALL_CATEGORIES = '__all__';
+const NEW_CATEGORY = '__new__';
 
 export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
   const queryClient = useQueryClient();
@@ -64,36 +84,51 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [categoriesDialogOpen, setCategoriesDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<VenueRentalItem | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [form, setForm] = useState<FormValues>(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [itemToDelete, setItemToDelete] = useState<VenueRentalItem | null>(null);
+  const [creatingCategoryInline, setCreatingCategoryInline] = useState(false);
+  const [inlineCategoryName, setInlineCategoryName] = useState('');
 
   const query = useQuery({
     queryKey: ['venue-rental-items', venue.id],
     queryFn: () => getOwnerRentalItems(venue.id),
   });
 
+  const categoriesQuery = useQuery({
+    queryKey: ['venue-rental-item-categories', venue.id],
+    queryFn: () => getRentalItemCategories(venue.id),
+  });
+
+  const categories = useMemo(
+    () => [...(categoriesQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [categoriesQuery.data],
+  );
+
   const items = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
     [query.data],
   );
 
-  const categories = useMemo(
-    () => Array.from(new Set(items.map((item) => item.category))).sort(),
-    [items],
-  );
-
   const filteredItems = items.filter((item) => {
-    if (categoryFilter !== ALL_CATEGORIES && item.category !== categoryFilter) return false;
+    if (categoryFilter !== ALL_CATEGORIES && item.category.id !== categoryFilter) return false;
     if (search.trim() && !item.name.toLowerCase().includes(search.trim().toLowerCase())) {
       return false;
     }
     return true;
   });
 
-  const invalidate = () =>
+  const invalidateCategories = () =>
+    queryClient.invalidateQueries({ queryKey: ['venue-rental-item-categories', venue.id] });
+  // Category item-counts (shown in the categories manager, and used to gate deleting a category)
+  // depend on which items exist, so creating/editing/deleting an item must also refresh them.
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['venue-rental-items', venue.id] });
+    invalidateCategories();
+  };
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -101,7 +136,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
         venue.id,
         {
           name: form.name.trim(),
-          category: form.category.trim(),
+          categoryId: form.categoryId,
           description: form.description.trim() || undefined,
           pricePerUnit: Number(form.pricePerUnit),
           unitLabel: form.unitLabel.trim() || undefined,
@@ -152,10 +187,26 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     },
   });
 
+  const createCategoryInlineMutation = useMutation({
+    mutationFn: (name: string) => createRentalItemCategory(venue.id, { name }),
+    onSuccess: (newCategory) => {
+      invalidateCategories();
+      setForm((prev) => ({ ...prev, categoryId: newCategory.id }));
+      setFieldErrors((prev) => ({ ...prev, categoryId: undefined }));
+      setCreatingCategoryInline(false);
+      setInlineCategoryName('');
+    },
+    onError: (error: { message?: string }) => {
+      toast.error('No se pudo crear la categoria', { description: error.message });
+    },
+  });
+
   const openCreateDialog = () => {
     setEditingItem(null);
     setForm(emptyForm);
     setPhotoFile(null);
+    setFieldErrors({});
+    setCreatingCategoryInline(false);
     setDialogOpen(true);
   };
 
@@ -163,7 +214,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     setEditingItem(item);
     setForm({
       name: item.name,
-      category: item.category,
+      categoryId: item.category.id,
       description: item.description ?? '',
       pricePerUnit: String(item.pricePerUnit),
       unitLabel: item.unitLabel,
@@ -171,31 +222,51 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
       isActive: item.isActive,
     });
     setPhotoFile(null);
+    setFieldErrors({});
+    setCreatingCategoryInline(false);
     setDialogOpen(true);
   };
 
+  const handleCategorySelectChange = (value: string) => {
+    if (value === NEW_CATEGORY) {
+      setCreatingCategoryInline(true);
+      setInlineCategoryName('');
+      return;
+    }
+    setForm((prev) => ({ ...prev, categoryId: value }));
+    setFieldErrors((prev) => ({ ...prev, categoryId: undefined }));
+  };
+
   const handleSubmit = () => {
+    const errors: FieldErrors = {};
     if (!form.name.trim()) {
-      toast.warning('El nombre es obligatorio');
-      return;
+      errors.name = 'El nombre es obligatorio.';
     }
-    if (!form.category.trim()) {
-      toast.warning('La categoria es obligatoria');
-      return;
+    if (!form.categoryId) {
+      errors.categoryId = 'Elige o crea una categoria.';
     }
-    if (!form.pricePerUnit.trim() || Number.isNaN(Number(form.pricePerUnit))) {
-      toast.warning('El precio es obligatorio');
-      return;
+    const price = Number(form.pricePerUnit);
+    if (!form.pricePerUnit.trim() || Number.isNaN(price) || price < 0) {
+      errors.pricePerUnit = 'Ingresa un precio valido (0 o mas).';
     }
+    if (form.stockQty.trim()) {
+      const stock = Number(form.stockQty);
+      if (Number.isNaN(stock) || !Number.isInteger(stock) || stock < 0) {
+        errors.stockQty = 'El stock debe ser un numero entero, 0 o mas.';
+      }
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
     if (editingItem) {
       updateMutation.mutate({
         id: editingItem.id,
         data: {
           name: form.name.trim(),
-          category: form.category.trim(),
+          categoryId: form.categoryId,
           description: form.description.trim() || undefined,
-          pricePerUnit: Number(form.pricePerUnit),
+          pricePerUnit: price,
           unitLabel: form.unitLabel.trim() || undefined,
           stockQty: form.stockQty.trim() ? Number(form.stockQty) : undefined,
           isActive: form.isActive,
@@ -229,10 +300,16 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
             pedirlos.
           </p>
         </div>
-        <Button size="sm" onClick={openCreateDialog}>
-          <Plus className="h-4 w-4" />
-          Agregar item
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setCategoriesDialogOpen(true)}>
+            <Settings2 className="h-4 w-4" />
+            Gestionar categorias
+          </Button>
+          <Button size="sm" onClick={openCreateDialog}>
+            <Plus className="h-4 w-4" />
+            Agregar item
+          </Button>
+        </div>
       </div>
 
       {items.length > 0 ? (
@@ -244,8 +321,8 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           >
             <option value={ALL_CATEGORIES}>Todas las categorias</option>
             {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
           </Select>
@@ -307,7 +384,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                     {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {item.category} · {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
+                    {item.category.name} · {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
                     {item.stockQty !== null ? ` · stock ${item.stockQty}` : ''}
                   </p>
                 </div>
@@ -357,31 +434,82 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
             <DialogTitle>{editingItem ? 'Editar item' : 'Nuevo item'}</DialogTitle>
           </DialogHeader>
 
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Los campos marcados con <span className="text-destructive">*</span> son obligatorios.
+          </p>
+
           <div className="space-y-4">
             <div className="sf-form-group">
-              <Label htmlFor="rental-item-name">Nombre</Label>
+              <Label htmlFor="rental-item-name">
+                Nombre <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="rental-item-name"
                 placeholder="Mesa redonda para 10"
                 value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                onChange={(event) => {
+                  setForm((prev) => ({ ...prev, name: event.target.value }));
+                  setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                }}
+                aria-invalid={Boolean(fieldErrors.name)}
               />
+              {fieldErrors.name ? <p className="sf-form-error">{fieldErrors.name}</p> : null}
             </div>
 
             <div className="sf-form-group">
-              <Label htmlFor="rental-item-category">Categoria</Label>
-              <Input
-                id="rental-item-category"
-                list="rental-item-categories"
-                placeholder="Mobiliario"
-                value={form.category}
-                onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-              />
-              <datalist id="rental-item-categories">
-                {categories.map((category) => (
-                  <option key={category} value={category} />
-                ))}
-              </datalist>
+              <Label htmlFor="rental-item-category">
+                Categoria <span className="text-destructive">*</span>
+              </Label>
+              {creatingCategoryInline ? (
+                <div className="flex gap-2">
+                  <Input
+                    id="rental-item-category"
+                    placeholder="Nombre de la categoria"
+                    value={inlineCategoryName}
+                    onChange={(event) => setInlineCategoryName(event.target.value)}
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!inlineCategoryName.trim() || createCategoryInlineMutation.isPending}
+                    onClick={() => createCategoryInlineMutation.mutate(inlineCategoryName.trim())}
+                  >
+                    {createCategoryInlineMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Crear categoria'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCreatingCategoryInline(false)}
+                    disabled={createCategoryInlineMutation.isPending}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  id="rental-item-category"
+                  value={form.categoryId}
+                  onChange={(event) => handleCategorySelectChange(event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.categoryId)}
+                >
+                  <option value="">Selecciona una categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                  <option value={NEW_CATEGORY}>+ Crear categoria nueva</option>
+                </Select>
+              )}
+              {fieldErrors.categoryId ? (
+                <p className="sf-form-error">{fieldErrors.categoryId}</p>
+              ) : null}
             </div>
 
             <div className="sf-form-group">
@@ -417,20 +545,27 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="sf-form-group">
-                <Label htmlFor="rental-item-price">Precio</Label>
+                <Label htmlFor="rental-item-price">
+                  Precio <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="rental-item-price"
                   type="number"
                   min={0}
                   step="0.01"
                   value={form.pricePerUnit}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, pricePerUnit: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setForm((prev) => ({ ...prev, pricePerUnit: event.target.value }));
+                    setFieldErrors((prev) => ({ ...prev, pricePerUnit: undefined }));
+                  }}
+                  aria-invalid={Boolean(fieldErrors.pricePerUnit)}
                 />
+                {fieldErrors.pricePerUnit ? (
+                  <p className="sf-form-error">{fieldErrors.pricePerUnit}</p>
+                ) : null}
               </div>
               <div className="sf-form-group">
-                <Label htmlFor="rental-item-unit">Unidad</Label>
+                <Label htmlFor="rental-item-unit">Unidad (opcional)</Label>
                 <Input
                   id="rental-item-unit"
                   placeholder="unidad"
@@ -447,10 +582,15 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                   type="number"
                   min={0}
                   value={form.stockQty}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, stockQty: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setForm((prev) => ({ ...prev, stockQty: event.target.value }));
+                    setFieldErrors((prev) => ({ ...prev, stockQty: undefined }));
+                  }}
+                  aria-invalid={Boolean(fieldErrors.stockQty)}
                 />
+                {fieldErrors.stockQty ? (
+                  <p className="sf-form-error">{fieldErrors.stockQty}</p>
+                ) : null}
               </div>
             </div>
 
@@ -489,6 +629,12 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
         onConfirm={() => {
           if (itemToDelete) deleteMutation.mutate(itemToDelete.id);
         }}
+      />
+
+      <VenueRentalItemCategoriesManager
+        venue={venue}
+        open={categoriesDialogOpen}
+        onOpenChange={setCategoriesDialogOpen}
       />
     </div>
   );

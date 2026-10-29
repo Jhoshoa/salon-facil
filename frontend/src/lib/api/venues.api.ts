@@ -17,6 +17,7 @@ import type {
   VenueFormPayload,
   VenueMedia,
   VenueRentalItem,
+  VenueRentalItemCategory,
   VenueRentalItemInput,
   VenueSearchParams,
 } from '@/types/api';
@@ -236,6 +237,53 @@ export const reorderRentalItems = async (
   order: string[],
 ): Promise<VenueRentalItem[]> => {
   return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ order }),
+  });
+};
+
+// Categorias del catalogo de alquiler -- propias de cada local, no un catalogo global
+export const getRentalItemCategories = async (
+  venueId: string,
+): Promise<VenueRentalItemCategory[]> => {
+  return apiRequest<VenueRentalItemCategory[]>(`/venues/${venueId}/rental-item-categories`);
+};
+
+export const createRentalItemCategory = async (
+  venueId: string,
+  payload: { name: string; sortOrder?: number },
+): Promise<VenueRentalItemCategory> => {
+  return apiRequest<VenueRentalItemCategory>(`/venues/${venueId}/rental-item-categories`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateRentalItemCategory = async (
+  venueId: string,
+  categoryId: string,
+  payload: { name?: string; sortOrder?: number },
+): Promise<VenueRentalItemCategory> => {
+  return apiRequest<VenueRentalItemCategory>(
+    `/venues/${venueId}/rental-item-categories/${categoryId}`,
+    { method: 'PUT', body: JSON.stringify(payload) },
+  );
+};
+
+export const deleteRentalItemCategory = async (
+  venueId: string,
+  categoryId: string,
+): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/rental-item-categories/${categoryId}`, {
+    method: 'DELETE',
+  });
+};
+
+export const reorderRentalItemCategories = async (
+  venueId: string,
+  order: string[],
+): Promise<VenueRentalItemCategory[]> => {
+  return apiRequest<VenueRentalItemCategory[]>(`/venues/${venueId}/rental-item-categories/order`, {
     method: 'PUT',
     body: JSON.stringify({ order }),
   });

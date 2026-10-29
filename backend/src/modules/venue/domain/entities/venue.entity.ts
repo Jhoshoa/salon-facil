@@ -169,7 +169,7 @@ export interface VenueRentalItemEntity {
   id: string;
   venueId: string;
   name: string;
-  category: string;
+  category: { id: string; name: string };
   description: string | null;
   photoUrl: string | null;
   photoPublicId: string | null;
@@ -178,5 +178,14 @@ export interface VenueRentalItemEntity {
   stockQty: number | null;
   isActive: boolean;
   sortOrder: number;
+  createdAt: Date;
+}
+
+export interface VenueRentalItemCategoryEntity {
+  id: string;
+  venueId: string;
+  name: string;
+  sortOrder: number;
+  itemCount: number;
   createdAt: Date;
 }
