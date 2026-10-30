@@ -63,7 +63,7 @@ export interface CreateRentalItemInput {
   pricePerUnit?: number;
   isIncluded?: boolean;
   unitLabel?: string;
-  stockQty?: number;
+  stockQty?: number | null;
   sortOrder?: number;
 }
 
@@ -157,7 +157,7 @@ export interface IVenueRepository {
   createRentalItem(
     venueId: string,
     data: CreateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required'>;
+  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required' | 'limit_reached'>;
   /** `previousPhotoPublicId` is the Cloudinary id that was replaced or cleared by this update
    * (or `null` if the photo didn't change) -- the caller best-effort-deletes it from Cloudinary,
    * same as `deleteRentalItem` already does for a fully deleted item. */
@@ -175,12 +175,15 @@ export interface IVenueRepository {
     venueId: string,
     itemId: string,
   ): Promise<{ photoPublicId: string | null } | null>;
-  reorderRentalItems(venueId: string, order: string[]): Promise<VenueRentalItemEntity[]>;
+  reorderRentalItems(
+    venueId: string,
+    order: string[],
+  ): Promise<VenueRentalItemEntity[] | 'invalid_order'>;
   listRentalItemCategories(venueId: string): Promise<VenueRentalItemCategoryEntity[]>;
   createRentalItemCategory(
     venueId: string,
     data: CreateRentalItemCategoryInput,
-  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name'>;
+  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name' | 'limit_reached'>;
   updateRentalItemCategory(
     venueId: string,
     categoryId: string,

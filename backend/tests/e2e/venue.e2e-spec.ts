@@ -6,6 +6,8 @@ import cookieParser = require('cookie-parser');
 import { AppModule } from '../../src/app.module';
 import { CloudinaryService } from '../../src/modules/upload/cloudinary.service';
 
+import { createVerifiedVenue } from './helpers/booking-fixtures';
+
 type TestAgent = ReturnType<typeof request.agent>;
 
 // Cloudinary isn't configured in this environment (no CLOUDINARY_* env vars), so a real
@@ -694,6 +696,279 @@ describe('Venues (e2e)', () => {
         .get(`/api/v1/venues/${rentalVenueId}/rental-items/manage`)
         .expect(200);
       expect(res.body.some((item: { id: string }) => item.id === rentalItemId)).toBe(false);
+    });
+  });
+
+  describe('Rental catalog: access control and input validation', () => {
+    let venueA: string;
+    let venueB: string;
+    let categoryA: string;
+    let categoryB: string;
+    let itemA: string;
+    let itemB: string;
+
+    const createCategory = async (agent: TestAgent, venueId: string, name: string) => {
+      const res = await agent
+        .post(`/api/v1/venues/${venueId}/rental-item-categories`)
+        .send({ name })
+        .expect(201);
+      return res.body.id as string;
+    };
+
+    const createItem = async (agent: TestAgent, venueId: string, categoryId: string) => {
+      const res = await agent
+        .post(`/api/v1/venues/${venueId}/rental-items`)
+        .field('name', 'Item de prueba')
+        .field('categoryId', categoryId)
+        .field('pricePerUnit', '10')
+        .expect(201);
+      return res.body.id as string;
+    };
+
+    beforeAll(async () => {
+      venueA = await createVerifiedVenue(ownerAgent, adminAgent, uniqueId);
+      venueB = await createVerifiedVenue(owner2Agent, adminAgent, uniqueId);
+      categoryA = await createCategory(ownerAgent, venueA, 'Categoria A');
+      categoryB = await createCategory(owner2Agent, venueB, 'Categoria B');
+      itemA = await createItem(ownerAgent, venueA, categoryA);
+      itemB = await createItem(owner2Agent, venueB, categoryB);
+    }, 30000);
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    const writeRoutes = (): [string, string, string][] => [
+      ['GET', 'rental-items/manage', 'read'],
+      ['POST', 'rental-items', 'create'],
+      ['PUT', 'rental-items/order', 'reorder'],
+      ['PUT', `rental-items/${itemA}`, 'update'],
+      ['DELETE', `rental-items/${itemA}`, 'delete'],
+      ['GET', 'rental-item-categories', 'read'],
+      ['POST', 'rental-item-categories', 'create'],
+      ['PUT', 'rental-item-categories/order', 'reorder'],
+      ['PUT', `rental-item-categories/${categoryA}`, 'update'],
+      ['DELETE', `rental-item-categories/${categoryA}`, 'delete'],
+    ];
+
+    // Bodies are valid on purpose, so a 401/403 can only come from the access check.
+    const send = (agent: ReturnType<typeof request>, method: string, path: string) => {
+      const url = `/api/v1/venues/${venueA}/${path}`;
+      const req =
+        method === 'GET'
+          ? agent.get(url)
+          : method === 'DELETE'
+            ? agent.delete(url)
+            : method === 'POST'
+              ? agent.post(url)
+              : agent.put(url);
+      if (path.endsWith('/order')) return req.send({ order: [itemA] });
+      if (path === 'rental-item-categories') return req.send({ name: 'Intruso' });
+      if (path.startsWith('rental-item-categories/')) return req.send({ name: 'Intruso' });
+      if (path === 'rental-items') {
+        return req.field('name', 'Intruso').field('categoryId', categoryA).field('pricePerUnit', 1);
+      }
+      if (path.startsWith('rental-items/') && method === 'PUT') {
+        return req.field('name', 'Intruso');
+      }
+      return req;
+    };
+
+    it('rejects every management route for anonymous visitors, clients and other owners', async () => {
+      for (const [method, path] of writeRoutes()) {
+        await send(request(app.getHttpServer()), method, path).expect(401);
+        await send(clientAgent as never, method, path).expect(403);
+        await send(owner2Agent as never, method, path).expect(403);
+      }
+
+      const stored = await ownerAgent.get(`/api/v1/venues/${venueA}/rental-items/manage`);
+      expect(stored.body.map((item: { name: string }) => item.name)).toEqual(['Item de prueba']);
+    });
+
+    it('lets an admin manage any venue catalog', async () => {
+      await adminAgent.get(`/api/v1/venues/${venueA}/rental-items/manage`).expect(200);
+    });
+
+    it('does not upload the photo of someone without access to the venue', async () => {
+      await owner2Agent
+        .post(`/api/v1/venues/${venueA}/rental-items`)
+        .field('name', 'Intruso')
+        .field('categoryId', categoryA)
+        .field('pricePerUnit', '1')
+        .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
+        .expect(403);
+      await owner2Agent
+        .put(`/api/v1/venues/${venueA}/rental-items/${itemA}`)
+        .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
+        .expect(403);
+
+      expect(fakeCloudinary.uploadImage).not.toHaveBeenCalled();
+    });
+
+    it('removes the uploaded photo when the item ends up not being saved', async () => {
+      await ownerAgent
+        .post(`/api/v1/venues/${venueA}/rental-items`)
+        .field('name', 'Con categoria ajena')
+        .field('categoryId', categoryB)
+        .field('pricePerUnit', '1')
+        .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
+        .expect(404);
+
+      expect(fakeCloudinary.uploadImage).toHaveBeenCalledTimes(1);
+      expect(fakeCloudinary.deleteImage).toHaveBeenCalledWith('fake-public-id');
+    });
+
+    it('never crosses data between venues, even when the owner controls the venue in the URL', async () => {
+      const base = `/api/v1/venues/${venueB}`;
+
+      await owner2Agent.put(`${base}/rental-items/${itemA}`).field('name', 'Robado').expect(404);
+      await owner2Agent.delete(`${base}/rental-items/${itemA}`).expect(404);
+      await owner2Agent
+        .put(`${base}/rental-item-categories/${categoryA}`)
+        .send({ name: 'Robada' })
+        .expect(404);
+      await owner2Agent.delete(`${base}/rental-item-categories/${categoryA}`).expect(404);
+      await owner2Agent
+        .post(`${base}/rental-items`)
+        .field('name', 'Cruzado')
+        .field('categoryId', categoryA)
+        .field('pricePerUnit', '1')
+        .expect(404);
+      await owner2Agent
+        .put(`${base}/rental-items/${itemB}`)
+        .field('categoryId', categoryA)
+        .expect(404);
+      await owner2Agent
+        .put(`${base}/rental-items/order`)
+        .send({ order: [itemA] })
+        .expect(400);
+      await owner2Agent
+        .put(`${base}/rental-item-categories/order`)
+        .send({ order: [categoryA] })
+        .expect(400);
+
+      const stored = await ownerAgent.get(`/api/v1/venues/${venueA}/rental-items/manage`);
+      expect(stored.body[0]).toMatchObject({ id: itemA, name: 'Item de prueba' });
+    });
+
+    it.each([
+      ['non-strings', [1]],
+      ['non-UUIDs', ['abc']],
+      ['nested objects', [{ id: 'x' }]],
+      ['an empty list', []],
+      ['not a list', 'abc'],
+    ])('answers 400, not 500, when reordering items with %s', (_label, order) => {
+      return ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-items/order`)
+        .send({ order })
+        .expect(400);
+    });
+
+    it('rejects a reorder that repeats an item or leaves one out', async () => {
+      const url = `/api/v1/venues/${venueA}/rental-items/order`;
+      await ownerAgent
+        .put(url)
+        .send({ order: [itemA, itemA] })
+        .expect(400);
+
+      const second = await createItem(ownerAgent, venueA, categoryA);
+      await ownerAgent
+        .put(url)
+        .send({ order: [itemA] })
+        .expect(400);
+      await ownerAgent
+        .put(url)
+        .send({ order: [second, itemA] })
+        .expect(200);
+      await ownerAgent.delete(`/api/v1/venues/${venueA}/rental-items/${second}`).expect(204);
+    });
+
+    it('answers 404, not 500, for ids that are not UUIDs', async () => {
+      await ownerAgent.delete(`/api/v1/venues/${venueA}/rental-items/not-a-uuid`).expect(404);
+      await ownerAgent.get('/api/v1/venues/not-a-uuid/rental-items/manage').expect(404);
+      await request(app.getHttpServer()).get('/api/v1/venues/not-a-uuid/rental-items').expect(404);
+    });
+
+    it('answers 400, not 500, for a sort order the database column cannot hold', async () => {
+      await ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-items/${itemA}`)
+        .field('sortOrder', '99999999999')
+        .expect(400);
+      await ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-item-categories/${categoryA}`)
+        .send({ sortOrder: 99999999999 })
+        .expect(400);
+    });
+
+    it('does not turn an empty price into a free item', async () => {
+      await ownerAgent
+        .post(`/api/v1/venues/${venueA}/rental-items`)
+        .field('name', 'Sin precio')
+        .field('categoryId', categoryA)
+        .field('pricePerUnit', '')
+        .expect(400);
+
+      const updated = await ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-items/${itemA}`)
+        .field('pricePerUnit', '')
+        .expect(200);
+      expect(updated.body.pricePerUnit).toBe(10);
+    });
+
+    it('rejects a price with more than 2 decimals, or a negative one', async () => {
+      const url = `/api/v1/venues/${venueA}/rental-items/${itemA}`;
+      await ownerAgent.put(url).field('pricePerUnit', '1.234').expect(400);
+      await ownerAgent.put(url).field('pricePerUnit', '-1').expect(400);
+    });
+
+    it('treats an empty stock as "not tracked" and a blank unit as the default', async () => {
+      const res = await ownerAgent
+        .post(`/api/v1/venues/${venueA}/rental-items`)
+        .field('name', 'Campos vacios')
+        .field('categoryId', categoryA)
+        .field('pricePerUnit', '5')
+        .field('stockQty', '')
+        .field('unitLabel', '   ')
+        .expect(201);
+
+      expect(res.body.stockQty).toBeNull();
+      expect(res.body.unitLabel).toBe('unidad');
+      await ownerAgent.delete(`/api/v1/venues/${venueA}/rental-items/${res.body.id}`).expect(204);
+    });
+
+    it('rejects fields a client should never be able to set', async () => {
+      await ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-items/${itemA}`)
+        .field('venueId', venueB)
+        .expect(400);
+      await ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-items/${itemA}`)
+        .field('photoUrl', 'https://evil.example/x.jpg')
+        .expect(400);
+    });
+
+    it('shows the public only active items, without internal Cloudinary ids', async () => {
+      const withPhoto = await ownerAgent
+        .post(`/api/v1/venues/${venueA}/rental-items`)
+        .field('name', 'Con foto')
+        .field('categoryId', categoryA)
+        .field('pricePerUnit', '5')
+        .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
+        .expect(201);
+      const hidden = await createItem(ownerAgent, venueA, categoryA);
+      await ownerAgent
+        .put(`/api/v1/venues/${venueA}/rental-items/${hidden}`)
+        .field('isActive', 'false')
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/venues/${venueA}/rental-items`)
+        .expect(200);
+
+      const ids = res.body.map((item: { id: string }) => item.id);
+      expect(ids).toContain(withPhoto.body.id);
+      expect(ids).not.toContain(hidden);
+      for (const item of res.body) expect(item).not.toHaveProperty('photoPublicId');
     });
   });
 

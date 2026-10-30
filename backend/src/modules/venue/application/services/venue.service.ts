@@ -468,6 +468,15 @@ export class VenueService {
     return this.venueRepository.reorderMedia(id, order, coverId);
   }
 
+  /** For work that has to happen before the service call that would otherwise check this, such
+   * as uploading a file: nobody without access to the venue should get to spend our storage. */
+  async assertCanEditVenue(venueId: string, userId: string, userRole: UserRole): Promise<void> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+  }
+
   /** Public, read-only catalog -- only active items, and only for a venue a random visitor
    * could actually reach (same isPublic() gate as getVenueBySlug, so this can't be used to peek
    * at a draft/unverified venue's items via a guessed id). */
@@ -509,6 +518,9 @@ export class VenueService {
     }
     if (result === 'price_required') {
       throw new BadRequestException('Indica un precio o marca el item como incluido con el local');
+    }
+    if (result === 'limit_reached') {
+      throw new ConflictException('Este local alcanzo el maximo de items en su catalogo');
     }
     return result;
   }
@@ -571,7 +583,11 @@ export class VenueService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
-    return this.venueRepository.reorderRentalItems(venueId, order);
+    const result = await this.venueRepository.reorderRentalItems(venueId, order);
+    if (result === 'invalid_order') {
+      throw new BadRequestException('order debe incluir todos los items del local');
+    }
+    return result;
   }
 
   async listRentalItemCategories(
@@ -599,6 +615,9 @@ export class VenueService {
     const result = await this.venueRepository.createRentalItemCategory(venueId, data);
     if (result === 'duplicate_name') {
       throw new ConflictException(`Ya existe una categoria llamada '${data.name}'`);
+    }
+    if (result === 'limit_reached') {
+      throw new ConflictException('Este local alcanzo el maximo de categorias');
     }
     return result;
   }

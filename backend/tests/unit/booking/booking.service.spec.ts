@@ -899,6 +899,7 @@ describe('BookingService', () => {
 
     it('should throw BadRequestException when booking is not approved', async () => {
       mockBookingRepository.findById.mockResolvedValue(makeBooking());
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
 
       await expect(service.markDepositPaid('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
         BadRequestException,
@@ -940,6 +941,7 @@ describe('BookingService', () => {
       mockBookingRepository.findById.mockResolvedValue(
         makeBooking({ status: BookingStatus.PENDING }),
       );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
 
       await expect(service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
         BadRequestException,
@@ -992,6 +994,7 @@ describe('BookingService', () => {
       mockBookingRepository.findById.mockResolvedValue(
         makeBooking({ status: BookingStatus.PENDING }),
       );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
 
       await expect(service.markAsNoShow('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
         BadRequestException,
