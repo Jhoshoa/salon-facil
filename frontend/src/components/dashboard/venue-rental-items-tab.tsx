@@ -3,15 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
-  ArrowRight,
-  ImagePlus,
-  Loader2,
-  Pencil,
-  Plus,
-  Settings2,
-  Trash2,
-} from 'lucide-react';
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, ImagePlus, Loader2, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import {
@@ -25,7 +32,12 @@ import {
 } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { CURRENCY, formatCurrency } from '@/lib/formatters';
-import { chargeBasisLabels } from '@/lib/rental-items';
+import {
+  chargeBasisLabels,
+  groupRentalItemsByCategory,
+  reorderRentalItemsWithinCategory,
+} from '@/lib/rental-items';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +56,90 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { VenueRentalItemCategoriesManager } from './venue-rental-item-categories-manager';
 import type { RentalItemChargeBasis, Venue, VenueRentalItem } from '@/types/api';
+
+interface SortableRentalItemRowProps {
+  item: VenueRentalItem;
+  showChargeBasis: boolean;
+  dragDisabled: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+const SortableRentalItemRow = ({
+  item,
+  showChargeBasis,
+  dragDisabled,
+  onEdit,
+  onDelete,
+}: SortableRentalItemRowProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: dragDisabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        'flex flex-wrap items-center gap-4 bg-background p-4',
+        isDragging && 'relative z-10 shadow-md',
+      )}
+    >
+      <button
+        type="button"
+        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        aria-label={`Arrastrar ${item.name} para reordenar`}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted">
+        {item.photoUrl ? (
+          <Image
+            src={item.photoUrl}
+            alt={item.name}
+            fill
+            className="object-cover"
+            loader={cloudinaryImageLoader}
+            sizes="64px"
+          />
+        ) : null}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="font-medium">{item.name}</p>
+          {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {item.pricePerUnit === null
+            ? 'Incluido con el local'
+            : `${formatCurrency(item.pricePerUnit)} / ${item.unitLabel}${
+                showChargeBasis ? ` · ${chargeBasisLabels[item.chargeBasis]}` : ''
+              }`}
+          {item.stockQty !== null ? ` · stock ${item.stockQty}` : ''}
+        </p>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button type="button" size="sm" variant="outline" onClick={onEdit}>
+          <Pencil className="h-4 w-4" />
+          Editar
+        </Button>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          onClick={onDelete}
+          title="Eliminar item"
+          aria-label="Eliminar item"
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 interface VenueRentalItemsTabProps {
   venue: Venue;
@@ -100,6 +196,13 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
   const [confirmRemovePhotoOpen, setConfirmRemovePhotoOpen] = useState(false);
   const [creatingCategoryInline, setCreatingCategoryInline] = useState(false);
   const [inlineCategoryName, setInlineCategoryName] = useState('');
+  // Holds the just-dragged order until the refetch lands, so the list doesn't snap back meanwhile.
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // Local preview of a newly picked (not-yet-uploaded) photo -- revoked whenever the file
   // changes or the component unmounts, so these object URLs don't leak.
@@ -128,10 +231,12 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     [categoriesQuery.data],
   );
 
-  const items = useMemo(
-    () => [...(query.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [query.data],
-  );
+  const items = useMemo(() => {
+    const sorted = [...(query.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (!dragOrder) return sorted;
+    const byId = new Map(sorted.map((item) => [item.id, item]));
+    return dragOrder.map((id) => byId.get(id)).filter((item): item is VenueRentalItem => !!item);
+  }, [query.data, dragOrder]);
 
   const filteredItems = items.filter((item) => {
     if (categoryFilter !== ALL_CATEGORIES && item.category.id !== categoryFilter) return false;
@@ -203,8 +308,15 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
 
   const reorderMutation = useMutation({
     mutationFn: (order: string[]) => reorderRentalItems(venue.id, order),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['venue-rental-items', venue.id] });
+      setDragOrder(null);
+    },
     onError: (error: { message?: string }) => {
+      setDragOrder(null);
+      // The list may be stale (an item added from another tab), which is exactly what gets a
+      // reorder rejected -- refetch so the next attempt sends the current set.
+      queryClient.invalidateQueries({ queryKey: ['venue-rental-items', venue.id] });
       toast.error('No se pudo actualizar el orden', { description: error.message });
     },
   });
@@ -330,13 +442,13 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     createMutation.mutate();
   };
 
-  const move = (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= items.length) return;
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
 
-    const next = [...items];
-    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-    reorderMutation.mutate(next.map((item) => item.id));
+    const order = reorderRentalItemsWithinCategory(items, String(active.id), String(over.id));
+    if (!order) return;
+    setDragOrder(order);
+    reorderMutation.mutate(order);
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -418,82 +530,38 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
       ) : null}
 
       {filteredItems.length > 0 ? (
-        <div className="sf-card divide-y overflow-hidden">
-          {filteredItems.map((item) => {
-            const index = items.findIndex((candidate) => candidate.id === item.id);
-            return (
-              <div key={item.id} className="flex flex-wrap items-center gap-4 p-4">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted">
-                  {item.photoUrl ? (
-                    <Image
-                      src={item.photoUrl}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                      loader={cloudinaryImageLoader}
-                      sizes="64px"
-                    />
-                  ) : null}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{item.name}</p>
-                    {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
+        <div className="space-y-5">
+          {groupRentalItemsByCategory(filteredItems).map((group) => (
+            <div key={group.category.id}>
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {group.category.name}
+              </h4>
+              {/* One context per category: an item can't be dragged out of its own. */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={group.items.map((item) => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="sf-card divide-y overflow-hidden">
+                    {group.items.map((item) => (
+                      <SortableRentalItemRow
+                        key={item.id}
+                        item={item}
+                        showChargeBasis={venue.allowsMultipleDays}
+                        dragDisabled={reorderMutation.isPending}
+                        onEdit={() => openEditDialog(item)}
+                        onDelete={() => setItemToDelete(item)}
+                      />
+                    ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {item.category.name} ·{' '}
-                    {item.pricePerUnit === null
-                      ? 'Incluido con el local'
-                      : `${formatCurrency(item.pricePerUnit)} / ${item.unitLabel}${
-                          venue.allowsMultipleDays
-                            ? ` · ${chargeBasisLabels[item.chargeBasis]}`
-                            : ''
-                        }`}
-                    {item.stockQty !== null ? ` · stock ${item.stockQty}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => move(index, -1)}
-                    disabled={index === 0 || reorderMutation.isPending}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => move(index, 1)}
-                    disabled={index === items.length - 1 || reorderMutation.isPending}
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => openEditDialog(item)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => setItemToDelete(item)}
-                    title="Eliminar item"
-                    aria-label="Eliminar item"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+                </SortableContext>
+              </DndContext>
+            </div>
+          ))}
         </div>
       ) : null}
 

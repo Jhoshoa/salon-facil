@@ -9,7 +9,6 @@ import {
   deleteRentalItem,
   getOwnerRentalItems,
   getRentalItemCategories,
-  reorderRentalItems,
   updateRentalItem,
 } from '@/lib/api/venues.api';
 
@@ -32,7 +31,6 @@ const mockGetOwnerRentalItems = getOwnerRentalItems as jest.MockedFunction<
 const mockCreateRentalItem = createRentalItem as jest.MockedFunction<typeof createRentalItem>;
 const mockUpdateRentalItem = updateRentalItem as jest.MockedFunction<typeof updateRentalItem>;
 const mockDeleteRentalItem = deleteRentalItem as jest.MockedFunction<typeof deleteRentalItem>;
-const mockReorderRentalItems = reorderRentalItems as jest.MockedFunction<typeof reorderRentalItems>;
 const mockGetRentalItemCategories = getRentalItemCategories as jest.MockedFunction<
   typeof getRentalItemCategories
 >;
@@ -242,7 +240,7 @@ describe('VenueRentalItemsTab', () => {
     mockUpdateRentalItem.mockResolvedValue(item);
     renderTab();
 
-    expect(await screen.findByText(/Mobiliario · Incluido con el local/)).toBeInTheDocument();
+    expect(await screen.findByText(/^Incluido con el local/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /editar/i }));
 
     expect(screen.getByRole('radio', { name: 'Incluido con el local' })).toBeChecked();
@@ -466,24 +464,29 @@ describe('VenueRentalItemsTab', () => {
     expect(screen.queryByText('Mantel blanco')).not.toBeInTheDocument();
   });
 
-  it('reordena items con las flechas', async () => {
-    const user = userEvent.setup();
+  it('agrupa los items por categoria, en el orden de las categorias, sin flechas', async () => {
     mockGetOwnerRentalItems.mockResolvedValue([
-      makeItem({ id: 'item-1', name: 'Mesa redonda', sortOrder: 0 }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', sortOrder: 1 }),
+      makeItem({
+        id: 'item-1',
+        name: 'Silla',
+        category: { id: 'cat-m', name: 'Mobiliario', sortOrder: 1 },
+        sortOrder: 0,
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Plato',
+        category: { id: 'cat-v', name: 'Vajilla', sortOrder: 0 },
+        sortOrder: 1,
+      }),
     ]);
-    mockReorderRentalItems.mockResolvedValue([]);
     renderTab();
 
-    await screen.findByText('Mesa redonda');
+    await screen.findByText('Silla');
 
-    const moveRightButtons = screen
-      .getAllByRole('button')
-      .filter((button) => button.querySelector('svg.lucide-arrow-right'));
-    await user.click(moveRightButtons[0]);
-
-    await waitFor(() =>
-      expect(mockReorderRentalItems).toHaveBeenCalledWith('venue-1', ['item-2', 'item-1']),
-    );
+    expect(
+      screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent),
+    ).toEqual(['Vajilla', 'Mobiliario']);
+    expect(screen.getByRole('button', { name: 'Arrastrar Silla para reordenar' })).toBeEnabled();
+    expect(document.querySelector('svg.lucide-arrow-right')).toBeNull();
   });
 });

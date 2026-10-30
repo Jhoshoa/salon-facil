@@ -211,6 +211,42 @@ describe('VenueRentalItemCatalog', () => {
     ]);
   });
 
+  it('agrupa por categoria bajo su titulo, y quita el titulo al filtrar', async () => {
+    const user = userEvent.setup();
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({
+        id: 'item-1',
+        name: 'Silla',
+        category: { id: 'cat-m', name: 'Mobiliario', sortOrder: 1 },
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Plato',
+        category: { id: 'cat-v', name: 'Vajilla', sortOrder: 0 },
+      }),
+    ]);
+    renderCatalog();
+
+    await screen.findByText('Silla');
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent),
+    ).toEqual(['Vajilla', 'Mobiliario']);
+
+    await user.click(screen.getByRole('button', { name: 'Vajilla' }));
+
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.getByText('Plato')).toBeInTheDocument();
+    expect(screen.queryByText('Silla')).not.toBeInTheDocument();
+  });
+
+  it('no muestra titulos si el local tiene una sola categoria', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([makeItem({ name: 'Silla' })]);
+    renderCatalog();
+
+    await screen.findByText('Silla');
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+  });
+
   it('filtra por categoria al hacer click en una pildora', async () => {
     const user = userEvent.setup();
     mockGetPublicRentalItems.mockResolvedValue([
