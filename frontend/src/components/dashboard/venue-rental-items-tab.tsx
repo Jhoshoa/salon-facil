@@ -52,6 +52,7 @@ interface FormValues {
   name: string;
   categoryId: string;
   description: string;
+  isIncluded: boolean;
   pricePerUnit: string;
   unitLabel: string;
   stockQty: string;
@@ -69,6 +70,7 @@ const emptyForm: FormValues = {
   name: '',
   categoryId: '',
   description: '',
+  isIncluded: false,
   pricePerUnit: '',
   unitLabel: 'unidad',
   stockQty: '',
@@ -153,8 +155,9 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           name: form.name.trim(),
           categoryId: form.categoryId,
           description: form.description.trim() || undefined,
-          pricePerUnit: Number(form.pricePerUnit),
-          unitLabel: form.unitLabel.trim() || undefined,
+          isIncluded: form.isIncluded,
+          pricePerUnit: form.isIncluded ? undefined : Number(form.pricePerUnit),
+          unitLabel: form.isIncluded ? undefined : form.unitLabel.trim() || undefined,
           stockQty: form.stockQty.trim() ? Number(form.stockQty) : undefined,
         },
         photoFile ?? undefined,
@@ -233,7 +236,8 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
       name: item.name,
       categoryId: item.category.id,
       description: item.description ?? '',
-      pricePerUnit: String(item.pricePerUnit),
+      isIncluded: item.isIncluded,
+      pricePerUnit: item.pricePerUnit !== null ? String(item.pricePerUnit) : '',
       unitLabel: item.unitLabel,
       stockQty: item.stockQty !== null ? String(item.stockQty) : '',
       isActive: item.isActive,
@@ -284,7 +288,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
       errors.categoryId = 'Elige o crea una categoria.';
     }
     const price = Number(form.pricePerUnit);
-    if (!form.pricePerUnit.trim() || Number.isNaN(price) || price < 0) {
+    if (!form.isIncluded && (!form.pricePerUnit.trim() || Number.isNaN(price) || price < 0)) {
       errors.pricePerUnit = 'Ingresa un precio valido (0 o mas).';
     }
     if (form.stockQty.trim()) {
@@ -304,8 +308,9 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           name: form.name.trim(),
           categoryId: form.categoryId,
           description: form.description.trim() || null,
-          pricePerUnit: price,
-          unitLabel: form.unitLabel.trim() || emptyForm.unitLabel,
+          isIncluded: form.isIncluded,
+          pricePerUnit: form.isIncluded ? undefined : price,
+          unitLabel: form.isIncluded ? undefined : form.unitLabel.trim() || emptyForm.unitLabel,
           stockQty: form.stockQty.trim() ? Number(form.stockQty) : null,
           isActive: form.isActive,
           removePhoto: !photoFile && removePhoto ? true : undefined,
@@ -334,9 +339,9 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
         <div>
           <h3 className="text-base font-semibold">Catalogo de alquiler</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Items que ofreces por separado (vajilla, mobiliario, decoracion) con precio y stock
-            informativo. El visitante los ve en la ficha publica y te contacta por WhatsApp para
-            pedirlos.
+            Items que ofreces (vajilla, mobiliario, decoracion), incluidos con el local o con precio
+            aparte, y su stock informativo. El visitante los ve en la ficha publica y te contacta
+            por WhatsApp para pedir los que se cobran aparte.
           </p>
         </div>
         <div className="flex gap-2">
@@ -428,7 +433,10 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                     {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {item.category.name} · {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
+                    {item.category.name} ·{' '}
+                    {item.pricePerUnit === null
+                      ? 'Incluido con el local'
+                      : `${formatCurrency(item.pricePerUnit)} / ${item.unitLabel}`}
                     {item.stockQty !== null ? ` · stock ${item.stockQty}` : ''}
                   </p>
                 </div>
@@ -645,38 +653,69 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
               )}
             </div>
 
+            <fieldset className="sf-form-group">
+              <legend className="mb-2 text-sm font-medium leading-none">Cobro</legend>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="rental-item-pricing"
+                    checked={!form.isIncluded}
+                    onChange={() => setForm((prev) => ({ ...prev, isIncluded: false }))}
+                  />
+                  Se cobra aparte
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="rental-item-pricing"
+                    checked={form.isIncluded}
+                    onChange={() => {
+                      setForm((prev) => ({ ...prev, isIncluded: true }));
+                      setFieldErrors((prev) => ({ ...prev, pricePerUnit: undefined }));
+                    }}
+                  />
+                  Incluido con el local
+                </label>
+              </div>
+            </fieldset>
+
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="sf-form-group">
-                <Label htmlFor="rental-item-price">
-                  Precio <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="rental-item-price"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.pricePerUnit}
-                  onChange={(event) => {
-                    setForm((prev) => ({ ...prev, pricePerUnit: event.target.value }));
-                    setFieldErrors((prev) => ({ ...prev, pricePerUnit: undefined }));
-                  }}
-                  aria-invalid={Boolean(fieldErrors.pricePerUnit)}
-                />
-                {fieldErrors.pricePerUnit ? (
-                  <p className="sf-form-error">{fieldErrors.pricePerUnit}</p>
-                ) : null}
-              </div>
-              <div className="sf-form-group">
-                <Label htmlFor="rental-item-unit">Unidad (opcional)</Label>
-                <Input
-                  id="rental-item-unit"
-                  placeholder="unidad"
-                  value={form.unitLabel}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, unitLabel: event.target.value }))
-                  }
-                />
-              </div>
+              {!form.isIncluded ? (
+                <>
+                  <div className="sf-form-group">
+                    <Label htmlFor="rental-item-price">
+                      Precio <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="rental-item-price"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={form.pricePerUnit}
+                      onChange={(event) => {
+                        setForm((prev) => ({ ...prev, pricePerUnit: event.target.value }));
+                        setFieldErrors((prev) => ({ ...prev, pricePerUnit: undefined }));
+                      }}
+                      aria-invalid={Boolean(fieldErrors.pricePerUnit)}
+                    />
+                    {fieldErrors.pricePerUnit ? (
+                      <p className="sf-form-error">{fieldErrors.pricePerUnit}</p>
+                    ) : null}
+                  </div>
+                  <div className="sf-form-group">
+                    <Label htmlFor="rental-item-unit">Unidad (opcional)</Label>
+                    <Input
+                      id="rental-item-unit"
+                      placeholder="unidad"
+                      value={form.unitLabel}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, unitLabel: event.target.value }))
+                      }
+                    />
+                  </div>
+                </>
+              ) : null}
               <div className="sf-form-group">
                 <Label htmlFor="rental-item-stock">Stock (opcional)</Label>
                 <Input

@@ -507,6 +507,9 @@ export class VenueService {
     if (result === 'category_not_found') {
       throw new NotFoundException(`Categoria con ID '${data.categoryId}' no encontrada`);
     }
+    if (result === 'price_required') {
+      throw new BadRequestException('Indica un precio o marca el item como incluido con el local');
+    }
     return result;
   }
 
@@ -527,6 +530,9 @@ export class VenueService {
     }
     if (result === 'category_not_found') {
       throw new NotFoundException(`Categoria con ID '${data.categoryId}' no encontrada`);
+    }
+    if (result === 'price_required') {
+      throw new BadRequestException('Indica un precio o marca el item como incluido con el local');
     }
     // Best-effort, same criteria as deleteRentalItem: the DB row is already updated either way.
     if (result.previousPhotoPublicId) {

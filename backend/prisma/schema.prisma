@@ -563,7 +563,10 @@ model VenueRentalItem {
   description   String?  @db.Text
   photoUrl      String?  @map("photo_url")
   photoPublicId String?  @map("photo_public_id")
-  pricePerUnit  Decimal  @map("price_per_unit") @db.Decimal(12, 2)
+  // Null only when `isIncluded` is true -- an included item has no price, which is not the same
+  // as an item that is charged separately and happens to cost 0.
+  pricePerUnit  Decimal? @map("price_per_unit") @db.Decimal(12, 2)
+  isIncluded    Boolean  @default(false) @map("is_included")
   unitLabel     String   @default("unidad") @map("unit_label")
   stockQty      Int?     @map("stock_qty")
   isActive      Boolean  @default(true) @map("is_active")

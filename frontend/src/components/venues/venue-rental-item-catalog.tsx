@@ -8,6 +8,7 @@ import { getPublicRentalItems } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 
 interface VenueRentalItemCatalogProps {
@@ -48,8 +49,8 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
     <section className="sf-detail-section">
       <h2 className="sf-detail-title">Catalogo de alquiler</h2>
       <p className="mb-4 text-sm text-muted-foreground">
-        Items disponibles por separado, con precio y disponibilidad informativa. Consulta por
-        WhatsApp para pedirlos junto con tu reserva.
+        Lo que ofrece el local, con precio y disponibilidad informativa. Lo que se cobra aparte se
+        consulta por WhatsApp junto con tu reserva.
       </p>
 
       {categories.length > 1 || items.length > 4 ? (
@@ -123,9 +124,13 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
                   <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
                 ) : null}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="font-serif italic text-accent-foreground">
-                    {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
-                  </span>
+                  {item.pricePerUnit === null ? (
+                    <Badge variant="secondary">Incluido con el local</Badge>
+                  ) : (
+                    <span className="font-serif italic text-accent-foreground">
+                      {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
+                    </span>
+                  )}
                   {item.stockQty !== null ? (
                     <span className="text-xs text-muted-foreground">Stock: {item.stockQty}</span>
                   ) : null}

@@ -157,8 +157,9 @@ resolverlo ahora.
   (`backend/src/modules/upload/cloudinary.service.ts`), en una carpeta/preset separado?
 - `unitLabel` libre (como "por modulo" en el ejemplo de Le Dome) o una lista cerrada de
   unidades comunes (unidad, modulo, hora, dia)?
-- Conviene permitir que el dueno marque un item como "incluido sin costo" ademas de los que se
-  alquilan aparte (como ya hace `VenueAmenity.isIncluded`), o eso se queda exclusivamente en
-  `VenueAmenity` y este catalogo nuevo es solo para lo que tiene costo?
+- ~~Conviene permitir que el dueno marque un item como "incluido sin costo"?~~ Resuelto: si, con
+  `VenueRentalItem.isIncluded`. Un item incluido no tiene precio (`pricePerUnit` queda en null, no
+  en 0) y en la Fase 2 no se podra seleccionar ni sumara al total. Si un cliente pide mas de lo
+  incluido, por ahora el dueno crea dos items ("Sillas (incluidas)" y "Sillas adicionales").
 - En fase 2/3, la seleccion de items entra al mismo flujo de pago (`Payment`) que la reserva del
   local, o se liquida aparte directo entre dueno y cliente (como hoy via WhatsApp)?

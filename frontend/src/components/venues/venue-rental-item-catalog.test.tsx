@@ -21,6 +21,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   description: null,
   photoUrl: null,
   pricePerUnit: 50,
+  isIncluded: false,
   unitLabel: 'unidad',
   stockQty: null,
   isActive: true,
@@ -64,6 +65,17 @@ describe('VenueRentalItemCatalog', () => {
 
     expect(await screen.findByText('Mesa redonda')).toBeInTheDocument();
     expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
+  });
+
+  it('muestra "Incluido con el local" en vez de un precio, y conserva el stock', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ name: 'Silla tiffany', pricePerUnit: null, isIncluded: true, stockQty: 80 }),
+    ]);
+    renderCatalog();
+
+    expect(await screen.findByText('Incluido con el local')).toBeInTheDocument();
+    expect(screen.getByText('Stock: 80')).toBeInTheDocument();
+    expect(screen.queryByText(/\/ unidad/)).not.toBeInTheDocument();
   });
 
   it('muestra las categorias en el orden que definio el dueño, no alfabetico', async () => {

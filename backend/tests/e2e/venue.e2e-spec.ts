@@ -506,6 +506,75 @@ describe('Venues (e2e)', () => {
         });
     });
 
+    describe('items included with the venue', () => {
+      let includedItemId: string;
+
+      it('requires a price unless the item is included', async () => {
+        await ownerAgent
+          .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+          .field('name', 'Silla sin precio')
+          .field('categoryId', cristaleriaId)
+          .expect(400);
+        await ownerAgent
+          .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+          .field('name', 'Silla sin precio')
+          .field('categoryId', cristaleriaId)
+          .field('isIncluded', 'false')
+          .expect(400);
+      });
+
+      it('creates an included item with no price', async () => {
+        const res = await ownerAgent
+          .post(`/api/v1/venues/${rentalVenueId}/rental-items`)
+          .field('name', 'Silla incluida')
+          .field('categoryId', cristaleriaId)
+          .field('isIncluded', 'true')
+          .field('stockQty', '80')
+          .expect(201);
+        expect(res.body.isIncluded).toBe(true);
+        expect(res.body.pricePerUnit).toBeNull();
+        expect(res.body.stockQty).toBe(80);
+        includedItemId = res.body.id;
+      });
+
+      it('ignores a price sent together with isIncluded', async () => {
+        const res = await ownerAgent
+          .put(`/api/v1/venues/${rentalVenueId}/rental-items/${includedItemId}`)
+          .field('pricePerUnit', '9')
+          .expect(200);
+        expect(res.body.pricePerUnit).toBeNull();
+        expect(res.body.isIncluded).toBe(true);
+      });
+
+      it('refuses to charge an included item without a price', () => {
+        return ownerAgent
+          .put(`/api/v1/venues/${rentalVenueId}/rental-items/${includedItemId}`)
+          .field('isIncluded', 'false')
+          .expect(400);
+      });
+
+      it('switches to charged with a price, and back to included clearing it', async () => {
+        const charged = await ownerAgent
+          .put(`/api/v1/venues/${rentalVenueId}/rental-items/${includedItemId}`)
+          .field('isIncluded', 'false')
+          .field('pricePerUnit', '12.5')
+          .expect(200);
+        expect(charged.body.isIncluded).toBe(false);
+        expect(charged.body.pricePerUnit).toBe(12.5);
+
+        const included = await ownerAgent
+          .put(`/api/v1/venues/${rentalVenueId}/rental-items/${includedItemId}`)
+          .field('isIncluded', 'true')
+          .expect(200);
+        expect(included.body.isIncluded).toBe(true);
+        expect(included.body.pricePerUnit).toBeNull();
+
+        await ownerAgent
+          .delete(`/api/v1/venues/${rentalVenueId}/rental-items/${includedItemId}`)
+          .expect(204);
+      });
+    });
+
     it('removePhoto clears the photo without uploading a replacement', () => {
       return ownerAgent
         .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)

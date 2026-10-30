@@ -11,6 +11,7 @@ import {
   Min,
   MinLength,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { parseBoolean, parseIntOrNull, trimString, trimStringOrNull } from './create-venue.dto';
@@ -38,10 +39,17 @@ export class CreateRentalItemDto {
   @MaxLength(1000)
   description?: string;
 
+  // Required unless the item comes included with the venue, which has no price to give.
+  @ValidateIf((dto: CreateRentalItemDto) => !dto.isIncluded)
   @IsNumber()
   @Min(0)
   @Max(999999.99)
-  pricePerUnit!: number;
+  pricePerUnit?: number;
+
+  @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  isIncluded?: boolean;
 
   @IsOptional()
   @Transform(trimString)
@@ -84,6 +92,11 @@ export class UpdateRentalItemDto {
   @Min(0)
   @Max(999999.99)
   pricePerUnit?: number;
+
+  @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  isIncluded?: boolean;
 
   @IsOptional()
   @Transform(trimString)

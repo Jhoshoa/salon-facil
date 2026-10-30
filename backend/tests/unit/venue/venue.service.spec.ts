@@ -604,6 +604,7 @@ describe('VenueService', () => {
       photoUrl: 'https://cdn/vaso.jpg',
       photoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
       pricePerUnit: 0.5,
+      isIncluded: false,
       unitLabel: 'unidad',
       stockQty: 325,
       isActive: true,
@@ -657,6 +658,19 @@ describe('VenueService', () => {
     });
 
     describe('createRentalItem', () => {
+      it('throws BadRequestException when the item has no price and is not included', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.createRentalItem.mockResolvedValue('price_required');
+
+        await expect(
+          service.createRentalItem('venue-1', 'owner-1', UserRole.OWNER, {
+            name: 'Vaso largo',
+            categoryId: 'cat-1',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
       it('delegates to the repository when the caller can edit the venue', async () => {
         mockRepository.findById.mockResolvedValue(mockVenue);
         mockVenue.canBeEditedBy.mockReturnValue(true);
@@ -706,6 +720,18 @@ describe('VenueService', () => {
     });
 
     describe('updateRentalItem', () => {
+      it('throws BadRequestException when the item would end up charged with no price', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue('price_required');
+
+        await expect(
+          service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+            isIncluded: false,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
       it('returns the updated item when the caller can edit the venue', async () => {
         mockRepository.findById.mockResolvedValue(mockVenue);
         mockVenue.canBeEditedBy.mockReturnValue(true);

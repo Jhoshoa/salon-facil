@@ -979,11 +979,12 @@ export class VenueRepository implements IVenueRepository {
   async createRentalItem(
     venueId: string,
     data: CreateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | 'category_not_found'> {
+  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required'> {
     const category = await this.prisma.venueRentalItemCategory.findFirst({
       where: { id: data.categoryId, venueId },
     });
     if (!category) return 'category_not_found';
+    if (!data.isIncluded && data.pricePerUnit == null) return 'price_required';
 
     let sortOrder = data.sortOrder;
     if (sortOrder === undefined) {
@@ -1002,7 +1003,8 @@ export class VenueRepository implements IVenueRepository {
         description: data.description,
         photoUrl: data.photoUrl,
         photoPublicId: data.photoPublicId,
-        pricePerUnit: new Prisma.Decimal(data.pricePerUnit),
+        pricePerUnit: data.isIncluded ? null : new Prisma.Decimal(data.pricePerUnit!),
+        isIncluded: data.isIncluded ?? false,
         unitLabel: data.unitLabel ?? 'unidad',
         stockQty: data.stockQty,
         sortOrder,
@@ -1020,6 +1022,7 @@ export class VenueRepository implements IVenueRepository {
     | { entity: VenueRentalItemEntity; previousPhotoPublicId: string | null }
     | 'not_found'
     | 'category_not_found'
+    | 'price_required'
   > {
     const existing = await this.prisma.venueRentalItem.findFirst({
       where: { id: itemId, venueId },
@@ -1031,6 +1034,13 @@ export class VenueRepository implements IVenueRepository {
         where: { id: data.categoryId, venueId },
       });
       if (!category) return 'category_not_found';
+    }
+
+    // Checked against the row's current state, not just this request: an edit that only sends
+    // `isIncluded: false` on an item with no price yet would otherwise leave it charged at nothing.
+    const isIncluded = data.isIncluded ?? existing.isIncluded;
+    if (!isIncluded && data.pricePerUnit == null && existing.pricePerUnit == null) {
+      return 'price_required';
     }
 
     // A new upload replaces the old photo; `removePhoto` clears it without a replacement. Either
@@ -1048,7 +1058,12 @@ export class VenueRepository implements IVenueRepository {
         description: data.description,
         photoUrl: photoCleared ? null : data.photoUrl,
         photoPublicId: photoCleared ? null : data.photoPublicId,
-        pricePerUnit: data.pricePerUnit != null ? new Prisma.Decimal(data.pricePerUnit) : undefined,
+        pricePerUnit: isIncluded
+          ? null
+          : data.pricePerUnit != null
+            ? new Prisma.Decimal(data.pricePerUnit)
+            : undefined,
+        isIncluded,
         unitLabel: data.unitLabel,
         stockQty: data.stockQty,
         isActive: data.isActive,
@@ -1205,7 +1220,8 @@ export class VenueRepository implements IVenueRepository {
       description: raw.description,
       photoUrl: raw.photoUrl,
       photoPublicId: raw.photoPublicId,
-      pricePerUnit: Number(raw.pricePerUnit),
+      pricePerUnit: raw.pricePerUnit === null ? null : Number(raw.pricePerUnit),
+      isIncluded: raw.isIncluded,
       unitLabel: raw.unitLabel,
       stockQty: raw.stockQty,
       isActive: raw.isActive,

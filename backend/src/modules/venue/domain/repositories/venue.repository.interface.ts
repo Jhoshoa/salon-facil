@@ -60,7 +60,8 @@ export interface CreateRentalItemInput {
   description?: string;
   photoUrl?: string;
   photoPublicId?: string;
-  pricePerUnit: number;
+  pricePerUnit?: number;
+  isIncluded?: boolean;
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;
@@ -74,6 +75,7 @@ export interface UpdateRentalItemInput {
   photoPublicId?: string;
   removePhoto?: boolean;
   pricePerUnit?: number;
+  isIncluded?: boolean;
   unitLabel?: string;
   stockQty?: number | null;
   isActive?: boolean;
@@ -155,7 +157,7 @@ export interface IVenueRepository {
   createRentalItem(
     venueId: string,
     data: CreateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | 'category_not_found'>;
+  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required'>;
   /** `previousPhotoPublicId` is the Cloudinary id that was replaced or cleared by this update
    * (or `null` if the photo didn't change) -- the caller best-effort-deletes it from Cloudinary,
    * same as `deleteRentalItem` already does for a fully deleted item. */
@@ -167,6 +169,7 @@ export interface IVenueRepository {
     | { entity: VenueRentalItemEntity; previousPhotoPublicId: string | null }
     | 'not_found'
     | 'category_not_found'
+    | 'price_required'
   >;
   deleteRentalItem(
     venueId: string,

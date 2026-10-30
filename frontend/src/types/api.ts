@@ -201,7 +201,9 @@ export interface VenueRentalItem {
   category: { id: string; name: string; sortOrder: number };
   description: string | null;
   photoUrl: string | null;
-  pricePerUnit: number;
+  // Null only when `isIncluded` is true: an included item has no price.
+  pricePerUnit: number | null;
+  isIncluded: boolean;
   unitLabel: string;
   stockQty: number | null;
   isActive: boolean;
@@ -212,7 +214,8 @@ export interface VenueRentalItemInput {
   name: string;
   categoryId: string;
   description?: string;
-  pricePerUnit: number;
+  pricePerUnit?: number;
+  isIncluded?: boolean;
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;

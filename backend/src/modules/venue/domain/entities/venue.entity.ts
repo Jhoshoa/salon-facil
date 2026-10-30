@@ -173,7 +173,8 @@ export interface VenueRentalItemEntity {
   description: string | null;
   photoUrl: string | null;
   photoPublicId: string | null;
-  pricePerUnit: number;
+  pricePerUnit: number | null;
+  isIncluded: boolean;
   unitLabel: string;
   stockQty: number | null;
   isActive: boolean;

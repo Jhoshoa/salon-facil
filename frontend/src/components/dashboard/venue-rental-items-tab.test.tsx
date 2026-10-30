@@ -63,6 +63,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   description: null,
   photoUrl: null,
   pricePerUnit: 50,
+  isIncluded: false,
   unitLabel: 'unidad',
   stockQty: null,
   isActive: true,
@@ -150,6 +151,64 @@ describe('VenueRentalItemsTab', () => {
 
     // El select vuelve a aparecer con la categoria nueva ya elegida.
     expect(await screen.findByLabelText(/^categoria/i)).toHaveValue('cat-nueva');
+  });
+
+  it('crea un item incluido con el local, sin pedir precio ni unidad', async () => {
+    const user = userEvent.setup();
+    mockGetOwnerRentalItems.mockResolvedValue([]);
+    mockCreateRentalItem.mockResolvedValue(makeItem({ pricePerUnit: null, isIncluded: true }));
+    renderTab();
+
+    await screen.findByText('Sin items todavia');
+    await user.click(screen.getByRole('button', { name: /agregar item/i }));
+
+    await user.type(screen.getByLabelText(/^nombre/i), 'Sillas');
+    await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
+    await user.click(screen.getByRole('radio', { name: 'Incluido con el local' }));
+
+    expect(screen.queryByLabelText(/^precio/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^unidad/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^stock/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Crear' }));
+
+    await waitFor(() =>
+      expect(mockCreateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        expect.objectContaining({ name: 'Sillas', isIncluded: true, pricePerUnit: undefined }),
+        undefined,
+      ),
+    );
+  });
+
+  it('muestra "Incluido con el local" en la lista y pide precio al pasarlo a cobrado', async () => {
+    const user = userEvent.setup();
+    const item = makeItem({ id: 'item-1', pricePerUnit: null, isIncluded: true });
+    mockGetOwnerRentalItems.mockResolvedValue([item]);
+    mockUpdateRentalItem.mockResolvedValue(item);
+    renderTab();
+
+    expect(await screen.findByText(/Mobiliario · Incluido con el local/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+
+    expect(screen.getByRole('radio', { name: 'Incluido con el local' })).toBeChecked();
+    await user.click(screen.getByRole('radio', { name: 'Se cobra aparte' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(screen.getByText(/ingresa un precio valido/i)).toBeInTheDocument();
+    expect(mockUpdateRentalItem).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText(/^precio/i), '15');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(mockUpdateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        'item-1',
+        expect.objectContaining({ isIncluded: false, pricePerUnit: 15 }),
+        undefined,
+      ),
+    );
   });
 
   it('muestra errores inline y no crea el item si faltan campos obligatorios', async () => {
