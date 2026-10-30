@@ -390,7 +390,7 @@ describe('Venues (e2e)', () => {
         .expect(201)
         .then((res) => {
           expect(res.body.name).toBe('Vaso largo');
-          expect(res.body.category).toEqual({ id: cristaleriaId, name: 'Cristaleria' });
+          expect(res.body.category).toMatchObject({ id: cristaleriaId, name: 'Cristaleria' });
           expect(res.body.pricePerUnit).toBe(0.5);
           expect(res.body.stockQty).toBe(325);
           expect(res.body.unitLabel).toBe('unidad');
@@ -457,6 +457,43 @@ describe('Venues (e2e)', () => {
           expect(res.body.pricePerUnit).toBe(0.75);
           expect(res.body.name).toBe('Vaso largo'); // unchanged fields stay as they were
         });
+    });
+
+    it('clears description and stock when they arrive empty, without touching other fields', async () => {
+      await ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('description', 'Vaso de vidrio')
+        .field('stockQty', '40')
+        .expect(200);
+
+      const omitted = await ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('pricePerUnit', '0.75')
+        .expect(200);
+      expect(omitted.body.description).toBe('Vaso de vidrio');
+      expect(omitted.body.stockQty).toBe(40);
+
+      const zero = await ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('stockQty', '0')
+        .expect(200);
+      expect(zero.body.stockQty).toBe(0);
+
+      const cleared = await ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('description', '')
+        .field('stockQty', '')
+        .expect(200);
+      expect(cleared.body.description).toBeNull();
+      expect(cleared.body.stockQty).toBeNull();
+      expect(cleared.body.pricePerUnit).toBe(0.75);
+    });
+
+    it('rejects a non-numeric stock on update', () => {
+      return ownerAgent
+        .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
+        .field('stockQty', 'abc')
+        .expect(400);
     });
 
     it('uploads a photo on update (the item had none)', () => {
@@ -661,6 +698,70 @@ describe('Venues (e2e)', () => {
         .send({ order })
         .expect(200);
       expect(res.body.map((c: { id: string }) => c.id)).toEqual(order);
+    });
+
+    it('includes the category order on each item', async () => {
+      const listRes = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(200);
+      const [first] = listRes.body;
+
+      const itemRes = await ownerAgent
+        .post(`/api/v1/venues/${categoryVenueId}/rental-items`)
+        .field('name', 'Silla de prueba')
+        .field('categoryId', first.id)
+        .field('pricePerUnit', '2')
+        .expect(201);
+
+      const itemsRes = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-items/manage`)
+        .expect(200);
+      expect(itemsRes.body[0].category).toEqual({
+        id: first.id,
+        name: first.name,
+        sortOrder: first.sortOrder,
+      });
+
+      await ownerAgent
+        .delete(`/api/v1/venues/${categoryVenueId}/rental-items/${itemRes.body.id}`)
+        .expect(204);
+    });
+
+    it('rejects a reorder with invalid ids instead of failing with a 500', async () => {
+      await ownerAgent
+        .put(`/api/v1/venues/${categoryVenueId}/rental-item-categories/order`)
+        .send({ order: [1] })
+        .expect(400);
+      await ownerAgent
+        .put(`/api/v1/venues/${categoryVenueId}/rental-item-categories/order`)
+        .send({ order: [] })
+        .expect(400);
+    });
+
+    it('rejects a reorder that repeats, omits or adds categories', async () => {
+      const listRes = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(200);
+      const ids: string[] = listRes.body.map((c: { id: string }) => c.id);
+      const url = `/api/v1/venues/${categoryVenueId}/rental-item-categories/order`;
+
+      await ownerAgent
+        .put(url)
+        .send({ order: [ids[0], ids[0]] })
+        .expect(400);
+      await ownerAgent
+        .put(url)
+        .send({ order: ids.slice(1) })
+        .expect(400);
+      await ownerAgent
+        .put(url)
+        .send({ order: [...ids.slice(1), '00000000-0000-4000-8000-000000000000'] })
+        .expect(400);
+
+      const afterRes = await ownerAgent
+        .get(`/api/v1/venues/${categoryVenueId}/rental-item-categories`)
+        .expect(200);
+      expect(afterRes.body.map((c: { id: string }) => c.id)).toEqual(ids);
     });
 
     it('blocks deleting a category that still has items (409), then allows it once empty', async () => {

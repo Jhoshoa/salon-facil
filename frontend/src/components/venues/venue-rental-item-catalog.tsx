@@ -28,9 +28,9 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
   const items = useMemo(() => query.data ?? [], [query.data]);
 
   const categories = useMemo(() => {
-    const byId = new Map(items.map((item) => [item.category.id, item.category.name]));
-    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) =>
-      a.name.localeCompare(b.name),
+    const byId = new Map(items.map((item) => [item.category.id, item.category]));
+    return Array.from(byId.values()).sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
     );
   }, [items]);
 

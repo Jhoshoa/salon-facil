@@ -19,6 +19,7 @@ import type {
   VenueRentalItem,
   VenueRentalItemCategory,
   VenueRentalItemInput,
+  VenueRentalItemUpdateInput,
   VenueSearchParams,
 } from '@/types/api';
 
@@ -193,13 +194,14 @@ export const getOwnerRentalItems = async (venueId: string): Promise<VenueRentalI
 };
 
 const buildRentalItemFormData = (
-  payload: Partial<VenueRentalItemInput> & { isActive?: boolean; removePhoto?: boolean },
+  payload: VenueRentalItemInput | VenueRentalItemUpdateInput,
   photo?: File,
 ): FormData => {
   const formData = new FormData();
   Object.entries(payload).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-    formData.set(key, String(value));
+    if (value === undefined) return;
+    // Multipart can't carry a real null -- the backend reads an empty field as "clear this value".
+    formData.set(key, value === null ? '' : String(value));
   });
   if (photo) formData.append('photo', photo);
   return formData;
@@ -219,7 +221,7 @@ export const createRentalItem = async (
 export const updateRentalItem = async (
   venueId: string,
   itemId: string,
-  payload: Partial<VenueRentalItemInput> & { isActive?: boolean; removePhoto?: boolean },
+  payload: VenueRentalItemUpdateInput,
   photo?: File,
 ): Promise<VenueRentalItem> => {
   return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items/${itemId}`, {

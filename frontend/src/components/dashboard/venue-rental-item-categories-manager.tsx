@@ -263,6 +263,9 @@ export const VenueRentalItemCategoriesManager = ({
     },
     onError: (error: { message?: string }) => {
       setDragOrder(null);
+      // The list may be stale (e.g. a category added from another tab), which is exactly what
+      // gets a reorder rejected -- refetch so the next attempt sends the current set.
+      invalidate();
       toast.error('No se pudo actualizar el orden', { description: error.message });
     },
   });

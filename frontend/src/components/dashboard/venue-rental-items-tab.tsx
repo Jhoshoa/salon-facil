@@ -303,10 +303,10 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
         data: {
           name: form.name.trim(),
           categoryId: form.categoryId,
-          description: form.description.trim() || undefined,
+          description: form.description.trim() || null,
           pricePerUnit: price,
-          unitLabel: form.unitLabel.trim() || undefined,
-          stockQty: form.stockQty.trim() ? Number(form.stockQty) : undefined,
+          unitLabel: form.unitLabel.trim() || emptyForm.unitLabel,
+          stockQty: form.stockQty.trim() ? Number(form.stockQty) : null,
           isActive: form.isActive,
           removePhoto: !photoFile && removePhoto ? true : undefined,
         },

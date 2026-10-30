@@ -59,7 +59,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   id: 'item-1',
   venueId: 'venue-1',
   name: 'Mesa redonda',
-  category: { id: 'cat-mobiliario', name: 'Mobiliario' },
+  category: { id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 },
   description: null,
   photoUrl: null,
   pricePerUnit: 50,
@@ -193,6 +193,36 @@ describe('VenueRentalItemsTab', () => {
     );
   });
 
+  it('vaciar descripcion, stock y unidad al editar los limpia en vez de ignorarlos', async () => {
+    const user = userEvent.setup();
+    const item = makeItem({
+      id: 'item-1',
+      description: 'Mesa de madera',
+      stockQty: 12,
+      unitLabel: 'por modulo',
+    });
+    mockGetOwnerRentalItems.mockResolvedValue([item]);
+    mockUpdateRentalItem.mockResolvedValue(item);
+    renderTab();
+
+    await screen.findByText('Mesa redonda');
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+
+    await user.clear(screen.getByLabelText(/^descripcion/i));
+    await user.clear(screen.getByLabelText(/^stock/i));
+    await user.clear(screen.getByLabelText(/^unidad/i));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(mockUpdateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        'item-1',
+        expect.objectContaining({ description: null, stockQty: null, unitLabel: 'unidad' }),
+        undefined,
+      ),
+    );
+  });
+
   it('previsualiza una foto nueva y permite quitarla antes de guardar', async () => {
     const user = userEvent.setup();
     mockGetOwnerRentalItems.mockResolvedValue([]);
@@ -291,19 +321,19 @@ describe('VenueRentalItemsTab', () => {
   it('filtra por categoria y por nombre', async () => {
     const user = userEvent.setup();
     mockGetRentalItemCategories.mockResolvedValue([
-      makeCategory({ id: 'cat-mobiliario', name: 'Mobiliario' }),
-      makeCategory({ id: 'cat-decoracion', name: 'Decoracion' }),
+      makeCategory({ id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 }),
+      makeCategory({ id: 'cat-decoracion', name: 'Decoracion', sortOrder: 1 }),
     ]);
     mockGetOwnerRentalItems.mockResolvedValue([
       makeItem({
         id: 'item-1',
         name: 'Mesa redonda',
-        category: { id: 'cat-mobiliario', name: 'Mobiliario' },
+        category: { id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 },
       }),
       makeItem({
         id: 'item-2',
         name: 'Mantel blanco',
-        category: { id: 'cat-decoracion', name: 'Decoracion' },
+        category: { id: 'cat-decoracion', name: 'Decoracion', sortOrder: 1 },
       }),
     ]);
     renderTab();

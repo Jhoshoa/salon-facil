@@ -169,7 +169,7 @@ export interface VenueRentalItemEntity {
   id: string;
   venueId: string;
   name: string;
-  category: { id: string; name: string };
+  category: { id: string; name: string; sortOrder: number };
   description: string | null;
   photoUrl: string | null;
   photoPublicId: string | null;

@@ -13,7 +13,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { parseBoolean, trimString } from './create-venue.dto';
+import { parseBoolean, parseIntOrNull, trimString, trimStringOrNull } from './create-venue.dto';
 
 // Arrives as multipart/form-data (the photo travels alongside these fields in the same
 // request), so every field lands as a string — the global ValidationPipe's
@@ -74,10 +74,10 @@ export class UpdateRentalItemDto {
   categoryId?: string;
 
   @IsOptional()
-  @Transform(trimString)
+  @Transform(trimStringOrNull)
   @IsString()
   @MaxLength(1000)
-  description?: string;
+  description?: string | null;
 
   @IsOptional()
   @IsNumber()
@@ -92,10 +92,11 @@ export class UpdateRentalItemDto {
   unitLabel?: string;
 
   @IsOptional()
+  @Transform(parseIntOrNull)
   @IsInt()
   @Min(0)
   @Max(100000)
-  stockQty?: number;
+  stockQty?: number | null;
 
   @IsOptional()
   @Transform(parseBoolean)

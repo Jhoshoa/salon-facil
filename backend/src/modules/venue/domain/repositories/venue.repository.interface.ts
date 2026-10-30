@@ -69,13 +69,13 @@ export interface CreateRentalItemInput {
 export interface UpdateRentalItemInput {
   name?: string;
   categoryId?: string;
-  description?: string;
+  description?: string | null;
   photoUrl?: string;
   photoPublicId?: string;
   removePhoto?: boolean;
   pricePerUnit?: number;
   unitLabel?: string;
-  stockQty?: number;
+  stockQty?: number | null;
   isActive?: boolean;
   sortOrder?: number;
 }
@@ -189,10 +189,12 @@ export interface IVenueRepository {
     venueId: string,
     categoryId: string,
   ): Promise<{ itemCount: number } | 'not_found'>;
+  /** `order` must list every category of the venue exactly once -- a partial list would leave the
+   * ones it omits with a `sortOrder` that collides with the new positions. */
   reorderRentalItemCategories(
     venueId: string,
     order: string[],
-  ): Promise<VenueRentalItemCategoryEntity[]>;
+  ): Promise<VenueRentalItemCategoryEntity[] | 'invalid_order'>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   /** Only for the admin "attach a real owner" flow -- not exposed through the generic update(),

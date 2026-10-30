@@ -64,6 +64,26 @@ export function trimString({ value }: { value: unknown }): unknown {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+/** For optional text a form can clear: multipart can't carry a real null, so an empty field means
+ * "clear this value" (`null` skips the validators via `@IsOptional`). */
+export function trimStringOrNull({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() || null : value;
+}
+
+/** Same idea for optional integers. Reads the raw value from `obj`, like `parseBoolean` above:
+ * implicit conversion has already turned an empty string into `0` by the time this runs. */
+export function parseIntOrNull({
+  obj,
+  key,
+}: {
+  obj: Record<string, unknown>;
+  key: string;
+}): unknown {
+  const raw = obj[key];
+  if (typeof raw !== 'string') return raw;
+  return raw.trim() === '' ? null : Number(raw);
+}
+
 export class CreateVenueServiceDto {
   @IsString()
   @MinLength(1)

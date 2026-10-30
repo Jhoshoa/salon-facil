@@ -38,6 +38,7 @@ import {
 import { CreateRentalItemDto, UpdateRentalItemDto } from '../application/dto/rental-item.dto';
 import {
   CreateRentalItemCategoryDto,
+  ReorderRentalItemCategoriesDto,
   UpdateRentalItemCategoryDto,
 } from '../application/dto/rental-item-category.dto';
 import { VenueService } from '../application/services/venue.service';
@@ -565,13 +566,10 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Categorias reordenadas' })
   async reorderRentalItemCategories(
     @Param('id') id: string,
-    @Body('order') order: string[],
+    @Body() dto: ReorderRentalItemCategoriesDto,
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
-    if (!Array.isArray(order) || order.length === 0) {
-      throw new BadRequestException('order debe ser un arreglo con los IDs de las categorias');
-    }
-    return this.venueService.reorderRentalItemCategories(id, user.id, user.role, order);
+    return this.venueService.reorderRentalItemCategories(id, user.id, user.role, dto.order);
   }
 
   @Put(':id/rental-item-categories/:categoryId')

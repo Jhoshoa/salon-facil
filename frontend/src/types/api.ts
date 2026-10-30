@@ -198,7 +198,7 @@ export interface VenueRentalItem {
   id: string;
   venueId: string;
   name: string;
-  category: { id: string; name: string };
+  category: { id: string; name: string; sortOrder: number };
   description: string | null;
   photoUrl: string | null;
   pricePerUnit: number;
@@ -216,6 +216,16 @@ export interface VenueRentalItemInput {
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;
+}
+
+// `null` clears an optional value on edit -- `undefined` leaves it as it was.
+export interface VenueRentalItemUpdateInput extends Partial<
+  Omit<VenueRentalItemInput, 'description' | 'stockQty'>
+> {
+  description?: string | null;
+  stockQty?: number | null;
+  isActive?: boolean;
+  removePhoto?: boolean;
 }
 
 export interface VenueRentalItemCategory {

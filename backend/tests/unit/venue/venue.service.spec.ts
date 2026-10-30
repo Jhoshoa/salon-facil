@@ -599,7 +599,7 @@ describe('VenueService', () => {
       id: 'item-1',
       venueId: 'venue-1',
       name: 'Vaso largo',
-      category: { id: 'cat-1', name: 'Cristaleria' },
+      category: { id: 'cat-1', name: 'Cristaleria', sortOrder: 0 },
       description: null,
       photoUrl: 'https://cdn/vaso.jpg',
       photoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
@@ -1068,6 +1068,16 @@ describe('VenueService', () => {
         expect(mockRepository.reorderRentalItemCategories).toHaveBeenCalledWith('venue-1', [
           'cat-1',
         ]);
+      });
+
+      it('throws BadRequestException when the order does not match the venue categories', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.reorderRentalItemCategories.mockResolvedValue('invalid_order');
+
+        await expect(
+          service.reorderRentalItemCategories('venue-1', 'owner-1', UserRole.OWNER, ['cat-1']),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('throws ForbiddenException for a different owner', async () => {

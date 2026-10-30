@@ -1170,7 +1170,16 @@ export class VenueRepository implements IVenueRepository {
   async reorderRentalItemCategories(
     venueId: string,
     order: string[],
-  ): Promise<VenueRentalItemCategoryEntity[]> {
+  ): Promise<VenueRentalItemCategoryEntity[] | 'invalid_order'> {
+    const existing = await this.prisma.venueRentalItemCategory.findMany({
+      where: { venueId },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((category) => category.id));
+    if (order.length !== existingIds.size || order.some((id) => !existingIds.has(id))) {
+      return 'invalid_order';
+    }
+
     await this.prisma.$transaction(
       order.map((categoryId, index) =>
         this.prisma.venueRentalItemCategory.updateMany({
@@ -1188,7 +1197,11 @@ export class VenueRepository implements IVenueRepository {
       id: raw.id,
       venueId: raw.venueId,
       name: raw.name,
-      category: { id: raw.category.id, name: raw.category.name },
+      category: {
+        id: raw.category.id,
+        name: raw.category.name,
+        sortOrder: raw.category.sortOrder,
+      },
       description: raw.description,
       photoUrl: raw.photoUrl,
       photoPublicId: raw.photoPublicId,

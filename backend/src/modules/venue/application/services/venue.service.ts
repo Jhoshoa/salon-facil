@@ -649,7 +649,11 @@ export class VenueService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
-    return this.venueRepository.reorderRentalItemCategories(venueId, order);
+    const result = await this.venueRepository.reorderRentalItemCategories(venueId, order);
+    if (result === 'invalid_order') {
+      throw new BadRequestException('order debe incluir todas las categorias del local');
+    }
+    return result;
   }
 
   async getVenueCompletion(

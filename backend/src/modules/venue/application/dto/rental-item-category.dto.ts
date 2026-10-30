@@ -1,9 +1,11 @@
 import {
   ArrayNotEmpty,
+  ArrayUnique,
   IsArray,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   MinLength,
   MaxLength,
@@ -41,6 +43,7 @@ export class UpdateRentalItemCategoryDto {
 export class ReorderRentalItemCategoriesDto {
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
   order!: string[];
 }
