@@ -11,6 +11,7 @@ import {
   type RentalItemLine,
 } from '@/hooks/use-rental-item-selection';
 import { createBooking, previewBookingPrice } from '@/lib/api/bookings.api';
+import { formatRentalItemBreakdown } from '@/lib/rental-items';
 import { formatCurrency, formatDate, formatDateInput, formatTime12h } from '@/lib/formatters';
 import {
   bookingSchema,
@@ -669,7 +670,16 @@ export const BookingForm = ({
                   </div>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
                     <span className="min-w-0 text-xs text-muted-foreground">
-                      {formatCurrency(line.item.pricePerUnit ?? 0)} / {line.item.unitLabel}
+                      {formatRentalItemBreakdown(
+                        {
+                          quantity: line.quantity,
+                          unitPrice: line.item.pricePerUnit ?? 0,
+                          chargeBasis: line.item.chargeBasis,
+                          billedDays: line.billedDays,
+                        },
+                        Boolean(isMultiDay),
+                      )}{' '}
+                      · {line.item.unitLabel}
                     </span>
                     <RentalItemQuantityStepper
                       itemName={line.item.name}
@@ -683,7 +693,9 @@ export const BookingForm = ({
             </ul>
             <p className="mt-1 text-xs text-muted-foreground">
               El propietario confirma que los tenga disponibles para tu fecha.
-              {isMultiDay ? ' Se cobran una sola vez, no por cada dia de la reserva.' : ''}
+              {isMultiDay && rentalItemLines.some((line) => line.item.chargeBasis === 'PER_DAY')
+                ? ' Los items por dia se multiplican por los dias de tu reserva.'
+                : ''}
             </p>
           </div>
         ) : null}

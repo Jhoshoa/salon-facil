@@ -546,6 +546,11 @@ export class VenueService {
     if (result === 'price_required') {
       throw new BadRequestException('Indica un precio o marca el item como incluido con el local');
     }
+    if (result === 'stock_required') {
+      throw new BadRequestException(
+        'Indica la cantidad disponible de los items que se cobran aparte',
+      );
+    }
     // Best-effort, same criteria as deleteRentalItem: the DB row is already updated either way.
     if (result.previousPhotoPublicId) {
       await this.cloudinaryService.deleteImage(result.previousPhotoPublicId).catch(() => {});

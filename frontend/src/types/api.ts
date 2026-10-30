@@ -194,6 +194,8 @@ export interface VenueMedia {
   isCover: boolean;
 }
 
+export type RentalItemChargeBasis = 'PER_DAY' | 'PER_EVENT';
+
 export interface VenueRentalItem {
   id: string;
   venueId: string;
@@ -204,6 +206,7 @@ export interface VenueRentalItem {
   // Null only when `isIncluded` is true: an included item has no price.
   pricePerUnit: number | null;
   isIncluded: boolean;
+  chargeBasis: RentalItemChargeBasis;
   unitLabel: string;
   stockQty: number | null;
   isActive: boolean;
@@ -216,6 +219,7 @@ export interface VenueRentalItemInput {
   description?: string;
   pricePerUnit?: number;
   isIncluded?: boolean;
+  chargeBasis?: RentalItemChargeBasis;
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;
@@ -461,6 +465,9 @@ export interface SelectedRentalItem {
   unitLabel: string;
   unitPrice: number;
   quantity: number;
+  /** Absent on bookings made before items could be charged per day: those were charged once. */
+  chargeBasis?: RentalItemChargeBasis;
+  billedDays?: number;
   subtotal: number;
 }
 

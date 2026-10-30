@@ -39,10 +39,12 @@ const line: RentalItemLine = {
     name: 'Mesa redonda',
     pricePerUnit: 12.5,
     isIncluded: false,
+    chargeBasis: 'PER_DAY',
     unitLabel: 'unidad',
     stockQty: 10,
   } as VenueRentalItem,
   quantity: 4,
+  billedDays: 1,
   subtotal: 50,
 };
 

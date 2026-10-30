@@ -80,9 +80,51 @@ describe('BookingDetailClient', () => {
     renderDetail();
 
     expect(await screen.findByText('Items del catalogo')).toBeInTheDocument();
-    expect(screen.getByText('Mesa redonda × 3')).toBeInTheDocument();
-    expect(screen.getByText('Vajilla × 1')).toBeInTheDocument();
-    expect(screen.getByText(/12,50/)).toBeInTheDocument();
+    expect(screen.getByText('Mesa redonda')).toBeInTheDocument();
+    expect(screen.getByText(/^3 × Bs/)).toBeInTheDocument();
+    expect(screen.getByText('Vajilla')).toBeInTheDocument();
+    expect(screen.getAllByText(/12,50/).length).toBeGreaterThan(0);
+  });
+
+  it('muestra la cuenta por dia o por evento en una reserva de varios dias', async () => {
+    (getBooking as jest.Mock).mockResolvedValue({
+      ...booking,
+      endDate: '2027-03-12',
+      selectedRentalItems: [
+        {
+          rentalItemId: 'item-1',
+          name: 'Mesa',
+          unitLabel: 'unidad',
+          unitPrice: 50,
+          quantity: 4,
+          chargeBasis: 'PER_DAY',
+          billedDays: 3,
+          subtotal: 600,
+        },
+        {
+          rentalItemId: 'item-2',
+          name: 'Toldo',
+          unitLabel: 'unidad',
+          unitPrice: 300,
+          quantity: 1,
+          chargeBasis: 'PER_EVENT',
+          billedDays: 1,
+          subtotal: 300,
+        },
+      ],
+    });
+    renderDetail();
+
+    expect(await screen.findByText(/4 × Bs.*50 × 3 dias/)).toBeInTheDocument();
+    expect(screen.getByText(/1 × Bs.*300 \(por evento\)/)).toBeInTheDocument();
+  });
+
+  it('no inventa dias en reservas anteriores, que se cobraron una sola vez', async () => {
+    (getBooking as jest.Mock).mockResolvedValue({ ...booking, endDate: '2027-03-12' });
+    renderDetail();
+
+    expect(await screen.findByText(/^3 × Bs/)).toBeInTheDocument();
+    expect(screen.queryByText(/dias/)).not.toBeInTheDocument();
   });
 
   it('no muestra la seccion si la reserva no tiene items', async () => {

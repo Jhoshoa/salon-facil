@@ -1,4 +1,4 @@
-import { PaymentPolicy } from '@prisma/client';
+import { PaymentPolicy, RentalItemChargeBasis } from '@prisma/client';
 
 export enum BookingStatus {
   PENDING = 'PENDING',
@@ -25,6 +25,9 @@ export interface SelectedRentalItem {
   unitLabel: string;
   unitPrice: number;
   quantity: number;
+  chargeBasis: RentalItemChargeBasis;
+  /** Days this item was charged for: the booking's days if PER_DAY, 1 if PER_EVENT. */
+  billedDays: number;
   subtotal: number;
 }
 

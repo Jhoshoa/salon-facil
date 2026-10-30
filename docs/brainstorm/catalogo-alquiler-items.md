@@ -86,10 +86,12 @@ un segundo pago separado). El stock sigue siendo informativo, no se bloquea por 
 el dueno confirma manualmente si tiene todo disponible para esa fecha, igual que hace hoy por
 WhatsApp, solo que ahora la lista ya le llega armada.
 
-> **Decisiones al construir la Fase 2:** la seleccion se guarda como foto en
+> **Decisiones al construir la Fase 2:** el stock es obligatorio en los items que se cobran aparte,
+> porque es el limite contra el que se valida la cantidad; un item anterior sin stock no se puede
+> agregar hasta que el dueno lo complete. La seleccion se guarda como foto en
 > `Booking.selectedRentalItems`, con el precio de la base de datos (nunca el que envia el cliente).
-> Los items entran en el total y en el calculo del anticipo, y se cobran una sola vez por reserva,
-> aunque dure varios dias. La cantidad no puede superar `stockQty`: es el total del local, y como el
+> Los items entran en el total y en el calculo del anticipo. En reservas de varios dias, el dueno
+> elige por item si se cobra por dia (por defecto) o una sola vez por evento completo. La cantidad no puede superar `stockQty`: es el total del local, y como el
 > dueno no puede editar el monto de una solicitud, pedir mas dejaria un total imposible de cumplir.
 > Una solicitud con items nunca se confirma sola, aunque el local tenga reserva inmediata: el stock
 > no se controla por fecha, asi que el dueno tiene que confirmarlo antes de que el cliente pague.

@@ -4,8 +4,6 @@ import { toast } from 'sonner';
 import { getPublicRentalItems } from '@/lib/api/venues.api';
 import type { VenueRentalItem } from '@/types/api';
 
-export const MAX_RENTAL_ITEM_QUANTITY = 100000;
-
 export const rentalItemsQueryKey = (venueId: string | undefined) => [
   'venue-rental-items',
   'public',
@@ -15,21 +13,22 @@ export const rentalItemsQueryKey = (venueId: string | undefined) => [
 export interface RentalItemLine {
   item: VenueRentalItem;
   quantity: number;
+  billedDays: number;
   subtotal: number;
 }
 
-/** Only items charged separately and with stock can be added to a quote. */
+/** Only items charged separately and with stock can be added to a quote. An older item with no
+ * stock at all has nothing to limit the quantity against, so it can't either until it's completed. */
 export const canAddRentalItemToQuote = (item: VenueRentalItem): boolean =>
-  !item.isIncluded && item.pricePerUnit !== null && item.stockQty !== 0;
+  !item.isIncluded && item.pricePerUnit !== null && (item.stockQty ?? 0) > 0;
 
-export const maxRentalItemQuantity = (item: VenueRentalItem): number =>
-  item.stockQty ?? MAX_RENTAL_ITEM_QUANTITY;
+export const maxRentalItemQuantity = (item: VenueRentalItem): number => item.stockQty ?? 0;
 
 /** The client's catalog selection. It lives above both the catalog and the booking form because
  * they're siblings, and the mobile form is unmounted whenever its sheet is closed. Lines are
  * derived from the current catalog, so an item the owner deleted or whose stock dropped corrects
  * itself as soon as the catalog refetches. */
-export const useRentalItemSelection = (venueId: string | undefined) => {
+export const useRentalItemSelection = (venueId: string | undefined, bookingDays = 1) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const { data: items } = useQuery({
@@ -44,10 +43,11 @@ export const useRentalItemSelection = (venueId: string | undefined) => {
         const requested = quantities[item.id];
         if (!requested || !canAddRentalItemToQuote(item)) return [];
         const quantity = Math.min(requested, maxRentalItemQuantity(item));
-        const subtotal = Math.round((item.pricePerUnit ?? 0) * quantity * 100) / 100;
-        return [{ item, quantity, subtotal }];
+        const billedDays = item.chargeBasis === 'PER_DAY' ? bookingDays : 1;
+        const subtotal = Math.round((item.pricePerUnit ?? 0) * quantity * billedDays * 100) / 100;
+        return [{ item, quantity, billedDays, subtotal }];
       }),
-    [items, quantities],
+    [items, quantities, bookingDays],
   );
 
   // Money just changed without the client touching anything, so they have to be told. Runs only

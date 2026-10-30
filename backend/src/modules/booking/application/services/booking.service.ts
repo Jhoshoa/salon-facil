@@ -6,7 +6,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CalendarBlockStatus, NotificationType, PriceUnit } from '@prisma/client';
+import {
+  CalendarBlockStatus,
+  NotificationType,
+  PriceUnit,
+  RentalItemChargeBasis,
+} from '@prisma/client';
 import {
   BOOKING_REPOSITORY,
   IBookingRepository,
@@ -175,7 +180,11 @@ export class BookingService {
       venue.paymentPolicy,
       venue.depositPercentage,
     );
-    const rentalItems = await this.resolveSelectedRentalItems(venueId, dto.selectedRentalItems);
+    const rentalItems = await this.resolveSelectedRentalItems(
+      venueId,
+      dto.selectedRentalItems,
+      dates.length,
+    );
     const priceCalculation = this.applySelectedExtras(
       venue,
       dto.selectedAmenityIds,
@@ -327,7 +336,11 @@ export class BookingService {
       venue.paymentPolicy,
       venue.depositPercentage,
     );
-    const rentalItems = await this.resolveSelectedRentalItems(venueId, dto.selectedRentalItems);
+    const rentalItems = await this.resolveSelectedRentalItems(
+      venueId,
+      dto.selectedRentalItems,
+      dates.length,
+    );
     return this.applySelectedExtras(venue, dto.selectedAmenityIds, rentalItems, rangeCalculation);
   }
 
@@ -336,11 +349,12 @@ export class BookingService {
    * handling below: dropping an item silently would leave a client believing they had requested
    * something the owner never sees, so a stale selection is an error the form can show. Stock is
    * the venue's total, not what's free on that date, so going over it can never be fulfilled;
-   * staying under it is still only an estimate the owner has to confirm. Each item is charged once
-   * per booking, however many days the booking spans. */
+   * staying under it is still only an estimate the owner has to confirm. The owner decides per item
+   * whether a booking of several days pays for each day or once for the whole event. */
   private async resolveSelectedRentalItems(
     venueId: string,
     selection: RentalItemSelectionEntry[] | undefined,
+    bookingDays: number,
   ): Promise<SelectedRentalItem[]> {
     if (!selection?.length) return [];
 
@@ -355,23 +369,27 @@ export class BookingService {
 
     return selection.map(({ rentalItemId, quantity }) => {
       const item = available.get(rentalItemId);
-      if (!item || item.isIncluded || item.pricePerUnit === null) {
+      // No stock means an older item the owner hasn't completed: there's nothing to check against.
+      if (!item || item.isIncluded || item.pricePerUnit === null || item.stockQty === null) {
         throw new BadRequestException(
           'Uno de los items que elegiste ya no esta disponible. Actualiza tu seleccion.',
         );
       }
-      if (item.stockQty !== null && quantity > item.stockQty) {
+      if (quantity > item.stockQty) {
         throw new BadRequestException(
           `El local tiene ${item.stockQty} en total de "${item.name}" y pediste ${quantity}`,
         );
       }
+      const billedDays = item.chargeBasis === RentalItemChargeBasis.PER_DAY ? bookingDays : 1;
       return {
         rentalItemId: item.id,
         name: item.name,
         unitLabel: item.unitLabel,
         unitPrice: item.pricePerUnit,
         quantity,
-        subtotal: this.round(item.pricePerUnit * quantity),
+        chargeBasis: item.chargeBasis,
+        billedDays,
+        subtotal: this.round(item.pricePerUnit * quantity * billedDays),
       };
     });
   }
