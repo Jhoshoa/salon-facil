@@ -6,7 +6,7 @@ import {
   VenueStatus,
 } from '../entities/venue.entity';
 import { VenueFilterDto } from '../../application/dto/venue-filter.dto';
-import { AmenityCategory, Departamento } from '@prisma/client';
+import { AmenityCategory, Departamento, RentalItemChargeBasis } from '@prisma/client';
 
 export const VENUE_REPOSITORY = Symbol('VENUE_REPOSITORY');
 
@@ -62,6 +62,7 @@ export interface CreateRentalItemInput {
   photoPublicId?: string;
   pricePerUnit?: number;
   isIncluded?: boolean;
+  chargeBasis?: RentalItemChargeBasis;
   unitLabel?: string;
   stockQty?: number | null;
   sortOrder?: number;
@@ -76,6 +77,7 @@ export interface UpdateRentalItemInput {
   removePhoto?: boolean;
   pricePerUnit?: number;
   isIncluded?: boolean;
+  chargeBasis?: RentalItemChargeBasis;
   unitLabel?: string;
   stockQty?: number | null;
   isActive?: boolean;

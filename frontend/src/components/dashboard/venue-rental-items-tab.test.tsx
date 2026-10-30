@@ -64,6 +64,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   photoUrl: null,
   pricePerUnit: 50,
   isIncluded: false,
+  chargeBasis: 'PER_DAY',
   unitLabel: 'unidad',
   stockQty: null,
   isActive: true,
@@ -71,11 +72,11 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   ...overrides,
 });
 
-const renderTab = () => {
+const renderTab = (testVenue: Venue = venue) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <VenueRentalItemsTab venue={venue} />
+      <VenueRentalItemsTab venue={testVenue} />
     </QueryClientProvider>,
   );
 };
@@ -168,6 +169,42 @@ describe('VenueRentalItemsTab', () => {
 
     expect(screen.getByText(/hasta 2 decimales/i)).toBeInTheDocument();
     expect(mockCreateRentalItem).not.toHaveBeenCalled();
+  });
+
+  it('deja elegir el cobro por evento en un local de varios dias, con por dia por defecto', async () => {
+    const user = userEvent.setup();
+    mockGetOwnerRentalItems.mockResolvedValue([]);
+    mockCreateRentalItem.mockResolvedValue(makeItem({}));
+    renderTab({ ...venue, allowsMultipleDays: true });
+
+    await screen.findByText('Sin items todavia');
+    await user.click(screen.getByRole('button', { name: /agregar item/i }));
+    expect(screen.getByRole('radio', { name: 'Cobrar por dia' })).toBeChecked();
+
+    await user.type(screen.getByLabelText(/^nombre/i), 'Toldo');
+    await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
+    await user.type(screen.getByLabelText(/^precio/i), '300');
+    await user.click(screen.getByRole('radio', { name: 'Cobrar por evento completo' }));
+    await user.click(screen.getByRole('button', { name: 'Crear' }));
+
+    await waitFor(() =>
+      expect(mockCreateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        expect.objectContaining({ chargeBasis: 'PER_EVENT' }),
+        undefined,
+      ),
+    );
+  });
+
+  it('no muestra el tipo de cobro en un local de un solo dia', async () => {
+    const user = userEvent.setup();
+    mockGetOwnerRentalItems.mockResolvedValue([]);
+    renderTab();
+
+    await screen.findByText('Sin items todavia');
+    await user.click(screen.getByRole('button', { name: /agregar item/i }));
+
+    expect(screen.queryByRole('radio', { name: 'Cobrar por dia' })).not.toBeInTheDocument();
   });
 
   it('crea un item incluido con el local, sin pedir precio ni unidad', async () => {

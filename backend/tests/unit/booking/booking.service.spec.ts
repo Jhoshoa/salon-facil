@@ -492,6 +492,7 @@ describe('BookingService', () => {
       unitLabel: 'unidad',
       pricePerUnit: 12.5,
       isIncluded: false,
+      chargeBasis: 'PER_DAY',
       stockQty: 80,
     };
     const toldo = {
@@ -500,6 +501,7 @@ describe('BookingService', () => {
       unitLabel: 'por evento',
       pricePerUnit: 300,
       isIncluded: false,
+      chargeBasis: 'PER_EVENT',
       stockQty: null,
     };
     const mesaIncluida = {
@@ -542,8 +544,41 @@ describe('BookingService', () => {
         unitLabel: 'unidad',
         unitPrice: 12.5,
         quantity: 4,
+        chargeBasis: 'PER_DAY',
+        billedDays: 1,
         subtotal: 50,
       });
+    });
+
+    it('multiplies per-day items by the days of the booking, and per-event items only once', async () => {
+      const result = await service.previewPrice('venue-1', {
+        ...previewDto,
+        endDate: ANCHOR_PLUS_2_DATE,
+        selectedRentalItems: [
+          { rentalItemId: 'silla', quantity: 4 },
+          { rentalItemId: 'toldo', quantity: 2 },
+        ],
+      });
+
+      expect(result.rentalItems).toEqual([
+        expect.objectContaining({ rentalItemId: 'silla', billedDays: 3, subtotal: 150 }),
+        expect.objectContaining({ rentalItemId: 'toldo', billedDays: 1, subtotal: 600 }),
+      ]);
+      expect(result.rentalItemsTotal).toBe(750);
+    });
+
+    it('persists the billed days so the quote stays explainable later', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ allowsMultipleDays: true }));
+
+      await service.requestBooking('venue-1', 'client-1', {
+        ...bookingDto,
+        endDate: ANCHOR_PLUS_1_DATE,
+        selectedRentalItems: [{ rentalItemId: 'silla', quantity: 1 }],
+      });
+
+      expect(mockBookingRepository.create.mock.calls[0][0].selectedRentalItems).toEqual([
+        expect.objectContaining({ chargeBasis: 'PER_DAY', billedDays: 2, subtotal: 25 }),
+      ]);
     });
 
     it('does not query the catalog when nothing was selected', async () => {
@@ -570,6 +605,8 @@ describe('BookingService', () => {
           unitLabel: 'por evento',
           unitPrice: 300,
           quantity: 1,
+          chargeBasis: 'PER_EVENT',
+          billedDays: 1,
           subtotal: 300,
         },
       ]);

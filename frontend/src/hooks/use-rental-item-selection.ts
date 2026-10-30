@@ -15,6 +15,7 @@ export const rentalItemsQueryKey = (venueId: string | undefined) => [
 export interface RentalItemLine {
   item: VenueRentalItem;
   quantity: number;
+  billedDays: number;
   subtotal: number;
 }
 
@@ -29,7 +30,7 @@ export const maxRentalItemQuantity = (item: VenueRentalItem): number =>
  * they're siblings, and the mobile form is unmounted whenever its sheet is closed. Lines are
  * derived from the current catalog, so an item the owner deleted or whose stock dropped corrects
  * itself as soon as the catalog refetches. */
-export const useRentalItemSelection = (venueId: string | undefined) => {
+export const useRentalItemSelection = (venueId: string | undefined, bookingDays = 1) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const { data: items } = useQuery({
@@ -44,10 +45,11 @@ export const useRentalItemSelection = (venueId: string | undefined) => {
         const requested = quantities[item.id];
         if (!requested || !canAddRentalItemToQuote(item)) return [];
         const quantity = Math.min(requested, maxRentalItemQuantity(item));
-        const subtotal = Math.round((item.pricePerUnit ?? 0) * quantity * 100) / 100;
-        return [{ item, quantity, subtotal }];
+        const billedDays = item.chargeBasis === 'PER_DAY' ? bookingDays : 1;
+        const subtotal = Math.round((item.pricePerUnit ?? 0) * quantity * billedDays * 100) / 100;
+        return [{ item, quantity, billedDays, subtotal }];
       }),
-    [items, quantities],
+    [items, quantities, bookingDays],
   );
 
   // Money just changed without the client touching anything, so they have to be told. Runs only

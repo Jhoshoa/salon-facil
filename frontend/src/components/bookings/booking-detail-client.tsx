@@ -8,6 +8,7 @@ import { cancelBooking, getBooking } from '@/lib/api/bookings.api';
 import { getBookingPayments } from '@/lib/api/payments.api';
 import { deleteReview, getBookingReview } from '@/lib/api/reviews.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
+import { formatRentalItemBreakdown } from '@/lib/rental-items';
 import { PaymentProofDrawer } from '@/components/payments/payment-proof-drawer';
 import { paymentTypeLabels } from '@/components/payments/payment-labels';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
@@ -231,8 +232,12 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             <ul className="mt-1 space-y-1 text-sm">
               {booking.selectedRentalItems.map((item) => (
                 <li key={item.rentalItemId} className="flex items-center justify-between gap-3">
-                  <span>
-                    {item.name} × {item.quantity}
+                  <span className="min-w-0">
+                    {item.name}
+                    <span className="block text-xs text-muted-foreground">
+                      {formatRentalItemBreakdown(item, booking.eventDate !== booking.endDate)} ·{' '}
+                      {item.unitLabel}
+                    </span>
                   </span>
                   <span className="shrink-0 text-muted-foreground">
                     {formatCurrency(item.subtotal)}

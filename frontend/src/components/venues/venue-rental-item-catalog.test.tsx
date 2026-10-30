@@ -22,6 +22,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   photoUrl: null,
   pricePerUnit: 50,
   isIncluded: false,
+  chargeBasis: 'PER_DAY',
   unitLabel: 'unidad',
   stockQty: null,
   isActive: true,
@@ -32,12 +33,14 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
 const renderCatalog = (
   quantities: Record<string, number> = {},
   onQuantityChange: (itemId: string, quantity: number) => void = jest.fn(),
+  showChargeBasis = false,
 ) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <VenueRentalItemCatalog
         venueId="venue-1"
+        showChargeBasis={showChargeBasis}
         quantities={quantities}
         onQuantityChange={onQuantityChange}
       />
@@ -99,6 +102,25 @@ describe('VenueRentalItemCatalog', () => {
     expect(await screen.findByRole('img', { name: 'Mesa redonda' })).toBeInTheDocument();
     expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Mantel blanco' })).not.toBeInTheDocument();
+  });
+
+  it('indica si se cobra por dia o por evento en locales de varios dias', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ id: 'item-1', name: 'Mesa', chargeBasis: 'PER_DAY' }),
+      makeItem({ id: 'item-2', name: 'Toldo', chargeBasis: 'PER_EVENT' }),
+    ]);
+    renderCatalog({}, jest.fn(), true);
+
+    expect(await screen.findByText(/por dia/)).toBeInTheDocument();
+    expect(screen.getByText(/por evento/)).toBeInTheDocument();
+  });
+
+  it('no menciona el tipo de cobro en locales de un solo dia', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([makeItem({ name: 'Mesa' })]);
+    renderCatalog();
+
+    await screen.findByText('Mesa');
+    expect(screen.queryByText(/por dia/)).not.toBeInTheDocument();
   });
 
   it('agrega un item cobrado aparte con cantidad 1', async () => {

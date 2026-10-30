@@ -26,6 +26,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   photoUrl: null,
   pricePerUnit: 12.5,
   isIncluded: false,
+  chargeBasis: 'PER_DAY',
   unitLabel: 'unidad',
   stockQty: 10,
   isActive: true,
@@ -68,6 +69,32 @@ describe('useRentalItemSelection', () => {
     act(() => result.current.setQuantity('item-2', 0));
     expect(result.current.lines).toHaveLength(1);
     expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it('multiplica por los dias solo los items que se cobran por dia', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ id: 'por-dia', pricePerUnit: 10, chargeBasis: 'PER_DAY' }),
+      makeItem({ id: 'por-evento', pricePerUnit: 300, chargeBasis: 'PER_EVENT' }),
+    ]);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useRentalItemSelection('venue-1', 3), { wrapper });
+    await waitFor(() =>
+      expect(queryClient.getQueryData(rentalItemsQueryKey('venue-1'))).toBeDefined(),
+    );
+
+    act(() => {
+      result.current.setQuantity('por-dia', 2);
+      result.current.setQuantity('por-evento', 1);
+    });
+
+    expect(result.current.lines.map((line) => [line.billedDays, line.subtotal])).toEqual([
+      [3, 60],
+      [1, 300],
+    ]);
+    expect(result.current.total).toBe(360);
   });
 
   it('avisa y corrige la seleccion si el dueño borra el item o baja el stock', async () => {

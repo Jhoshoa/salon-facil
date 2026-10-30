@@ -25,6 +25,7 @@ import {
 import { getMyVenues } from '@/lib/api/venues.api';
 import { getPendingOwnerPayments, confirmPayment, rejectPayment } from '@/lib/api/payments.api';
 import { formatCurrency, formatDate, formatTime12h } from '@/lib/formatters';
+import { formatRentalItemBreakdown } from '@/lib/rental-items';
 import type { Booking, BookingStatus, Payment, PaymentType } from '@/types/api';
 import { OwnerVenueSelect } from '@/components/dashboard/owner-venue-select';
 import { BookingStatusBadge } from '@/components/booking/booking-status-badge';
@@ -346,8 +347,9 @@ const BookingDetailModal = ({
                 {booking.selectedRentalItems?.map((item) => (
                   <li key={item.rentalItemId} className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">
-                      {item.name} × {item.quantity} ({formatCurrency(item.unitPrice)} /{' '}
-                      {item.unitLabel})
+                      {item.name}:{' '}
+                      {formatRentalItemBreakdown(item, booking.eventDate !== booking.endDate)} ·{' '}
+                      {item.unitLabel}
                     </span>
                     <span className="shrink-0">{formatCurrency(item.subtotal)}</span>
                   </li>

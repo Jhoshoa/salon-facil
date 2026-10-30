@@ -12,6 +12,7 @@ import {
 import { getPublicRentalItems } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
+import { chargeBasisLabels } from '@/lib/rental-items';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,8 @@ import { RentalItemQuantityStepper } from './rental-item-quantity-stepper';
 
 interface VenueRentalItemCatalogProps {
   venueId: string;
+  /** Only venues that take bookings of several days have a difference to explain. */
+  showChargeBasis?: boolean;
   quantities: Record<string, number>;
   onQuantityChange: (itemId: string, quantity: number) => void;
 }
@@ -28,6 +31,7 @@ const ALL_CATEGORIES = '__all__';
 
 export const VenueRentalItemCatalog = ({
   venueId,
+  showChargeBasis = false,
   quantities,
   onQuantityChange,
 }: VenueRentalItemCatalogProps) => {
@@ -154,6 +158,7 @@ export const VenueRentalItemCatalog = ({
                       ) : (
                         <p className="font-serif text-sm italic text-accent-foreground">
                           {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
+                          {showChargeBasis ? ` · ${chargeBasisLabels[item.chargeBasis]}` : ''}
                         </p>
                       )}
                       <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
