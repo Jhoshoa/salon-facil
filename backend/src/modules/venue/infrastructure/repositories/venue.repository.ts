@@ -1030,6 +1030,7 @@ export class VenueRepository implements IVenueRepository {
     | 'not_found'
     | 'category_not_found'
     | 'price_required'
+    | 'stock_required'
   > {
     const existing = await this.prisma.venueRentalItem.findFirst({
       where: { id: itemId, venueId },
@@ -1049,6 +1050,10 @@ export class VenueRepository implements IVenueRepository {
     if (!isIncluded && data.pricePerUnit == null && existing.pricePerUnit == null) {
       return 'price_required';
     }
+    // Same reasoning, and it's also what makes an older item without stock get completed the next
+    // time it's edited. `undefined` keeps the current value; `null` clears it.
+    const stockQty = data.stockQty === undefined ? existing.stockQty : data.stockQty;
+    if (!isIncluded && stockQty === null) return 'stock_required';
 
     // A new upload replaces the old photo; `removePhoto` clears it without a replacement. Either
     // way, the old Cloudinary asset (if any) needs cleanup -- the caller does that best-effort

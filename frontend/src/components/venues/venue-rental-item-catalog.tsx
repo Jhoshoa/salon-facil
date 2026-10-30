@@ -12,11 +12,12 @@ import {
 import { getPublicRentalItems } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
-import { chargeBasisLabels } from '@/lib/rental-items';
+import { chargeBasisLabels, groupRentalItemsByCategory } from '@/lib/rental-items';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { VenueRentalItem } from '@/types/api';
 import { RentalItemQuantityStepper } from './rental-item-quantity-stepper';
 
 interface VenueRentalItemCatalogProps {
@@ -61,6 +62,92 @@ export const VenueRentalItemCatalog = ({
   });
 
   if (items.length === 0) return null;
+
+  // A title only helps when there's more than one category on screen to tell apart.
+  const showCategoryTitles = categoryFilter === ALL_CATEGORIES && categories.length > 1;
+
+  const renderItem = (item: VenueRentalItem) => {
+    const isSelectable = canAddRentalItemToQuote(item);
+    const quantity = isSelectable ? (quantities[item.id] ?? 0) : 0;
+    const isAdded = quantity > 0;
+
+    return (
+      <div
+        key={item.id}
+        className={cn(
+          'flex gap-3 rounded-[var(--radius)] border p-2 transition-colors',
+          isAdded && 'border-primary bg-primary/5',
+        )}
+      >
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:h-20 sm:w-20">
+          {item.photoUrl ? (
+            <Image
+              src={item.photoUrl}
+              alt={item.name}
+              fill
+              className="object-cover"
+              loader={cloudinaryImageLoader}
+              sizes="80px"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              <Package className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
+          {item.description ? (
+            <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
+            <div className="min-w-0">
+              {item.pricePerUnit === null ? (
+                <Badge variant="secondary">Incluido con el local</Badge>
+              ) : (
+                <p className="font-serif text-sm italic text-accent-foreground">
+                  {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
+                  {showChargeBasis ? ` · ${chargeBasisLabels[item.chargeBasis]}` : ''}
+                </p>
+              )}
+              <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                {item.stockQty === 0 ? <span>Sin stock</span> : null}
+                {item.stockQty === null && !item.isIncluded ? (
+                  <span>Consultar disponibilidad</span>
+                ) : null}
+                {item.stockQty ? <span>Stock: {item.stockQty}</span> : null}
+                {isAdded ? (
+                  <span className="inline-flex items-center gap-0.5 font-medium text-primary">
+                    <Check className="h-3 w-3" />
+                    Agregado
+                  </span>
+                ) : null}
+              </p>
+            </div>
+            {isAdded ? (
+              <RentalItemQuantityStepper
+                itemName={item.name}
+                quantity={quantity}
+                max={maxRentalItemQuantity(item)}
+                onChange={(next) => onQuantityChange(item.id, next)}
+              />
+            ) : isSelectable ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0"
+                aria-label={`Agregar ${item.name} a la cotizacion`}
+                onClick={() => onQuantityChange(item.id, 1)}
+              >
+                Agregar
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <section className="sf-detail-section">
@@ -116,86 +203,17 @@ export const VenueRentalItemCatalog = ({
       {filteredItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ningun item coincide con tu busqueda.</p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {filteredItems.map((item) => {
-            const isSelectable = canAddRentalItemToQuote(item);
-            const quantity = isSelectable ? (quantities[item.id] ?? 0) : 0;
-            const isAdded = quantity > 0;
-
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  'flex gap-3 rounded-[var(--radius)] border p-2 transition-colors',
-                  isAdded && 'border-primary bg-primary/5',
-                )}
-              >
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:h-20 sm:w-20">
-                  {item.photoUrl ? (
-                    <Image
-                      src={item.photoUrl}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                      loader={cloudinaryImageLoader}
-                      sizes="80px"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground">
-                      <Package className="h-6 w-6" />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
-                  {item.description ? (
-                    <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
-                  ) : null}
-                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
-                    <div className="min-w-0">
-                      {item.pricePerUnit === null ? (
-                        <Badge variant="secondary">Incluido con el local</Badge>
-                      ) : (
-                        <p className="font-serif text-sm italic text-accent-foreground">
-                          {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
-                          {showChargeBasis ? ` · ${chargeBasisLabels[item.chargeBasis]}` : ''}
-                        </p>
-                      )}
-                      <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                        {item.stockQty === 0 ? <span>Sin stock</span> : null}
-                        {item.stockQty ? <span>Stock: {item.stockQty}</span> : null}
-                        {isAdded ? (
-                          <span className="inline-flex items-center gap-0.5 font-medium text-primary">
-                            <Check className="h-3 w-3" />
-                            Agregado
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                    {isAdded ? (
-                      <RentalItemQuantityStepper
-                        itemName={item.name}
-                        quantity={quantity}
-                        max={maxRentalItemQuantity(item)}
-                        onChange={(next) => onQuantityChange(item.id, next)}
-                      />
-                    ) : isSelectable ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 shrink-0"
-                        aria-label={`Agregar ${item.name} a la cotizacion`}
-                        onClick={() => onQuantityChange(item.id, 1)}
-                      >
-                        Agregar
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="space-y-5">
+          {groupRentalItemsByCategory(filteredItems).map((group) => (
+            <div key={group.category.id}>
+              {showCategoryTitles ? (
+                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  {group.category.name}
+                </h3>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">{group.items.map(renderItem)}</div>
+            </div>
+          ))}
         </div>
       )}
     </section>

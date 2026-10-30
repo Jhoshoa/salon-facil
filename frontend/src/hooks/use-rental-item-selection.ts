@@ -4,8 +4,6 @@ import { toast } from 'sonner';
 import { getPublicRentalItems } from '@/lib/api/venues.api';
 import type { VenueRentalItem } from '@/types/api';
 
-export const MAX_RENTAL_ITEM_QUANTITY = 100000;
-
 export const rentalItemsQueryKey = (venueId: string | undefined) => [
   'venue-rental-items',
   'public',
@@ -19,12 +17,12 @@ export interface RentalItemLine {
   subtotal: number;
 }
 
-/** Only items charged separately and with stock can be added to a quote. */
+/** Only items charged separately and with stock can be added to a quote. An older item with no
+ * stock at all has nothing to limit the quantity against, so it can't either until it's completed. */
 export const canAddRentalItemToQuote = (item: VenueRentalItem): boolean =>
-  !item.isIncluded && item.pricePerUnit !== null && item.stockQty !== 0;
+  !item.isIncluded && item.pricePerUnit !== null && (item.stockQty ?? 0) > 0;
 
-export const maxRentalItemQuantity = (item: VenueRentalItem): number =>
-  item.stockQty ?? MAX_RENTAL_ITEM_QUANTITY;
+export const maxRentalItemQuantity = (item: VenueRentalItem): number => item.stockQty ?? 0;
 
 /** The client's catalog selection. It lives above both the catalog and the booking form because
  * they're siblings, and the mobile form is unmounted whenever its sheet is closed. Lines are

@@ -408,6 +408,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Mantel blanco')
         .field('categoryId', mantelerialId)
         .field('pricePerUnit', '15')
+        .field('stockQty', '100')
         .attach('photo', Buffer.from('fake-image-bytes'), 'mantel.jpg')
         .expect(201)
         .then((res) => {
@@ -436,6 +437,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'No deberia crearse')
         .field('categoryId', otherCategoryRes.body.id)
         .field('pricePerUnit', '1')
+        .field('stockQty', '100')
         .expect(404);
     });
 
@@ -484,11 +486,31 @@ describe('Venues (e2e)', () => {
       const cleared = await ownerAgent
         .put(`/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`)
         .field('description', '')
-        .field('stockQty', '')
         .expect(200);
       expect(cleared.body.description).toBeNull();
-      expect(cleared.body.stockQty).toBeNull();
       expect(cleared.body.pricePerUnit).toBe(0.75);
+    });
+
+    it('does not let a charged item lose its stock, but an included one can', async () => {
+      const url = `/api/v1/venues/${rentalVenueId}/rental-items/${rentalItemId}`;
+      await ownerAgent.put(url).field('stockQty', '').expect(400);
+
+      const included = await ownerAgent
+        .put(url)
+        .field('isIncluded', 'true')
+        .field('stockQty', '')
+        .expect(200);
+      expect(included.body.stockQty).toBeNull();
+
+      // Back to charged: both the price and the stock have to come with it.
+      await ownerAgent.put(url).field('isIncluded', 'false').field('pricePerUnit', '1').expect(400);
+      const charged = await ownerAgent
+        .put(url)
+        .field('isIncluded', 'false')
+        .field('pricePerUnit', '0.75')
+        .field('stockQty', '40')
+        .expect(200);
+      expect(charged.body.stockQty).toBe(40);
     });
 
     it('rejects a non-numeric stock on update', () => {
@@ -661,6 +683,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Sin sesion')
         .field('categoryId', cristaleriaId)
         .field('pricePerUnit', '1')
+        .field('stockQty', '100')
         .expect(401);
     });
 
@@ -670,6 +693,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Ajeno')
         .field('categoryId', cristaleriaId)
         .field('pricePerUnit', '1')
+        .field('stockQty', '100')
         .expect(403);
 
       await owner2Agent
@@ -721,6 +745,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Item de prueba')
         .field('categoryId', categoryId)
         .field('pricePerUnit', '10')
+        .field('stockQty', '100')
         .expect(201);
       return res.body.id as string;
     };
@@ -766,7 +791,11 @@ describe('Venues (e2e)', () => {
       if (path === 'rental-item-categories') return req.send({ name: 'Intruso' });
       if (path.startsWith('rental-item-categories/')) return req.send({ name: 'Intruso' });
       if (path === 'rental-items') {
-        return req.field('name', 'Intruso').field('categoryId', categoryA).field('pricePerUnit', 1);
+        return req
+          .field('name', 'Intruso')
+          .field('categoryId', categoryA)
+          .field('pricePerUnit', 1)
+          .field('stockQty', 1);
       }
       if (path.startsWith('rental-items/') && method === 'PUT') {
         return req.field('name', 'Intruso');
@@ -795,6 +824,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Intruso')
         .field('categoryId', categoryA)
         .field('pricePerUnit', '1')
+        .field('stockQty', '100')
         .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
         .expect(403);
       await owner2Agent
@@ -811,6 +841,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Con categoria ajena')
         .field('categoryId', categoryB)
         .field('pricePerUnit', '1')
+        .field('stockQty', '100')
         .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
         .expect(404);
 
@@ -833,6 +864,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Cruzado')
         .field('categoryId', categoryA)
         .field('pricePerUnit', '1')
+        .field('stockQty', '100')
         .expect(404);
       await owner2Agent
         .put(`${base}/rental-items/${itemB}`)
@@ -921,17 +953,33 @@ describe('Venues (e2e)', () => {
       await ownerAgent.put(url).field('pricePerUnit', '-1').expect(400);
     });
 
-    it('treats an empty stock as "not tracked" and a blank unit as the default', async () => {
+    it('requires the stock on a charged item, but not on an included one', async () => {
+      const create = () =>
+        ownerAgent
+          .post(`/api/v1/venues/${venueA}/rental-items`)
+          .field('name', 'Sin stock')
+          .field('categoryId', categoryA);
+
+      await create().field('pricePerUnit', '5').expect(400);
+      await create().field('pricePerUnit', '5').field('stockQty', '').expect(400);
+
+      const included = await create().field('isIncluded', 'true').expect(201);
+      expect(included.body.stockQty).toBeNull();
+      await ownerAgent
+        .delete(`/api/v1/venues/${venueA}/rental-items/${included.body.id}`)
+        .expect(204);
+    });
+
+    it('treats a blank unit as the default', async () => {
       const res = await ownerAgent
         .post(`/api/v1/venues/${venueA}/rental-items`)
         .field('name', 'Campos vacios')
         .field('categoryId', categoryA)
         .field('pricePerUnit', '5')
-        .field('stockQty', '')
+        .field('stockQty', '3')
         .field('unitLabel', '   ')
         .expect(201);
 
-      expect(res.body.stockQty).toBeNull();
       expect(res.body.unitLabel).toBe('unidad');
       await ownerAgent.delete(`/api/v1/venues/${venueA}/rental-items/${res.body.id}`).expect(204);
     });
@@ -953,6 +1001,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Con foto')
         .field('categoryId', categoryA)
         .field('pricePerUnit', '5')
+        .field('stockQty', '100')
         .attach('photo', Buffer.from('fake-image-bytes'), 'x.jpg')
         .expect(201);
       const hidden = await createItem(ownerAgent, venueA, categoryA);
@@ -1055,6 +1104,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Silla de prueba')
         .field('categoryId', first.id)
         .field('pricePerUnit', '2')
+        .field('stockQty', '100')
         .expect(201);
 
       const itemsRes = await ownerAgent
@@ -1120,6 +1170,7 @@ describe('Venues (e2e)', () => {
         .field('name', 'Plato hondo')
         .field('categoryId', categoryId)
         .field('pricePerUnit', '2')
+        .field('stockQty', '100')
         .expect(201);
 
       await ownerAgent

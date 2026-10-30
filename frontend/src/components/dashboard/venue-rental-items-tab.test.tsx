@@ -9,7 +9,6 @@ import {
   deleteRentalItem,
   getOwnerRentalItems,
   getRentalItemCategories,
-  reorderRentalItems,
   updateRentalItem,
 } from '@/lib/api/venues.api';
 
@@ -32,7 +31,6 @@ const mockGetOwnerRentalItems = getOwnerRentalItems as jest.MockedFunction<
 const mockCreateRentalItem = createRentalItem as jest.MockedFunction<typeof createRentalItem>;
 const mockUpdateRentalItem = updateRentalItem as jest.MockedFunction<typeof updateRentalItem>;
 const mockDeleteRentalItem = deleteRentalItem as jest.MockedFunction<typeof deleteRentalItem>;
-const mockReorderRentalItems = reorderRentalItems as jest.MockedFunction<typeof reorderRentalItems>;
 const mockGetRentalItemCategories = getRentalItemCategories as jest.MockedFunction<
   typeof getRentalItemCategories
 >;
@@ -66,7 +64,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   isIncluded: false,
   chargeBasis: 'PER_DAY',
   unitLabel: 'unidad',
-  stockQty: null,
+  stockQty: 10,
   isActive: true,
   sortOrder: 0,
   ...overrides,
@@ -110,6 +108,7 @@ describe('VenueRentalItemsTab', () => {
     await user.type(screen.getByLabelText(/^nombre/i), 'Mesa redonda');
     await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
     await user.type(screen.getByLabelText(/^precio/i), '50');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
 
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -164,6 +163,7 @@ describe('VenueRentalItemsTab', () => {
     await user.type(screen.getByLabelText(/^nombre/i), 'Mesa redonda');
     await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
     await user.type(screen.getByLabelText(/^precio/i), '1.234');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
 
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -184,6 +184,7 @@ describe('VenueRentalItemsTab', () => {
     await user.type(screen.getByLabelText(/^nombre/i), 'Toldo');
     await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
     await user.type(screen.getByLabelText(/^precio/i), '300');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
     await user.click(screen.getByRole('radio', { name: 'Cobrar por evento completo' }));
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -242,7 +243,7 @@ describe('VenueRentalItemsTab', () => {
     mockUpdateRentalItem.mockResolvedValue(item);
     renderTab();
 
-    expect(await screen.findByText(/Mobiliario · Incluido con el local/)).toBeInTheDocument();
+    expect(await screen.findByText(/^Incluido con el local/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /editar/i }));
 
     expect(screen.getByRole('radio', { name: 'Incluido con el local' })).toBeChecked();
@@ -253,6 +254,7 @@ describe('VenueRentalItemsTab', () => {
     expect(mockUpdateRentalItem).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText(/^precio/i), '15');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() =>
@@ -306,7 +308,7 @@ describe('VenueRentalItemsTab', () => {
     );
   });
 
-  it('vaciar descripcion, stock y unidad al editar los limpia en vez de ignorarlos', async () => {
+  it('vaciar descripcion y unidad al editar los limpia en vez de ignorarlos', async () => {
     const user = userEvent.setup();
     const item = makeItem({
       id: 'item-1',
@@ -322,7 +324,6 @@ describe('VenueRentalItemsTab', () => {
     await user.click(screen.getByRole('button', { name: /editar/i }));
 
     await user.clear(screen.getByLabelText(/^descripcion/i));
-    await user.clear(screen.getByLabelText(/^stock/i));
     await user.clear(screen.getByLabelText(/^unidad/i));
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
@@ -330,10 +331,45 @@ describe('VenueRentalItemsTab', () => {
       expect(mockUpdateRentalItem).toHaveBeenCalledWith(
         'venue-1',
         'item-1',
-        expect.objectContaining({ description: null, stockQty: null, unitLabel: 'unidad' }),
+        expect.objectContaining({ description: null, stockQty: 12, unitLabel: 'unidad' }),
         undefined,
       ),
     );
+  });
+
+  it('exige la cantidad disponible en un item cobrado, pero no en uno incluido', async () => {
+    const user = userEvent.setup();
+    const item = makeItem({ id: 'item-1', stockQty: 12 });
+    mockGetOwnerRentalItems.mockResolvedValue([item]);
+    mockUpdateRentalItem.mockResolvedValue(item);
+    renderTab();
+
+    await screen.findByText('Mesa redonda');
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+    await user.clear(screen.getByLabelText(/^cantidad/i));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(screen.getByText('Indica cuantos tienes disponibles.')).toBeInTheDocument();
+    expect(mockUpdateRentalItem).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('radio', { name: 'Incluido con el local' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(mockUpdateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        'item-1',
+        expect.objectContaining({ isIncluded: true, stockQty: null }),
+        undefined,
+      ),
+    );
+  });
+
+  it('avisa al dueño si un item cobrado anterior no tiene cantidad', async () => {
+    mockGetOwnerRentalItems.mockResolvedValue([makeItem({ stockQty: null })]);
+    renderTab();
+
+    expect(await screen.findByText('Falta cantidad disponible')).toBeInTheDocument();
   });
 
   it('previsualiza una foto nueva y permite quitarla antes de guardar', async () => {
@@ -466,24 +502,29 @@ describe('VenueRentalItemsTab', () => {
     expect(screen.queryByText('Mantel blanco')).not.toBeInTheDocument();
   });
 
-  it('reordena items con las flechas', async () => {
-    const user = userEvent.setup();
+  it('agrupa los items por categoria, en el orden de las categorias, sin flechas', async () => {
     mockGetOwnerRentalItems.mockResolvedValue([
-      makeItem({ id: 'item-1', name: 'Mesa redonda', sortOrder: 0 }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', sortOrder: 1 }),
+      makeItem({
+        id: 'item-1',
+        name: 'Silla',
+        category: { id: 'cat-m', name: 'Mobiliario', sortOrder: 1 },
+        sortOrder: 0,
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Plato',
+        category: { id: 'cat-v', name: 'Vajilla', sortOrder: 0 },
+        sortOrder: 1,
+      }),
     ]);
-    mockReorderRentalItems.mockResolvedValue([]);
     renderTab();
 
-    await screen.findByText('Mesa redonda');
+    await screen.findByText('Silla');
 
-    const moveRightButtons = screen
-      .getAllByRole('button')
-      .filter((button) => button.querySelector('svg.lucide-arrow-right'));
-    await user.click(moveRightButtons[0]);
-
-    await waitFor(() =>
-      expect(mockReorderRentalItems).toHaveBeenCalledWith('venue-1', ['item-2', 'item-1']),
-    );
+    expect(
+      screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent),
+    ).toEqual(['Vajilla', 'Mobiliario']);
+    expect(screen.getByRole('button', { name: 'Arrastrar Silla para reordenar' })).toBeEnabled();
+    expect(document.querySelector('svg.lucide-arrow-right')).toBeNull();
   });
 });

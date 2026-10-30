@@ -178,7 +178,8 @@ describe('Bookings (e2e)', () => {
       let req = users.ownerAgent
         .post(`/api/v1/venues/${targetVenueId}/rental-items`)
         .field('categoryId', categoryRes.body.id);
-      for (const [key, value] of Object.entries(fields)) req = req.field(key, value);
+      const withStock = fields.isIncluded ? fields : { stockQty: '1000', ...fields };
+      for (const [key, value] of Object.entries(withStock)) req = req.field(key, value);
       const res = await req.expect(201);
       return res.body.id;
     };
@@ -326,6 +327,7 @@ describe('Bookings (e2e)', () => {
       const expensive = await createItem(itemsVenueId, {
         name: 'Carisimo',
         pricePerUnit: '999999.99',
+        stockQty: '100000',
       });
 
       await users.clientAgent

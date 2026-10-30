@@ -502,7 +502,7 @@ describe('BookingService', () => {
       pricePerUnit: 300,
       isIncluded: false,
       chargeBasis: 'PER_EVENT',
-      stockQty: null,
+      stockQty: 5,
     };
     const mesaIncluida = {
       id: 'mesa',
@@ -515,7 +515,12 @@ describe('BookingService', () => {
 
     beforeEach(() => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue());
-      mockVenueService.listPublicRentalItems.mockResolvedValue([silla, toldo, mesaIncluida]);
+      mockVenueService.listPublicRentalItems.mockResolvedValue([
+        silla,
+        toldo,
+        mesaIncluida,
+        { ...toldo, id: 'sin-stock', stockQty: null },
+      ]);
       mockBookingRepository.create.mockResolvedValue(makeBooking());
     });
 
@@ -637,6 +642,7 @@ describe('BookingService', () => {
     it.each([
       ['included with the venue', 'mesa'],
       ['deleted, inactive or from another venue', 'no-existe'],
+      ['missing its stock, from before it was required', 'sin-stock'],
     ])('rejects an item that is %s, without creating anything', async (_label, rentalItemId) => {
       await expect(
         service.requestBooking('venue-1', 'client-1', {
