@@ -131,8 +131,21 @@ export class CloudinaryService implements OnModuleInit {
     return Promise.all(uploads);
   }
 
+  /** `invalidate` also purges the CDN's copies: without it a deleted photo keeps opening from its
+   * URL until the cache expires. Callers treat a failure here as best-effort and carry on, so this
+   * is the one place that leaves a trace of the file that stayed behind, to find and remove it. */
   async deleteImage(publicId: string): Promise<void> {
     this.ensureConfigured();
-    await cloudinary.uploader.destroy(publicId);
+
+    try {
+      const { result } = await cloudinary.uploader.destroy(publicId, { invalidate: true });
+      // "not found" is fine: the goal was for the file not to exist.
+      if (result !== 'ok' && result !== 'not found') {
+        this.logger.warn(`Cloudinary no borro ${publicId}: ${result}`);
+      }
+    } catch (error) {
+      this.logger.error(`No se pudo borrar ${publicId} de Cloudinary`);
+      throw error;
+    }
   }
 }
