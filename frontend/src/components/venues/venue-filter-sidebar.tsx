@@ -215,7 +215,7 @@ export const VenueFilterSidebar = ({
           </div>
 
           <div className="sf-filter-section">
-            <p className="sf-filter-title">Comodidades</p>
+            <p className="sf-filter-title">Caracteristicas</p>
             <div className="space-y-3">
               {isCatalogLoading ? (
                 <Skeleton className="h-24 w-full" />

@@ -105,6 +105,18 @@ de construir bien (condiciones de carrera entre reservas simultaneas del mismo i
 se cancela una reserva que tenia stock comprometido, etc.), asi que no es la fase por la que
 empezar.
 
+> **Comodidades y catalogo:** son datos distintos y siguen separados. Las caracteristicas (la lista
+> comun `Amenity` que administra el admin) describen el local y alimentan los filtros de busqueda;
+> los items son lo que se entrega o alquila, con cantidad y precio. Lo que se unio es la pantalla: el
+> dueno los maneja en la pestana "Lo que ofreces", y el cliente ve todo lo incluido en una sola
+> seccion y lo que se cobra aparte en "Agrega a tu reserva". El dueno tambien puede agregar
+> caracteristicas propias con su categoria (`VenueCustomFeature`), que se muestran en la ficha pero
+> no filtran.
+>
+> Lo que se cobra aparte ahora solo son items: las comodidades con costo extra se migraron a items
+> "por evento" con cantidad 1, y las que no tenian precio quedaron inactivas. Las reservas anteriores
+> conservan sus extras en `Booking.selectedExtras`.
+
 ## 5. Modelo de datos propuesto (boceto, no final)
 
 > **Actualizacion:** `category` ya no es texto libre. Se reemplazo por `VenueRentalItemCategory`

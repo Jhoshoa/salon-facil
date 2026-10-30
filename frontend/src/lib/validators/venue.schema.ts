@@ -41,12 +41,6 @@ export const venueOpeningHourSchema = z.object({
   isClosed: z.boolean(),
 });
 
-export const venueAmenitySelectionSchema = z.object({
-  amenityId: z.string(),
-  isIncluded: z.boolean(),
-  extraCost: z.coerce.number().min(0).optional(),
-});
-
 export const venueFormSchema = z.object({
   name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres').max(100),
   description: z
@@ -95,7 +89,6 @@ export const venueFormSchema = z.object({
   basePrice: z.coerce
     .number({ invalid_type_error: 'Ingresa un precio base' })
     .min(1, 'Ingresa un precio base'),
-  amenities: z.array(venueAmenitySelectionSchema).default([]),
   useTypes: z.array(z.string()).default([]),
   openingHours: z.array(venueOpeningHourSchema).length(7),
 });
@@ -137,7 +130,6 @@ export const venueFormDefaults: VenueFormValues = {
   rules: '',
   cancellationPolicy: '',
   basePrice: 0,
-  amenities: [],
   useTypes: [],
   openingHours: defaultOpeningHours,
 };

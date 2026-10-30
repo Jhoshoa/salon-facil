@@ -84,20 +84,20 @@ const SortableRentalItemRow = ({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'flex flex-wrap items-center gap-4 bg-background p-4',
+        'flex items-center gap-2 bg-background p-3 sm:gap-4 sm:p-4',
         isDragging && 'relative z-10 shadow-md',
       )}
     >
       <button
         type="button"
-        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        className="shrink-0 cursor-grab touch-none p-1 text-muted-foreground active:cursor-grabbing"
         aria-label={`Arrastrar ${item.name} para reordenar`}
         {...attributes}
         {...listeners}
       >
         <GripVertical className="h-4 w-4" />
       </button>
-      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted">
+      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:h-16 sm:w-16">
         {item.photoUrl ? (
           <Image
             src={item.photoUrl}
@@ -110,8 +110,8 @@ const SortableRentalItemRow = ({
         ) : null}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="font-medium">{item.name}</p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="line-clamp-2 break-words text-sm font-medium sm:text-base">{item.name}</p>
           {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
           {needsStock ? <Badge variant="destructive">Falta cantidad disponible</Badge> : null}
         </div>
@@ -124,10 +124,18 @@ const SortableRentalItemRow = ({
           {item.stockQty !== null ? ` · stock ${item.stockQty}` : ''}
         </p>
       </div>
-      <div className="flex items-center gap-1">
-        <Button type="button" size="sm" variant="outline" onClick={onEdit}>
+      <div className="flex shrink-0 items-center gap-1">
+        {/* Icon only on narrow screens: the label would leave the item's own text no room. */}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="px-2.5 sm:px-3"
+          onClick={onEdit}
+          aria-label={`Editar ${item.name}`}
+        >
           <Pencil className="h-4 w-4" />
-          Editar
+          <span className="hidden sm:inline">Editar</span>
         </Button>
         <Button
           type="button"
@@ -462,14 +470,14 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold">Catalogo de alquiler</h3>
+          <h3 className="text-base font-semibold">Items y servicios</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             Items que ofreces (vajilla, mobiliario, decoracion), incluidos con el local o con precio
             aparte, y su stock informativo. El visitante los ve en la ficha publica y puede agregar
             a su solicitud los que se cobran aparte. Tu confirmas la disponibilidad al revisarla.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             size="sm"
@@ -504,7 +512,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
             placeholder="Buscar por nombre..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-56"
+            className="w-full sm:w-56"
           />
         </div>
       ) : null}

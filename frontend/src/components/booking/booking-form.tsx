@@ -117,7 +117,6 @@ export const BookingForm = ({
       endTime: defaultSchedule.endTime,
       guestCount: Math.min(venue.capacityMax, 100),
       specialRequests: '',
-      selectedAmenityIds: [],
     },
   });
 
@@ -202,7 +201,6 @@ export const BookingForm = ({
       values.startTime,
       values.endTime,
       dailyScheduleEntries,
-      values.selectedAmenityIds,
       selectedRentalItems,
     ],
     queryFn: () =>
@@ -212,11 +210,10 @@ export const BookingForm = ({
         startTime: values.startTime,
         endTime: values.endTime,
         dailySchedule: dailyScheduleEntries,
-        selectedAmenityIds: values.selectedAmenityIds,
         selectedRentalItems,
       }),
     enabled: canPreview,
-    // Ticking an extra or nudging a date changes the query key, which would otherwise blank
+    // Adding an item or nudging a date changes the query key, which would otherwise blank
     // the price card back to its "no preview yet" state for a beat while the new total loads —
     // keep showing the last result in the meantime so the number updates smoothly in place.
     placeholderData: keepPreviousData,
@@ -231,20 +228,6 @@ export const BookingForm = ({
     if (previewQuery.isError) refreshRentalItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewQuery.isError]);
-
-  const extraAmenities = useMemo(
-    () => (venue.amenities ?? []).filter((item) => !item.isIncluded && item.extraCost),
-    [venue.amenities],
-  );
-
-  const selectedAmenityIds = form.watch('selectedAmenityIds');
-
-  const toggleAmenity = (id: string) => {
-    const next = selectedAmenityIds.includes(id)
-      ? selectedAmenityIds.filter((item) => item !== id)
-      : [...selectedAmenityIds, id];
-    form.setValue('selectedAmenityIds', next, { shouldDirty: true, shouldValidate: true });
-  };
 
   const openingHourByWeekday = useMemo(
     () => new Map((venue.openingHours ?? []).map((h) => [h.dayOfWeek, h])),
@@ -357,11 +340,6 @@ export const BookingForm = ({
           ) : !previewQuery.data && basePrice > 0 ? (
             <p className="mt-1 text-xs text-muted-foreground">
               {capitalize(unitLabels[venue.priceUnit])}
-            </p>
-          ) : null}
-          {previewQuery.data?.extrasTotal ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Incluye {formatCurrency(previewQuery.data.extrasTotal)} en extras
             </p>
           ) : null}
           {previewQuery.data?.rentalItemsTotal ? (
@@ -625,38 +603,13 @@ export const BookingForm = ({
           </p>
         ) : null}
 
-        {extraAmenities.length > 0 ? (
-          <div>
-            <p className={fieldLabelClass}>Extras opcionales</p>
-            <div>
-              {extraAmenities.map((item) => (
-                <label
-                  key={item.id}
-                  className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={selectedAmenityIds.includes(item.amenity.id)}
-                      onChange={() => toggleAmenity(item.amenity.id)}
-                      className="h-4 w-4 rounded-none border-foreground accent-primary"
-                    />
-                    {item.amenity.name}
-                  </span>
-                  <span className="font-serif italic text-accent-foreground">
-                    {formatCurrency(item.extraCost ?? 0)}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         {hasRentalItems ? (
           <div>
             <p className={fieldLabelClass}>Items del catalogo</p>
-            {/* Capped so a long selection can't push the submit button out of the sticky aside. */}
-            <ul className="max-h-48 overflow-y-auto pr-1">
+            {/* Capped so a long selection can't push the submit button out of the sticky aside. The
+             * mobile sheet already scrolls as a whole, so a second scroll there would only get in
+             * the way. */}
+            <ul className="lg:max-h-48 lg:overflow-y-auto lg:pr-1">
               {rentalItemLines.map((line) => (
                 <li
                   key={line.item.id}

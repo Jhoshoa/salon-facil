@@ -35,7 +35,7 @@ const navItems = [
   { href: '/admin/payments', label: 'Pagos y disputas', icon: CreditCard },
   { href: '/admin/catalog/space-types', label: 'Tipos de espacio', icon: LayoutGrid },
   { href: '/admin/catalog/use-types', label: 'Tipos de evento', icon: Sparkles },
-  { href: '/admin/catalog/amenities', label: 'Comodidades', icon: Tag },
+  { href: '/admin/catalog/amenities', label: 'Caracteristicas', icon: Tag },
   { href: '/admin/catalog/seasonal-events', label: 'Feriados y temporadas', icon: CalendarRange },
   { href: '/admin/audit-log', label: 'Historial de acciones', icon: History },
 ];

@@ -1021,6 +1021,115 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  describe('PUT /api/v1/venues/:id/features', () => {
+    let featuresVenueId: string;
+    let amenityA: string;
+    let amenityB: string;
+
+    const url = () => `/api/v1/venues/${featuresVenueId}/features`;
+    const feature = { name: 'Pista de madera', category: 'FACILITY' };
+
+    beforeAll(async () => {
+      featuresVenueId = await createVerifiedVenue(ownerAgent, adminAgent, uniqueId);
+      const catalog = await request(app.getHttpServer())
+        .get('/api/v1/venues/catalog/amenities')
+        .expect(200);
+      const all = Object.values(catalog.body).flat() as { id: string }[];
+      amenityA = all[0].id;
+      amenityB = all[1].id;
+    }, 30000);
+
+    it('saves both kinds, always as included, and shows them publicly', async () => {
+      const saved = await ownerAgent
+        .put(url())
+        .send({
+          amenityIds: [amenityA],
+          customFeatures: [{ ...feature, name: '  Pista de madera ' }],
+        })
+        .expect(200);
+
+      expect(saved.body.amenities).toEqual([
+        expect.objectContaining({
+          isIncluded: true,
+          amenity: expect.objectContaining({ id: amenityA }),
+        }),
+      ]);
+      expect(saved.body.customFeatures).toEqual([
+        expect.objectContaining({ name: 'Pista de madera', category: 'FACILITY' }),
+      ]);
+
+      const venue = await request(app.getHttpServer())
+        .get(`/api/v1/venues/${saved.body.slug}`)
+        .expect(200);
+      expect(venue.body.customFeatures[0].name).toBe('Pista de madera');
+    });
+
+    it('replaces the previous selection, and can clear it', async () => {
+      const replaced = await ownerAgent
+        .put(url())
+        .send({ amenityIds: [amenityB], customFeatures: [] })
+        .expect(200);
+      expect(
+        replaced.body.amenities.map((item: { amenity: { id: string } }) => item.amenity.id),
+      ).toEqual([amenityB]);
+      expect(replaced.body.customFeatures).toEqual([]);
+
+      const cleared = await ownerAgent
+        .put(url())
+        .send({ amenityIds: [], customFeatures: [] })
+        .expect(200);
+      expect(cleared.body.amenities).toEqual([]);
+    });
+
+    it('keeps them when the rest of the venue is saved', async () => {
+      await ownerAgent
+        .put(url())
+        .send({ amenityIds: [amenityA], customFeatures: [feature] })
+        .expect(200);
+
+      const res = await ownerAgent
+        .put(`/api/v1/venues/${featuresVenueId}`)
+        .field('rules', 'No fumar')
+        .expect(200);
+
+      expect(res.body.amenities).toHaveLength(1);
+      expect(res.body.customFeatures).toHaveLength(1);
+    });
+
+    it.each([
+      ['repeated ignoring case and accents', [feature, { ...feature, name: 'PISTA-DE MÁDERA' }]],
+      ['too short after trimming', [{ ...feature, name: '  a ' }]],
+      ['too long', [{ ...feature, name: 'x'.repeat(61) }]],
+      ['without a valid category', [{ ...feature, category: 'INVENTADA' }]],
+      ['without a category', [{ name: 'Sin categoria' }]],
+      [
+        'more than the limit',
+        Array.from({ length: 21 }, (_, index) => ({ ...feature, name: `Propia ${index}` })),
+      ],
+    ])('rejects custom features that are %s', (_label, customFeatures) => {
+      return ownerAgent.put(url()).send({ amenityIds: [], customFeatures }).expect(400);
+    });
+
+    it('rejects amenity ids that are not valid, unknown or repeated', async () => {
+      const send = (amenityIds: unknown) =>
+        ownerAgent.put(url()).send({ amenityIds, customFeatures: [] }).expect(400);
+
+      await send(['abc']);
+      await send(['00000000-0000-4000-8000-000000000000']);
+      await send([amenityA, amenityA]);
+      await send('abc');
+    });
+
+    it('only lets the owner or an admin change them', async () => {
+      const body = { amenityIds: [], customFeatures: [feature] };
+
+      await request(app.getHttpServer()).put(url()).send(body).expect(401);
+      await clientAgent.put(url()).send(body).expect(403);
+      await owner2Agent.put(url()).send(body).expect(403);
+      await adminAgent.put(url()).send(body).expect(200);
+    });
+  });
+
   describe('Venue rental item categories (e2e)', () => {
     let categoryVenueId: string;
 

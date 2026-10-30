@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { MapPin, Trash2 } from 'lucide-react';
 import {
   createVenue,
-  getAmenitiesCatalog,
   getSeasonalEventsCatalog,
   getSpaceTypesCatalog,
   getUseTypesCatalog,
@@ -21,30 +20,20 @@ import {
   venueFormSchema,
   type VenueFormValues,
 } from '@/lib/validators/venue.schema';
-import {
-  amenityCategoryLabels,
-  departamentoLabels,
-  priceUnitLabels,
-} from '@/components/venues/venue-filter-labels';
+import { departamentoLabels, priceUnitLabels } from '@/components/venues/venue-filter-labels';
+import { VenueCharacteristicsSection } from './venue-characteristics-section';
 import { VenueRentalItemsTab } from './venue-rental-items-tab';
 import { formatDate, formatTime12h } from '@/lib/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { PhoneInput } from '@/components/shared/phone-input';
 import { Button } from '@/components/ui/button';
 import { AppDrawer } from '@/components/shared/app-drawer';
 import { VenueLocationPickerDialog } from '@/components/venues/venue-location-picker-dialog';
-import type {
-  AmenityCategory,
-  PriceUnit,
-  Venue,
-  VenueFormPayload,
-  VenuePriceInput,
-} from '@/types/api';
+import type { PriceUnit, Venue, VenueFormPayload, VenuePriceInput } from '@/types/api';
 
 interface VenueFormProps {
   venue?: Venue;
@@ -147,14 +136,12 @@ const buildInitialPricingMode = (venue?: Venue): PricingMode => {
   return 'single';
 };
 
-export type TabKey =
-  'general' | 'location' | 'pricing' | 'amenities' | 'catalog' | 'hours' | 'rules';
+export type TabKey = 'general' | 'location' | 'pricing' | 'offerings' | 'hours' | 'rules';
 
 export const tabs: { key: TabKey; label: string }[] = [
   { key: 'general', label: 'General' },
   { key: 'location', label: 'Ubicacion' },
-  { key: 'amenities', label: 'Comodidades' },
-  { key: 'catalog', label: 'Catalogo' },
+  { key: 'offerings', label: 'Lo que ofreces' },
   { key: 'pricing', label: 'Precios y capacidad' },
   { key: 'hours', label: 'Horarios' },
   { key: 'rules', label: 'Reglas' },
@@ -187,7 +174,6 @@ const fieldTab: Record<keyof VenueFormValues, TabKey> = {
   paymentPolicy: 'pricing',
   depositPercentage: 'pricing',
   basePrice: 'pricing',
-  amenities: 'amenities',
   useTypes: 'general',
   openingHours: 'hours',
   rules: 'rules',
@@ -224,11 +210,6 @@ const venueToFormValues = (venue: Venue): VenueFormValues => {
     rules: venue.rules ?? '',
     cancellationPolicy: venue.cancellationPolicy ?? '',
     basePrice,
-    amenities: (venue.amenities ?? []).map((a) => ({
-      amenityId: a.amenity.id,
-      isIncluded: a.isIncluded,
-      extraCost: a.extraCost ?? undefined,
-    })),
     useTypes: (venue.uses ?? []).map((u) => u.useTypeId),
     openingHours: Array.from({ length: 7 }).map((_, dayOfWeek) => {
       const existing = hoursByDay.get(dayOfWeek);
@@ -295,7 +276,6 @@ const toPayload = (
         discountLabel: price.discountLabel ?? undefined,
       })),
   ],
-  amenities: values.amenities,
   useTypes: values.useTypes.map((useTypeId, index) => ({
     useTypeId,
     isPrimary: index === 0,
@@ -334,10 +314,6 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
   const [specificDateDraftError, setSpecificDateDraftError] = useState<string | null>(null);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
 
-  const amenitiesQuery = useQuery({
-    queryKey: ['venue-catalog', 'amenities'],
-    queryFn: getAmenitiesCatalog,
-  });
   const spaceTypesQuery = useQuery({
     queryKey: ['venue-catalog', 'space-types'],
     queryFn: getSpaceTypesCatalog,
@@ -576,7 +552,6 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     },
   });
 
-  const amenities = form.watch('amenities');
   const useTypes = form.watch('useTypes');
   const openingHours = form.watch('openingHours');
   const spaceType = form.watch('spaceType');
@@ -594,34 +569,6 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     (pricingMode === 'weekday_season' &&
       seasonRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR')) ||
     specificDateRules.some((rule) => (rule.unit || defaultPriceUnit) === 'HOUR');
-
-  const toggleAmenity = (id: string) => {
-    const exists = amenities.some((item) => item.amenityId === id);
-    const next = exists
-      ? amenities.filter((item) => item.amenityId !== id)
-      : [...amenities, { amenityId: id, isIncluded: true, extraCost: undefined }];
-    form.setValue('amenities', next, { shouldDirty: true });
-  };
-
-  const setAmenityIncluded = (id: string, isIncluded: boolean) => {
-    form.setValue(
-      'amenities',
-      amenities.map((item) =>
-        item.amenityId === id
-          ? { ...item, isIncluded, extraCost: isIncluded ? undefined : item.extraCost }
-          : item,
-      ),
-      { shouldDirty: true },
-    );
-  };
-
-  const setAmenityExtraCost = (id: string, extraCost: number | undefined) => {
-    form.setValue(
-      'amenities',
-      amenities.map((item) => (item.amenityId === id ? { ...item, extraCost } : item)),
-      { shouldDirty: true },
-    );
-  };
 
   const handleLocationConfirm = (latitude: number, longitude: number) => {
     form.setValue('latitude', latitude.toFixed(6), { shouldValidate: true, shouldDirty: true });
@@ -669,7 +616,7 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
     mutation.mutate(values);
   };
 
-  return (
+  const formElement = (
     <form className="space-y-5" onSubmit={form.handleSubmit(onValid, onInvalid)}>
       {!isTabControlled ? (
         <div className="flex flex-wrap gap-2 border-b pb-3">
@@ -1441,74 +1388,6 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
             </div>
           ) : null}
 
-          {activeTab === 'amenities' ? (
-            <div className="space-y-5">
-              {amenitiesQuery.isLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando comodidades...</p>
-              ) : (
-                Object.entries(amenitiesQuery.data ?? {}).map(([category, items]) => (
-                  <div key={category} className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {amenityCategoryLabels[category as AmenityCategory]}
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {items?.map((amenity) => {
-                        const entry = amenities.find((item) => item.amenityId === amenity.id);
-                        return (
-                          <div
-                            key={amenity.id}
-                            className="sf-surface space-y-2 rounded-[var(--radius)] p-2.5"
-                          >
-                            <label className="sf-filter-option cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(entry)}
-                                onChange={() => toggleAmenity(amenity.id)}
-                                className="h-4 w-4 rounded border-input accent-primary"
-                              />
-                              {amenity.name}
-                            </label>
-                            {entry ? (
-                              <div className="flex flex-wrap items-center gap-2 pl-6">
-                                <span className="w-12 text-xs text-muted-foreground">
-                                  {entry.isIncluded ? 'Incluido' : 'Extra'}
-                                </span>
-                                <Switch
-                                  checked={!entry.isIncluded}
-                                  onCheckedChange={(checked) =>
-                                    setAmenityIncluded(amenity.id, !checked)
-                                  }
-                                  aria-label={`${amenity.name} con costo extra`}
-                                />
-                                {!entry.isIncluded ? (
-                                  <div className="sf-surface flex h-8 items-center gap-1.5 rounded-[var(--radius)] px-2">
-                                    <span className="text-xs text-muted-foreground">Bs</span>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      className="h-6 w-16 rounded-sm border border-input bg-background px-1.5 py-0 text-sm leading-none shadow-none [appearance:textfield] focus-visible:ring-1 focus-visible:ring-primary/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                      value={entry.extraCost ?? ''}
-                                      onChange={(e) =>
-                                        setAmenityExtraCost(
-                                          amenity.id,
-                                          e.target.value ? Number(e.target.value) : undefined,
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : null}
-
           {activeTab === 'hours' ? (
             <div className="space-y-3">
               {openingHours.map((day) => (
@@ -1592,26 +1471,45 @@ export const VenueForm = ({ venue, activeTab: controlledTab, onTabChange }: Venu
               </div>
             </div>
           ) : null}
-
-          {activeTab === 'catalog' ? (
-            venue ? (
-              <VenueRentalItemsTab venue={venue} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Guarda el local primero para poder agregar items al catalogo de alquiler.
-              </p>
-            )
-          ) : null}
         </CardContent>
       </Card>
 
-      {activeTab !== 'catalog' ? (
-        <div className="flex justify-end">
-          <SubmitButton isLoading={mutation.isPending}>
-            {isEdit ? 'Guardar cambios' : 'Crear local'}
-          </SubmitButton>
-        </div>
-      ) : null}
+      <div className="flex justify-end">
+        <SubmitButton isLoading={mutation.isPending}>
+          {isEdit ? 'Guardar cambios' : 'Crear local'}
+        </SubmitButton>
+      </div>
     </form>
+  );
+
+  if (activeTab !== 'offerings') return formElement;
+
+  // No form on this tab: features and items each save on their own, so a save here can't be held
+  // back by an unrelated error on another tab.
+  if (!venue) {
+    return (
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">
+            Guarda el local primero para poder indicar lo que ofreces.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-3 sm:p-5">
+          <VenueCharacteristicsSection venue={venue} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-3 sm:p-5">
+          <VenueRentalItemsTab venue={venue} />
+        </CardContent>
+      </Card>
+    </div>
   );
 };

@@ -40,7 +40,6 @@ export const previewBookingPrice = async (
     startTime: string;
     endTime: string;
     dailySchedule?: DailyScheduleEntry[];
-    selectedAmenityIds?: string[];
     selectedRentalItems?: RentalItemSelectionEntry[];
   },
 ): Promise<RangePriceCalculation> => {
@@ -51,9 +50,6 @@ export const previewBookingPrice = async (
     ...(params.endDate ? { endDate: params.endDate } : {}),
     ...(params.dailySchedule?.length
       ? { dailySchedule: JSON.stringify(params.dailySchedule) }
-      : {}),
-    ...(params.selectedAmenityIds?.length
-      ? { selectedAmenityIds: params.selectedAmenityIds.join(',') }
       : {}),
     ...(params.selectedRentalItems?.length
       ? { selectedRentalItems: JSON.stringify(params.selectedRentalItems) }

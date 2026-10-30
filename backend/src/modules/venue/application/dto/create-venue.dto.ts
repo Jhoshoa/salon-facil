@@ -158,15 +158,6 @@ export class CreateVenueAmenityDto {
   amenityId!: string;
 
   @IsOptional()
-  @IsBoolean()
-  isIncluded: boolean = true;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  extraCost?: number;
-
-  @IsOptional()
   @IsString()
   notes?: string;
 }

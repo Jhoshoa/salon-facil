@@ -35,6 +35,7 @@ import {
   UpdateCatalogItemDto,
   UpdateSeasonalEventDto,
 } from '../application/dto/catalog.dto';
+import { UpdateVenueFeaturesDto } from '../application/dto/venue-features.dto';
 import {
   CreateRentalItemDto,
   ReorderRentalItemsDto,
@@ -428,6 +429,19 @@ export class VenueController {
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
     await this.venueService.deleteVenueMedia(id, mediaId, user.id, user.role);
+  }
+
+  @Put(':id/features')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reemplazar las caracteristicas del local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Local con sus caracteristicas actualizadas' })
+  async updateFeatures(
+    @Param('id') id: string,
+    @Body() dto: UpdateVenueFeaturesDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.updateVenueFeatures(id, user.id, user.role, dto);
   }
 
   // ========== RENTAL ITEM CATALOG (Fase 1 -- ver docs/brainstorm/catalogo-alquiler-items.md) ==========
