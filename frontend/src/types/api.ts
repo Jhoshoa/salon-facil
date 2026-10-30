@@ -454,6 +454,21 @@ export interface SelectedExtra {
   extraCost: number;
 }
 
+/** Foto del item del catalogo al momento de la solicitud: no cambia si el dueño lo edita despues. */
+export interface SelectedRentalItem {
+  rentalItemId: string;
+  name: string;
+  unitLabel: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface RentalItemSelectionEntry {
+  rentalItemId: string;
+  quantity: number;
+}
+
 export interface Booking {
   id: string;
   venueId: string;
@@ -472,6 +487,7 @@ export interface Booking {
   status: BookingStatus;
   specialRequests: string | null;
   selectedExtras: SelectedExtra[] | null;
+  selectedRentalItems: SelectedRentalItem[] | null;
   venue?: Venue;
   client?: { id: string; fullName: string; email: string; phone: string | null };
   /** The backend always includes this (every booking query eager-loads payments), so it's safe
@@ -520,6 +536,8 @@ export interface CreateBookingPayload {
   dailySchedule?: DailyScheduleEntry[];
   /** IDs de comodidades con costo extra elegidas por el cliente. */
   selectedAmenityIds?: string[];
+  /** Items del catalogo elegidos por el cliente, con su cantidad. */
+  selectedRentalItems?: RentalItemSelectionEntry[];
 }
 
 export interface DailyPriceBreakdown {
@@ -537,6 +555,8 @@ export interface RangePriceCalculation {
   days: DailyPriceBreakdown[];
   extras?: SelectedExtra[];
   extrasTotal?: number;
+  rentalItems?: SelectedRentalItem[];
+  rentalItemsTotal?: number;
 }
 
 export interface CreateBookingResponse {

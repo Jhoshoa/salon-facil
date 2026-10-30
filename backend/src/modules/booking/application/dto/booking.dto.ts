@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -20,6 +21,9 @@ import { Transform, Type } from 'class-transformer';
 import { CalendarBlockStatus } from '@prisma/client';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// preview-price carries the selection in the query string, so this also keeps that URL at a
+// length proxies accept.
+const MAX_SELECTED_RENTAL_ITEMS = 50;
 
 /** `dailySchedule` arrives as a real array in a JSON POST body, but as a JSON-encoded
  * string in GET query params (preview-price) — parse it back into an array either way. */
@@ -39,6 +43,26 @@ function parseDailyScheduleArray(value: unknown): unknown {
   }
 
   return parsedValue.map((item) => Object.assign(new DailyScheduleEntryDto(), item));
+}
+
+/** Same as parseDailyScheduleArray: a real array in a JSON POST body, a JSON-encoded string in
+ * GET query params (preview-price). */
+function parseSelectedRentalItems(value: unknown): unknown {
+  let parsedValue = value;
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      parsedValue = JSON.parse(value) as unknown;
+    } catch {
+      return value;
+    }
+  }
+
+  if (!Array.isArray(parsedValue)) {
+    return value;
+  }
+
+  return parsedValue.map((item) => Object.assign(new SelectedRentalItemDto(), item));
 }
 
 /** `selectedAmenityIds` arrives as a real array in a JSON POST body, but as a single
@@ -65,6 +89,17 @@ export class DailyScheduleEntryDto {
   @IsString({ message: 'La hora de fin es requerida' })
   @Matches(TIME_PATTERN, { message: 'La hora de fin debe tener formato HH:MM' })
   endTime!: string;
+}
+
+/** Un item del catalogo elegido por el cliente, con la cantidad que necesita. */
+export class SelectedRentalItemDto {
+  @IsUUID('4', { message: 'El item elegido no es valido' })
+  rentalItemId!: string;
+
+  @IsInt({ message: 'La cantidad debe ser un numero entero' })
+  @Min(1, { message: 'La cantidad debe ser al menos 1' })
+  @Max(100000, { message: 'La cantidad no puede exceder 100000' })
+  quantity!: number;
 }
 
 export class CreateBookingDto {
@@ -115,6 +150,16 @@ export class CreateBookingDto {
   @IsArray()
   @IsUUID('4', { each: true })
   selectedAmenityIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => parseSelectedRentalItems(value))
+  @IsArray()
+  @ArrayMaxSize(MAX_SELECTED_RENTAL_ITEMS, {
+    message: `Puedes elegir hasta ${MAX_SELECTED_RENTAL_ITEMS} items del catalogo`,
+  })
+  @ValidateNested({ each: true })
+  @Type(() => SelectedRentalItemDto)
+  selectedRentalItems?: SelectedRentalItemDto[];
 }
 
 export class CheckAvailabilityDto {
@@ -170,6 +215,16 @@ export class PreviewPriceDto {
   @IsArray()
   @IsUUID('4', { each: true })
   selectedAmenityIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => parseSelectedRentalItems(value))
+  @IsArray()
+  @ArrayMaxSize(MAX_SELECTED_RENTAL_ITEMS, {
+    message: `Puedes elegir hasta ${MAX_SELECTED_RENTAL_ITEMS} items del catalogo`,
+  })
+  @ValidateNested({ each: true })
+  @Type(() => SelectedRentalItemDto)
+  selectedRentalItems?: SelectedRentalItemDto[];
 }
 
 export class CreateCalendarBlockDto {

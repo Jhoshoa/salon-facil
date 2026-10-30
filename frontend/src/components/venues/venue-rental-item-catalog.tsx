@@ -3,26 +3,39 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
-import { Package, Search } from 'lucide-react';
+import { Check, Package, Search } from 'lucide-react';
+import {
+  canAddRentalItemToQuote,
+  maxRentalItemQuantity,
+  rentalItemsQueryKey,
+} from '@/hooks/use-rental-item-selection';
 import { getPublicRentalItems } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RentalItemQuantityStepper } from './rental-item-quantity-stepper';
 
 interface VenueRentalItemCatalogProps {
   venueId: string;
+  quantities: Record<string, number>;
+  onQuantityChange: (itemId: string, quantity: number) => void;
 }
 
 const ALL_CATEGORIES = '__all__';
 
-export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps) => {
+export const VenueRentalItemCatalog = ({
+  venueId,
+  quantities,
+  onQuantityChange,
+}: VenueRentalItemCatalogProps) => {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [search, setSearch] = useState('');
 
   const query = useQuery({
-    queryKey: ['venue-rental-items', 'public', venueId],
+    queryKey: rentalItemsQueryKey(venueId),
     queryFn: () => getPublicRentalItems(venueId),
   });
 
@@ -49,8 +62,8 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
     <section className="sf-detail-section">
       <h2 className="sf-detail-title">Catalogo de alquiler</h2>
       <p className="mb-4 text-sm text-muted-foreground">
-        Lo que ofrece el local, con precio y disponibilidad informativa. Lo que se cobra aparte se
-        consulta por WhatsApp junto con tu reserva.
+        Lo que ofrece el local. Agrega a tu cotizacion lo que se cobra aparte: el propietario
+        confirma que lo tenga disponible para tu fecha al revisar tu solicitud.
       </p>
 
       {categories.length > 1 || items.length > 4 ? (
@@ -100,44 +113,84 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
         <p className="text-sm text-muted-foreground">Ningun item coincide con tu busqueda.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {filteredItems.map((item) => (
-            <div key={item.id} className="flex gap-3 rounded-[var(--radius)] border p-2">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:h-20 sm:w-20">
-                {item.photoUrl ? (
-                  <Image
-                    src={item.photoUrl}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                    loader={cloudinaryImageLoader}
-                    sizes="80px"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
-                    <Package className="h-6 w-6" />
-                  </div>
+          {filteredItems.map((item) => {
+            const isSelectable = canAddRentalItemToQuote(item);
+            const quantity = isSelectable ? (quantities[item.id] ?? 0) : 0;
+            const isAdded = quantity > 0;
+
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  'flex gap-3 rounded-[var(--radius)] border p-2 transition-colors',
+                  isAdded && 'border-primary bg-primary/5',
                 )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
-                {item.description ? (
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
-                ) : null}
-                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 pt-0.5">
-                  {item.pricePerUnit === null ? (
-                    <Badge variant="secondary">Incluido con el local</Badge>
+              >
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:h-20 sm:w-20">
+                  {item.photoUrl ? (
+                    <Image
+                      src={item.photoUrl}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                      loader={cloudinaryImageLoader}
+                      sizes="80px"
+                    />
                   ) : (
-                    <span className="font-serif text-sm italic text-accent-foreground">
-                      {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
-                    </span>
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                      <Package className="h-6 w-6" />
+                    </div>
                   )}
-                  {item.stockQty !== null ? (
-                    <span className="text-xs text-muted-foreground">Stock: {item.stockQty}</span>
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
+                  {item.description ? (
+                    <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
                   ) : null}
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
+                    <div className="min-w-0">
+                      {item.pricePerUnit === null ? (
+                        <Badge variant="secondary">Incluido con el local</Badge>
+                      ) : (
+                        <p className="font-serif text-sm italic text-accent-foreground">
+                          {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
+                        </p>
+                      )}
+                      <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                        {item.stockQty === 0 ? <span>Sin stock</span> : null}
+                        {item.stockQty ? <span>Stock: {item.stockQty}</span> : null}
+                        {isAdded ? (
+                          <span className="inline-flex items-center gap-0.5 font-medium text-primary">
+                            <Check className="h-3 w-3" />
+                            Agregado
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                    {isAdded ? (
+                      <RentalItemQuantityStepper
+                        itemName={item.name}
+                        quantity={quantity}
+                        max={maxRentalItemQuantity(item)}
+                        onChange={(next) => onQuantityChange(item.id, next)}
+                      />
+                    ) : isSelectable ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shrink-0"
+                        aria-label={`Agregar ${item.name} a la cotizacion`}
+                        onClick={() => onQuantityChange(item.id, 1)}
+                      >
+                        Agregar
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

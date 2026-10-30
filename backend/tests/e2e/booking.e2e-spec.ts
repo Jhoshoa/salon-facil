@@ -161,6 +161,124 @@ describe('Bookings (e2e)', () => {
     });
   });
 
+  describe('Catalog items in the quote', () => {
+    let itemsVenueId: string;
+    let chargedItemId: string;
+    let includedItemId: string;
+    let otherVenueItemId: string;
+
+    const createItem = async (
+      targetVenueId: string,
+      fields: Record<string, string>,
+    ): Promise<string> => {
+      const categoryRes = await users.ownerAgent
+        .post(`/api/v1/venues/${targetVenueId}/rental-item-categories`)
+        .send({ name: `Categoria ${Math.random().toString(36).slice(2, 8)}` })
+        .expect(201);
+      let req = users.ownerAgent
+        .post(`/api/v1/venues/${targetVenueId}/rental-items`)
+        .field('categoryId', categoryRes.body.id);
+      for (const [key, value] of Object.entries(fields)) req = req.field(key, value);
+      const res = await req.expect(201);
+      return res.body.id;
+    };
+
+    const previewWith = (selection: unknown) =>
+      request(app.getHttpServer())
+        .get(`/api/v1/venues/${itemsVenueId}/bookings/preview-price`)
+        .query({
+          eventDate: futureDate(70),
+          startTime: '14:00',
+          endTime: '20:00',
+          selectedRentalItems: JSON.stringify(selection),
+        });
+
+    beforeAll(async () => {
+      const adminAgent = await loginAdmin(app);
+      itemsVenueId = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
+        capacityMax: 100,
+        basePrice: 1000,
+      });
+      const otherVenueId = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
+        capacityMax: 100,
+        basePrice: 1000,
+      });
+      chargedItemId = await createItem(itemsVenueId, {
+        name: 'Silla',
+        pricePerUnit: '12.5',
+        stockQty: '80',
+      });
+      includedItemId = await createItem(itemsVenueId, { name: 'Mesa', isIncluded: 'true' });
+      otherVenueItemId = await createItem(otherVenueId, { name: 'Ajeno', pricePerUnit: '10' });
+    }, 30000);
+
+    it('previews the total and the deposit with the items added', () => {
+      return previewWith([{ rentalItemId: chargedItemId, quantity: 4 }])
+        .expect(200)
+        .then((res) => {
+          expect(res.body.rentalItemsTotal).toBe(50);
+          expect(res.body.totalPrice).toBe(1050);
+          expect(res.body.depositAmount).toBe(315);
+          expect(res.body.rentalItems[0]).toMatchObject({ name: 'Silla', unitPrice: 12.5 });
+        });
+    });
+
+    it('saves a snapshot that survives a later price change', async () => {
+      const created = await users.clientAgent
+        .post(`/api/v1/venues/${itemsVenueId}/bookings`)
+        .send({
+          eventType: 'Boda',
+          eventDate: futureDate(71),
+          startTime: '14:00',
+          endTime: '20:00',
+          guestCount: 50,
+          selectedRentalItems: [{ rentalItemId: chargedItemId, quantity: 2 }],
+        })
+        .expect(201);
+
+      expect(created.body.booking.totalPrice).toBe(1025);
+      await users.ownerAgent
+        .put(`/api/v1/venues/${itemsVenueId}/rental-items/${chargedItemId}`)
+        .field('pricePerUnit', '99')
+        .expect(200);
+
+      const stored = await users.clientAgent
+        .get(`/api/v1/bookings/${created.body.booking.id}`)
+        .expect(200);
+      expect(stored.body.totalPrice).toBe(1025);
+      expect(stored.body.selectedRentalItems).toEqual([
+        {
+          rentalItemId: chargedItemId,
+          name: 'Silla',
+          unitLabel: 'unidad',
+          unitPrice: 12.5,
+          quantity: 2,
+          subtotal: 25,
+        },
+      ]);
+
+      await users.ownerAgent
+        .put(`/api/v1/venues/${itemsVenueId}/rental-items/${chargedItemId}`)
+        .field('pricePerUnit', '12.5')
+        .expect(200);
+    });
+
+    it('rejects a quantity above the stock', () => {
+      return previewWith([{ rentalItemId: chargedItemId, quantity: 81 }]).expect(400);
+    });
+
+    it('rejects an included item and an item from another venue', async () => {
+      await previewWith([{ rentalItemId: includedItemId, quantity: 1 }]).expect(400);
+      await previewWith([{ rentalItemId: otherVenueItemId, quantity: 1 }]).expect(400);
+    });
+
+    it('rejects a client-sent price and an invalid quantity', async () => {
+      await previewWith([{ rentalItemId: chargedItemId, quantity: 1, unitPrice: 1 }]).expect(400);
+      await previewWith([{ rentalItemId: chargedItemId, quantity: 0 }]).expect(400);
+      await previewWith([{ rentalItemId: chargedItemId, quantity: 1.5 }]).expect(400);
+    });
+  });
+
   describe('Approve / reject lifecycle', () => {
     let bookingId: string;
     let lifecycleDayOffset = 60;

@@ -8,6 +8,7 @@ import type {
   DailyScheduleEntry,
   PaginatedResponse,
   RangePriceCalculation,
+  RentalItemSelectionEntry,
 } from '@/types/api';
 
 export const createBooking = async (
@@ -40,6 +41,7 @@ export const previewBookingPrice = async (
     endTime: string;
     dailySchedule?: DailyScheduleEntry[];
     selectedAmenityIds?: string[];
+    selectedRentalItems?: RentalItemSelectionEntry[];
   },
 ): Promise<RangePriceCalculation> => {
   const search = new URLSearchParams({
@@ -52,6 +54,9 @@ export const previewBookingPrice = async (
       : {}),
     ...(params.selectedAmenityIds?.length
       ? { selectedAmenityIds: params.selectedAmenityIds.join(',') }
+      : {}),
+    ...(params.selectedRentalItems?.length
+      ? { selectedRentalItems: JSON.stringify(params.selectedRentalItems) }
       : {}),
   });
   return apiRequest<RangePriceCalculation>(

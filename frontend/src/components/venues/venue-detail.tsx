@@ -35,6 +35,7 @@ import type { AmenityCategory, ApiError, Venue } from '@/types/api';
 import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
+import { useRentalItemSelection } from '@/hooks/use-rental-item-selection';
 import { VenueRentalItemCatalog } from './venue-rental-item-catalog';
 import { FavoriteButton } from './favorite-button';
 import { ShareButton } from './share-button';
@@ -174,6 +175,14 @@ export const VenueDetail = ({
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [liveTotal, setLiveTotal] = useState<number | null>(null);
   const [mobileBookingOpen, setMobileBookingOpen] = useState(false);
+  const rentalSelection = useRentalItemSelection(query.data?.id);
+
+  const handleRentalItemQuantityChange = (itemId: string, quantity: number) => {
+    rentalSelection.setQuantity(itemId, quantity);
+    // The mobile form is unmounted while its sheet is closed, so nothing would recalculate the
+    // total shown in the bottom bar -- drop it rather than show one that's out of date.
+    if (!isDesktop && !mobileBookingOpen) setLiveTotal(null);
+  };
 
   const rangeValidationQuery = useQuery({
     queryKey: ['venue-availability-range-check', query.data?.id, initialStartDate, initialEndDate],
@@ -600,7 +609,11 @@ export const VenueDetail = ({
             </section>
           ) : null}
 
-          <VenueRentalItemCatalog venueId={venue.id} />
+          <VenueRentalItemCatalog
+            venueId={venue.id}
+            quantities={rentalSelection.quantities}
+            onQuantityChange={handleRentalItemQuantityChange}
+          />
 
           {/* Opening Hours */}
           {venue.openingHours?.length ? (
@@ -733,6 +746,9 @@ export const VenueDetail = ({
               selectedRange={selectedRange}
               onDatesChange={handleRangeChange}
               onPriceChange={setLiveTotal}
+              rentalItemLines={rentalSelection.lines}
+              onRentalItemQuantityChange={handleRentalItemQuantityChange}
+              onBookingCreated={rentalSelection.clear}
             />
           </aside>
         ) : null}
@@ -749,6 +765,13 @@ export const VenueDetail = ({
                 <p className="font-serif text-xl font-semibold text-primary">
                   {displayedPrice > 0 ? formatCurrency(displayedPrice) : 'Consultar'}
                 </p>
+                {rentalSelection.lines.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {liveTotal != null ? 'Incluye' : '+'} {rentalSelection.lines.length}{' '}
+                    {rentalSelection.lines.length === 1 ? 'item' : 'items'} ·{' '}
+                    {formatCurrency(rentalSelection.total)}
+                  </p>
+                ) : null}
               </div>
               <Button onClick={() => setMobileBookingOpen(true)}>Solicitar reserva</Button>
             </div>
@@ -760,6 +783,9 @@ export const VenueDetail = ({
             selectedRange={selectedRange}
             onDatesChange={handleRangeChange}
             onPriceChange={setLiveTotal}
+            rentalItemLines={rentalSelection.lines}
+            onRentalItemQuantityChange={handleRentalItemQuantityChange}
+            onBookingCreated={rentalSelection.clear}
             staleRangeNotice={staleRangeNotice}
             onDismissStaleNotice={() => setStaleRangeNotice(null)}
           />

@@ -1,10 +1,15 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import {
+  maxRentalItemQuantity,
+  rentalItemsQueryKey,
+  type RentalItemLine,
+} from '@/hooks/use-rental-item-selection';
 import { createBooking, previewBookingPrice } from '@/lib/api/bookings.api';
 import { formatCurrency, formatDate, formatDateInput, formatTime12h } from '@/lib/formatters';
 import {
@@ -14,10 +19,11 @@ import {
   type BookingFormValues,
 } from '@/lib/validators/booking.schema';
 import { useAuthStore } from '@/stores/auth.store';
-import type { DailyScheduleEntry, Venue } from '@/types/api';
+import type { DailyScheduleEntry, RentalItemSelectionEntry, Venue } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RentalItemQuantityStepper } from '@/components/venues/rental-item-quantity-stepper';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { LoginToBookModal } from './login-to-book-modal';
@@ -29,6 +35,10 @@ interface BookingFormProps {
   /** Reports the live total (once a price preview resolves) up to the parent — null while
    * no preview exists yet, so the caller knows to fall back to its own static base price. */
   onPriceChange?: (total: number | null) => void;
+  /** Catalog items the client added to this quote; the selection itself is owned by VenueDetail. */
+  rentalItemLines: RentalItemLine[];
+  onRentalItemQuantityChange: (itemId: string, quantity: number) => void;
+  onBookingCreated?: () => void;
   /** Pins the title + price header to the top of its scroll container instead of scrolling
    * away with the rest of the form — used inside the mobile bottom sheet, where the form is
    * long enough to scroll and the price is worth keeping in view. The desktop sticky aside
@@ -81,9 +91,13 @@ export const BookingForm = ({
   selectedRange,
   onDatesChange,
   onPriceChange,
+  rentalItemLines,
+  onRentalItemQuantityChange,
+  onBookingCreated,
   stickyHeader,
 }: BookingFormProps) => {
   const { isAuthenticated, role } = useAuthStore();
+  const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
@@ -112,9 +126,29 @@ export const BookingForm = ({
     form.setValue('endDate', selectedRange.end, { shouldValidate: true, shouldDirty: true });
   }, [selectedRange, form]);
 
+  const selectedRentalItems = useMemo(
+    () => rentalItemLines.map((line) => ({ rentalItemId: line.item.id, quantity: line.quantity })),
+    [rentalItemLines],
+  );
+  const hasRentalItems = rentalItemLines.length > 0;
+  // Stock and availability can only be checked by the owner, so a request with catalog items never
+  // auto-confirms, even on a venue with instant booking (same rule as the backend).
+  const confirmsInstantly = venue.instantBooking && !hasRentalItems;
+
+  // The catalog may have changed since it loaded (an item deleted, stock reduced). Refetching it
+  // lets the derived selection correct itself instead of leaving the client stuck on the error.
+  const refreshRentalItems = () => {
+    if (!hasRentalItems) return;
+    void queryClient.invalidateQueries({ queryKey: rentalItemsQueryKey(venue.id) });
+  };
+
   const mutation = useMutation({
-    mutationFn: (values: BookingFormValues & { dailySchedule?: DailyScheduleEntry[] }) =>
-      createBooking(venue.id, values),
+    mutationFn: (
+      values: BookingFormValues & {
+        dailySchedule?: DailyScheduleEntry[];
+        selectedRentalItems: RentalItemSelectionEntry[];
+      },
+    ) => createBooking(venue.id, values),
     onSuccess: (response) => {
       toast.success('Reserva solicitada', {
         description: `${
@@ -123,8 +157,10 @@ export const BookingForm = ({
       });
       form.reset();
       setConfirmOpen(false);
+      onBookingCreated?.();
     },
     onError: (error: { message?: string }) => {
+      refreshRentalItems();
       toast.error('No se pudo solicitar la reserva', {
         description: error.message ?? 'Intenta nuevamente.',
       });
@@ -166,6 +202,7 @@ export const BookingForm = ({
       values.endTime,
       dailyScheduleEntries,
       values.selectedAmenityIds,
+      selectedRentalItems,
     ],
     queryFn: () =>
       previewBookingPrice(venue.id, {
@@ -175,6 +212,7 @@ export const BookingForm = ({
         endTime: values.endTime,
         dailySchedule: dailyScheduleEntries,
         selectedAmenityIds: values.selectedAmenityIds,
+        selectedRentalItems,
       }),
     enabled: canPreview,
     // Ticking an extra or nudging a date changes the query key, which would otherwise blank
@@ -187,6 +225,11 @@ export const BookingForm = ({
     onPriceChange?.(previewQuery.data?.totalPrice ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewQuery.data]);
+
+  useEffect(() => {
+    if (previewQuery.isError) refreshRentalItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewQuery.isError]);
 
   const extraAmenities = useMemo(
     () => (venue.amenities ?? []).filter((item) => !item.isIncluded && item.extraCost),
@@ -265,7 +308,11 @@ export const BookingForm = ({
   };
 
   const handleConfirm = () => {
-    mutation.mutate({ ...form.getValues(), dailySchedule: dailyScheduleEntries });
+    mutation.mutate({
+      ...form.getValues(),
+      dailySchedule: dailyScheduleEntries,
+      selectedRentalItems,
+    });
   };
 
   const previewError = previewQuery.isError
@@ -302,7 +349,7 @@ export const BookingForm = ({
               {pricingModeLabel}
               {singleDayHours != null
                 ? ` · ${singleDayHours} ${singleDayHours === 1 ? 'hora' : 'horas'} · ${formatCurrency(
-                    Math.round((previewQuery.data.totalPrice / singleDayHours) * 100) / 100,
+                    Math.round((previewDays[0].appliedPrice / singleDayHours) * 100) / 100,
                   )}/hora`
                 : ''}
             </p>
@@ -314,6 +361,11 @@ export const BookingForm = ({
           {previewQuery.data?.extrasTotal ? (
             <p className="mt-0.5 text-xs text-muted-foreground">
               Incluye {formatCurrency(previewQuery.data.extrasTotal)} en extras
+            </p>
+          ) : null}
+          {previewQuery.data?.rentalItemsTotal ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Incluye {formatCurrency(previewQuery.data.rentalItemsTotal)} en items del catalogo
             </p>
           ) : null}
           {previewQuery.data && isMultiDay ? (
@@ -599,6 +651,43 @@ export const BookingForm = ({
           </div>
         ) : null}
 
+        {hasRentalItems ? (
+          <div>
+            <p className={fieldLabelClass}>Items del catalogo</p>
+            {/* Capped so a long selection can't push the submit button out of the sticky aside. */}
+            <ul className="max-h-48 overflow-y-auto pr-1">
+              {rentalItemLines.map((line) => (
+                <li
+                  key={line.item.id}
+                  className="border-t border-border py-2.5 text-sm first:border-t-0"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 break-words">{line.item.name}</span>
+                    <span className="shrink-0 font-serif italic text-accent-foreground">
+                      {formatCurrency(line.subtotal)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="min-w-0 text-xs text-muted-foreground">
+                      {formatCurrency(line.item.pricePerUnit ?? 0)} / {line.item.unitLabel}
+                    </span>
+                    <RentalItemQuantityStepper
+                      itemName={line.item.name}
+                      quantity={line.quantity}
+                      max={maxRentalItemQuantity(line.item)}
+                      onChange={(next) => onRentalItemQuantityChange(line.item.id, next)}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">
+              El propietario confirma que los tenga disponibles para tu fecha.
+              {isMultiDay ? ' Se cobran una sola vez, no por cada dia de la reserva.' : ''}
+            </p>
+          </div>
+        ) : null}
+
         <div>
           <Label htmlFor="specialRequests" className={fieldLabelClass}>
             Solicitudes especiales
@@ -634,11 +723,13 @@ export const BookingForm = ({
             ? `del ${values.eventDate} al ${values.endDate}`
             : `para ${values.eventDate || 'la fecha seleccionada'}`
         }. ${
-          venue.instantBooking
+          confirmsInstantly
             ? `Este local confirma al instante, asi que vas a poder pagar ${
                 venue.paymentPolicy === 'FULL_UPFRONT' ? 'el total' : 'el anticipo'
               } apenas la envies.`
-            : `El propietario debe aprobar tu solicitud antes de que puedas pagar ${
+            : `El propietario debe aprobar tu solicitud${
+                hasRentalItems ? ' y confirmar los items del catalogo' : ''
+              } antes de que puedas pagar ${
                 venue.paymentPolicy === 'FULL_UPFRONT' ? 'el total' : 'el anticipo'
               }.`
         }`}
