@@ -1,10 +1,14 @@
+// The whole platform charges in one currency today. Keeping it here means amounts and price
+// fields change together the day a venue can charge in another one.
+export const CURRENCY = { code: 'BOB', symbol: 'Bs', locale: 'es-BO' } as const;
+
 export const formatCurrency = (value: number) => {
   // Whole amounts stay clean, but cents are never rounded away: a Bs 0,50 item isn't "Bs 1", and a
   // quote has to show exactly what will be charged.
   const fractionDigits = Number.isInteger(value) ? 0 : 2;
-  return new Intl.NumberFormat('es-BO', {
+  return new Intl.NumberFormat(CURRENCY.locale, {
     style: 'currency',
-    currency: 'BOB',
+    currency: CURRENCY.code,
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(value);

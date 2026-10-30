@@ -24,7 +24,7 @@ import {
   updateRentalItem,
 } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
-import { formatCurrency } from '@/lib/formatters';
+import { CURRENCY, formatCurrency } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -685,20 +685,30 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                 <>
                   <div className="sf-form-group">
                     <Label htmlFor="rental-item-price">
-                      Precio <span className="text-destructive">*</span>
+                      Precio <span className="sr-only">en {CURRENCY.symbol}</span>{' '}
+                      <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      id="rental-item-price"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={form.pricePerUnit}
-                      onChange={(event) => {
-                        setForm((prev) => ({ ...prev, pricePerUnit: event.target.value }));
-                        setFieldErrors((prev) => ({ ...prev, pricePerUnit: undefined }));
-                      }}
-                      aria-invalid={Boolean(fieldErrors.pricePerUnit)}
-                    />
+                    <div className="relative">
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                      >
+                        {CURRENCY.symbol}
+                      </span>
+                      <Input
+                        id="rental-item-price"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="pl-9"
+                        value={form.pricePerUnit}
+                        onChange={(event) => {
+                          setForm((prev) => ({ ...prev, pricePerUnit: event.target.value }));
+                          setFieldErrors((prev) => ({ ...prev, pricePerUnit: undefined }));
+                        }}
+                        aria-invalid={Boolean(fieldErrors.pricePerUnit)}
+                      />
+                    </div>
                     {fieldErrors.pricePerUnit ? (
                       <p className="sf-form-error">{fieldErrors.pricePerUnit}</p>
                     ) : null}
