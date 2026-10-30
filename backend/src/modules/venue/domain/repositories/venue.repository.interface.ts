@@ -172,6 +172,7 @@ export interface IVenueRepository {
     | 'not_found'
     | 'category_not_found'
     | 'price_required'
+    | 'stock_required'
   >;
   deleteRentalItem(
     venueId: string,

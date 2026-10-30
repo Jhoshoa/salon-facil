@@ -64,7 +64,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   isIncluded: false,
   chargeBasis: 'PER_DAY',
   unitLabel: 'unidad',
-  stockQty: null,
+  stockQty: 10,
   isActive: true,
   sortOrder: 0,
   ...overrides,
@@ -108,6 +108,7 @@ describe('VenueRentalItemsTab', () => {
     await user.type(screen.getByLabelText(/^nombre/i), 'Mesa redonda');
     await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
     await user.type(screen.getByLabelText(/^precio/i), '50');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
 
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -162,6 +163,7 @@ describe('VenueRentalItemsTab', () => {
     await user.type(screen.getByLabelText(/^nombre/i), 'Mesa redonda');
     await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
     await user.type(screen.getByLabelText(/^precio/i), '1.234');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
 
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -182,6 +184,7 @@ describe('VenueRentalItemsTab', () => {
     await user.type(screen.getByLabelText(/^nombre/i), 'Toldo');
     await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
     await user.type(screen.getByLabelText(/^precio/i), '300');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
     await user.click(screen.getByRole('radio', { name: 'Cobrar por evento completo' }));
     await user.click(screen.getByRole('button', { name: 'Crear' }));
 
@@ -251,6 +254,7 @@ describe('VenueRentalItemsTab', () => {
     expect(mockUpdateRentalItem).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText(/^precio/i), '15');
+    await user.type(screen.getByLabelText(/^cantidad/i), '10');
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() =>
@@ -304,7 +308,7 @@ describe('VenueRentalItemsTab', () => {
     );
   });
 
-  it('vaciar descripcion, stock y unidad al editar los limpia en vez de ignorarlos', async () => {
+  it('vaciar descripcion y unidad al editar los limpia en vez de ignorarlos', async () => {
     const user = userEvent.setup();
     const item = makeItem({
       id: 'item-1',
@@ -320,7 +324,6 @@ describe('VenueRentalItemsTab', () => {
     await user.click(screen.getByRole('button', { name: /editar/i }));
 
     await user.clear(screen.getByLabelText(/^descripcion/i));
-    await user.clear(screen.getByLabelText(/^stock/i));
     await user.clear(screen.getByLabelText(/^unidad/i));
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
@@ -328,10 +331,45 @@ describe('VenueRentalItemsTab', () => {
       expect(mockUpdateRentalItem).toHaveBeenCalledWith(
         'venue-1',
         'item-1',
-        expect.objectContaining({ description: null, stockQty: null, unitLabel: 'unidad' }),
+        expect.objectContaining({ description: null, stockQty: 12, unitLabel: 'unidad' }),
         undefined,
       ),
     );
+  });
+
+  it('exige la cantidad disponible en un item cobrado, pero no en uno incluido', async () => {
+    const user = userEvent.setup();
+    const item = makeItem({ id: 'item-1', stockQty: 12 });
+    mockGetOwnerRentalItems.mockResolvedValue([item]);
+    mockUpdateRentalItem.mockResolvedValue(item);
+    renderTab();
+
+    await screen.findByText('Mesa redonda');
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+    await user.clear(screen.getByLabelText(/^cantidad/i));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(screen.getByText('Indica cuantos tienes disponibles.')).toBeInTheDocument();
+    expect(mockUpdateRentalItem).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('radio', { name: 'Incluido con el local' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(mockUpdateRentalItem).toHaveBeenCalledWith(
+        'venue-1',
+        'item-1',
+        expect.objectContaining({ isIncluded: true, stockQty: null }),
+        undefined,
+      ),
+    );
+  });
+
+  it('avisa al dueño si un item cobrado anterior no tiene cantidad', async () => {
+    mockGetOwnerRentalItems.mockResolvedValue([makeItem({ stockQty: null })]);
+    renderTab();
+
+    expect(await screen.findByText('Falta cantidad disponible')).toBeInTheDocument();
   });
 
   it('previsualiza una foto nueva y permite quitarla antes de guardar', async () => {

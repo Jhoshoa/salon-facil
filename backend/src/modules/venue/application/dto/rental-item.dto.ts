@@ -53,7 +53,7 @@ function trimStringOrUndefined({ value }: { value: unknown }): unknown {
 const PRICE_OPTIONS = { maxDecimalPlaces: 2 };
 const PRICE_MESSAGE = 'El precio debe ser un numero con hasta 2 decimales';
 const PRICE_RANGE_MESSAGE = 'El precio debe estar entre 0 y 999999.99';
-const STOCK_MESSAGE = 'El stock debe ser un numero entero';
+const STOCK_MESSAGE = 'Indica la cantidad disponible con un numero entero';
 const STOCK_RANGE_MESSAGE = 'El stock debe estar entre 0 y 100000';
 const NAME_LENGTH_MIN_MESSAGE = 'El nombre debe tener al menos 2 caracteres';
 const NAME_LENGTH_MAX_MESSAGE = 'El nombre no puede superar los 120 caracteres';
@@ -98,7 +98,9 @@ export class CreateRentalItemDto {
   @MaxLength(30, { message: 'La unidad no puede superar los 30 caracteres' })
   unitLabel?: string;
 
-  @IsOptional()
+  // Required on anything a client can add to a quote: it's the limit their quantity is checked
+  // against. An included item only shows it for information.
+  @ValidateIf((dto: CreateRentalItemDto) => !dto.isIncluded || dto.stockQty != null)
   @Transform(parseIntOrNull)
   @IsInt({ message: STOCK_MESSAGE })
   @Min(0, { message: STOCK_RANGE_MESSAGE })

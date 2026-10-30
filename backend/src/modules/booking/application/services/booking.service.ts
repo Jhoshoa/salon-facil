@@ -369,12 +369,13 @@ export class BookingService {
 
     return selection.map(({ rentalItemId, quantity }) => {
       const item = available.get(rentalItemId);
-      if (!item || item.isIncluded || item.pricePerUnit === null) {
+      // No stock means an older item the owner hasn't completed: there's nothing to check against.
+      if (!item || item.isIncluded || item.pricePerUnit === null || item.stockQty === null) {
         throw new BadRequestException(
           'Uno de los items que elegiste ya no esta disponible. Actualiza tu seleccion.',
         );
       }
-      if (item.stockQty !== null && quantity > item.stockQty) {
+      if (quantity > item.stockQty) {
         throw new BadRequestException(
           `El local tiene ${item.stockQty} en total de "${item.name}" y pediste ${quantity}`,
         );

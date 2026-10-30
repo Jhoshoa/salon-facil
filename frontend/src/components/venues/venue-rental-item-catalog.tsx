@@ -112,6 +112,9 @@ export const VenueRentalItemCatalog = ({
               )}
               <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                 {item.stockQty === 0 ? <span>Sin stock</span> : null}
+                {item.stockQty === null && !item.isIncluded ? (
+                  <span>Consultar disponibilidad</span>
+                ) : null}
                 {item.stockQty ? <span>Stock: {item.stockQty}</span> : null}
                 {isAdded ? (
                   <span className="inline-flex items-center gap-0.5 font-medium text-primary">

@@ -24,7 +24,7 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   isIncluded: false,
   chargeBasis: 'PER_DAY',
   unitLabel: 'unidad',
-  stockQty: null,
+  stockQty: 10,
   isActive: true,
   sortOrder: 0,
   ...overrides,
@@ -168,6 +168,14 @@ describe('VenueRentalItemCatalog', () => {
 
     expect(onQuantityChange).toHaveBeenLastCalledWith('item-1', 5);
     expect(input).toHaveValue('5');
+  });
+
+  it('pide consultar un item anterior que no tiene cantidad, sin dejar agregarlo', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([makeItem({ name: 'Toldo', stockQty: null })]);
+    renderCatalog();
+
+    expect(await screen.findByText('Consultar disponibilidad')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Agregar/ })).not.toBeInTheDocument();
   });
 
   it('no ofrece agregar un item incluido ni uno sin stock', async () => {

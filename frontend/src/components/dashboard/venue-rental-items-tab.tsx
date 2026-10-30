@@ -76,6 +76,8 @@ const SortableRentalItemRow = ({
     id: item.id,
     disabled: dragDisabled,
   });
+  // Older items can be missing it. Clients can't add them to a quote until the owner completes it.
+  const needsStock = !item.isIncluded && item.stockQty === null;
 
   return (
     <div
@@ -111,6 +113,7 @@ const SortableRentalItemRow = ({
         <div className="flex items-center gap-2">
           <p className="font-medium">{item.name}</p>
           {!item.isActive ? <Badge variant="secondary">Inactivo</Badge> : null}
+          {needsStock ? <Badge variant="destructive">Falta cantidad disponible</Badge> : null}
         </div>
         <p className="text-xs text-muted-foreground">
           {item.pricePerUnit === null
@@ -410,7 +413,9 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     } else if (!form.isIncluded && Math.round(price * 100) / 100 !== price) {
       errors.pricePerUnit = 'El precio puede tener hasta 2 decimales.';
     }
-    if (form.stockQty.trim()) {
+    if (!form.isIncluded && !form.stockQty.trim()) {
+      errors.stockQty = 'Indica cuantos tienes disponibles.';
+    } else if (form.stockQty.trim()) {
       const stock = Number(form.stockQty);
       if (Number.isNaN(stock) || !Number.isInteger(stock) || stock < 0) {
         errors.stockQty = 'El stock debe ser un numero entero, 0 o mas.';
@@ -840,9 +845,18 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                 </>
               ) : null}
               <div className="sf-form-group">
-                <Label htmlFor="rental-item-stock">Stock (opcional)</Label>
+                <Label htmlFor="rental-item-stock">
+                  {form.isIncluded ? (
+                    'Stock (opcional)'
+                  ) : (
+                    <>
+                      Cantidad <span className="text-destructive">*</span>
+                    </>
+                  )}
+                </Label>
                 <Input
                   id="rental-item-stock"
+                  placeholder={form.isIncluded ? undefined : 'Disponibles'}
                   type="number"
                   min={0}
                   value={form.stockQty}
