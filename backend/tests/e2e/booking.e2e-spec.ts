@@ -253,6 +253,8 @@ describe('Bookings (e2e)', () => {
           unitLabel: 'unidad',
           unitPrice: 12.5,
           quantity: 2,
+          chargeBasis: 'PER_DAY',
+          billedDays: 1,
           subtotal: 25,
         },
       ]);
@@ -261,6 +263,54 @@ describe('Bookings (e2e)', () => {
         .put(`/api/v1/venues/${itemsVenueId}/rental-items/${chargedItemId}`)
         .field('pricePerUnit', '12.5')
         .expect(200);
+    });
+
+    it('charges per day or per event according to the item, on a booking of several days', async () => {
+      const adminAgent = await loginAdmin(app);
+      const multiDayVenue = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
+        allowsMultipleDays: true,
+        basePrice: 1000,
+      });
+      const perDay = await createItem(multiDayVenue, { name: 'Vajilla', pricePerUnit: '10' });
+      const perEvent = await createItem(multiDayVenue, {
+        name: 'Toldo',
+        pricePerUnit: '300',
+        chargeBasis: 'PER_EVENT',
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/venues/${multiDayVenue}/bookings/preview-price`)
+        .query({
+          eventDate: futureDate(80),
+          endDate: futureDate(82),
+          startTime: '14:00',
+          endTime: '20:00',
+          selectedRentalItems: JSON.stringify([
+            { rentalItemId: perDay, quantity: 2 },
+            { rentalItemId: perEvent, quantity: 1 },
+          ]),
+        })
+        .expect(200);
+
+      expect(res.body.rentalItems).toEqual([
+        expect.objectContaining({ name: 'Vajilla', billedDays: 3, subtotal: 60 }),
+        expect.objectContaining({ name: 'Toldo', billedDays: 1, subtotal: 300 }),
+      ]);
+      expect(res.body.totalPrice).toBe(res.body.appliedPrice + 360);
+    });
+
+    it('rejects an unknown charge basis', async () => {
+      const category = await users.ownerAgent
+        .post(`/api/v1/venues/${itemsVenueId}/rental-item-categories`)
+        .send({ name: 'Con cobro invalido' })
+        .expect(201);
+      await users.ownerAgent
+        .post(`/api/v1/venues/${itemsVenueId}/rental-items`)
+        .field('name', 'Invalido')
+        .field('categoryId', category.body.id)
+        .field('pricePerUnit', '1')
+        .field('chargeBasis', 'POR_HORA')
+        .expect(400);
     });
 
     it('rejects a quantity above the stock', () => {

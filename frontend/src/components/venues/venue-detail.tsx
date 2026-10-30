@@ -36,6 +36,7 @@ import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
 import { useRentalItemSelection } from '@/hooks/use-rental-item-selection';
+import { countBookingDays } from '@/lib/rental-items';
 import { VenueRentalItemCatalog } from './venue-rental-item-catalog';
 import { FavoriteButton } from './favorite-button';
 import { ShareButton } from './share-button';
@@ -175,7 +176,10 @@ export const VenueDetail = ({
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [liveTotal, setLiveTotal] = useState<number | null>(null);
   const [mobileBookingOpen, setMobileBookingOpen] = useState(false);
-  const rentalSelection = useRentalItemSelection(query.data?.id);
+  const rentalSelection = useRentalItemSelection(
+    query.data?.id,
+    countBookingDays(selectedRange?.start, selectedRange?.end),
+  );
 
   const handleRentalItemQuantityChange = (itemId: string, quantity: number) => {
     rentalSelection.setQuantity(itemId, quantity);
@@ -611,6 +615,7 @@ export const VenueDetail = ({
 
           <VenueRentalItemCatalog
             venueId={venue.id}
+            showChargeBasis={venue.allowsMultipleDays}
             quantities={rentalSelection.quantities}
             onQuantityChange={handleRentalItemQuantityChange}
           />

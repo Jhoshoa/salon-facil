@@ -25,6 +25,7 @@ import {
 } from '@/lib/api/venues.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { CURRENCY, formatCurrency } from '@/lib/formatters';
+import { chargeBasisLabels } from '@/lib/rental-items';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +43,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { VenueRentalItemCategoriesManager } from './venue-rental-item-categories-manager';
-import type { Venue, VenueRentalItem } from '@/types/api';
+import type { RentalItemChargeBasis, Venue, VenueRentalItem } from '@/types/api';
 
 interface VenueRentalItemsTabProps {
   venue: Venue;
@@ -53,6 +54,7 @@ interface FormValues {
   categoryId: string;
   description: string;
   isIncluded: boolean;
+  chargeBasis: RentalItemChargeBasis;
   pricePerUnit: string;
   unitLabel: string;
   stockQty: string;
@@ -71,6 +73,7 @@ const emptyForm: FormValues = {
   categoryId: '',
   description: '',
   isIncluded: false,
+  chargeBasis: 'PER_DAY',
   pricePerUnit: '',
   unitLabel: 'unidad',
   stockQty: '',
@@ -156,6 +159,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           categoryId: form.categoryId,
           description: form.description.trim() || undefined,
           isIncluded: form.isIncluded,
+          chargeBasis: form.isIncluded ? undefined : form.chargeBasis,
           pricePerUnit: form.isIncluded ? undefined : Number(form.pricePerUnit),
           unitLabel: form.isIncluded ? undefined : form.unitLabel.trim() || undefined,
           stockQty: form.stockQty.trim() ? Number(form.stockQty) : undefined,
@@ -237,6 +241,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
       categoryId: item.category.id,
       description: item.description ?? '',
       isIncluded: item.isIncluded,
+      chargeBasis: item.chargeBasis,
       pricePerUnit: item.pricePerUnit !== null ? String(item.pricePerUnit) : '',
       unitLabel: item.unitLabel,
       stockQty: item.stockQty !== null ? String(item.stockQty) : '',
@@ -311,6 +316,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           categoryId: form.categoryId,
           description: form.description.trim() || null,
           isIncluded: form.isIncluded,
+          chargeBasis: form.isIncluded ? undefined : form.chargeBasis,
           pricePerUnit: form.isIncluded ? undefined : price,
           unitLabel: form.isIncluded ? undefined : form.unitLabel.trim() || emptyForm.unitLabel,
           stockQty: form.stockQty.trim() ? Number(form.stockQty) : null,
@@ -438,7 +444,11 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                     {item.category.name} ·{' '}
                     {item.pricePerUnit === null
                       ? 'Incluido con el local'
-                      : `${formatCurrency(item.pricePerUnit)} / ${item.unitLabel}`}
+                      : `${formatCurrency(item.pricePerUnit)} / ${item.unitLabel}${
+                          venue.allowsMultipleDays
+                            ? ` · ${chargeBasisLabels[item.chargeBasis]}`
+                            : ''
+                        }`}
                     {item.stockQty !== null ? ` · stock ${item.stockQty}` : ''}
                   </p>
                 </div>
@@ -682,6 +692,39 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
               </div>
             </fieldset>
 
+            {!form.isIncluded && venue.allowsMultipleDays ? (
+              <fieldset className="sf-form-group">
+                <legend className="mb-2 text-sm font-medium leading-none">
+                  En reservas de varios dias
+                </legend>
+                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="rental-item-charge-basis"
+                      checked={form.chargeBasis === 'PER_DAY'}
+                      onChange={() => setForm((prev) => ({ ...prev, chargeBasis: 'PER_DAY' }))}
+                    />
+                    Cobrar por dia
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="rental-item-charge-basis"
+                      checked={form.chargeBasis === 'PER_EVENT'}
+                      onChange={() => setForm((prev) => ({ ...prev, chargeBasis: 'PER_EVENT' }))}
+                    />
+                    Cobrar por evento completo
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {form.chargeBasis === 'PER_DAY'
+                    ? 'El precio se multiplica por los dias de la reserva.'
+                    : 'El precio se cobra una sola vez, sin importar los dias.'}
+                </p>
+              </fieldset>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-3">
               {!form.isIncluded ? (
                 <>
@@ -719,7 +762,7 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
                     <Label htmlFor="rental-item-unit">Unidad (opcional)</Label>
                     <Input
                       id="rental-item-unit"
-                      placeholder="unidad"
+                      placeholder="unidad, juego, modulo"
                       value={form.unitLabel}
                       onChange={(event) =>
                         setForm((prev) => ({ ...prev, unitLabel: event.target.value }))

@@ -1,9 +1,11 @@
+import { RentalItemChargeBasis } from '@prisma/client';
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -87,6 +89,10 @@ export class CreateRentalItemDto {
   isIncluded?: boolean;
 
   @IsOptional()
+  @IsEnum(RentalItemChargeBasis, { message: 'El tipo de cobro no es valido' })
+  chargeBasis?: RentalItemChargeBasis;
+
+  @IsOptional()
   @Transform(trimStringOrUndefined)
   @IsString()
   @MaxLength(30, { message: 'La unidad no puede superar los 30 caracteres' })
@@ -135,6 +141,10 @@ export class UpdateRentalItemDto {
   @Transform(parseBoolean)
   @IsBoolean()
   isIncluded?: boolean;
+
+  @IsOptional()
+  @IsEnum(RentalItemChargeBasis, { message: 'El tipo de cobro no es valido' })
+  chargeBasis?: RentalItemChargeBasis;
 
   @IsOptional()
   @Transform(trimStringOrUndefined)

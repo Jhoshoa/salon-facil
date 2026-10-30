@@ -5,6 +5,7 @@ import {
   Departamento,
   PaymentPolicy,
   PriceUnit,
+  RentalItemChargeBasis,
   VenueMediaType,
 } from '@prisma/client';
 
@@ -175,6 +176,7 @@ export interface VenueRentalItemEntity {
   photoPublicId: string | null;
   pricePerUnit: number | null;
   isIncluded: boolean;
+  chargeBasis: RentalItemChargeBasis;
   unitLabel: string;
   stockQty: number | null;
   isActive: boolean;

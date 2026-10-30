@@ -1011,6 +1011,7 @@ export class VenueRepository implements IVenueRepository {
         photoPublicId: data.photoPublicId,
         pricePerUnit: data.isIncluded ? null : new Prisma.Decimal(data.pricePerUnit!),
         isIncluded: data.isIncluded ?? false,
+        chargeBasis: data.chargeBasis,
         unitLabel: data.unitLabel ?? 'unidad',
         stockQty: data.stockQty,
         sortOrder,
@@ -1070,6 +1071,7 @@ export class VenueRepository implements IVenueRepository {
             ? new Prisma.Decimal(data.pricePerUnit)
             : undefined,
         isIncluded,
+        chargeBasis: data.chargeBasis,
         unitLabel: data.unitLabel,
         stockQty: data.stockQty,
         isActive: data.isActive,
@@ -1241,6 +1243,7 @@ export class VenueRepository implements IVenueRepository {
       photoPublicId: raw.photoPublicId,
       pricePerUnit: raw.pricePerUnit === null ? null : Number(raw.pricePerUnit),
       isIncluded: raw.isIncluded,
+      chargeBasis: raw.chargeBasis,
       unitLabel: raw.unitLabel,
       stockQty: raw.stockQty,
       isActive: raw.isActive,

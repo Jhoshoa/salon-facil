@@ -555,23 +555,31 @@ model VenuePrice {
 // registre primero. Fase 1 (ver docs/brainstorm/catalogo-alquiler-items.md): catalogo
 // informativo, sin carrito ni reserva real de stock -- stockQty es solo un numero mostrado,
 // nunca se descuenta automaticamente.
+enum RentalItemChargeBasis {
+  PER_DAY
+  PER_EVENT
+}
+
 model VenueRentalItem {
-  id            String   @id @default(uuid())
-  venueId       String   @map("venue_id")
+  id            String                @id @default(uuid())
+  venueId       String                @map("venue_id")
   name          String
-  categoryId    String   @map("category_id")
-  description   String?  @db.Text
-  photoUrl      String?  @map("photo_url")
-  photoPublicId String?  @map("photo_public_id")
+  categoryId    String                @map("category_id")
+  description   String?               @db.Text
+  photoUrl      String?               @map("photo_url")
+  photoPublicId String?               @map("photo_public_id")
   // Null only when `isIncluded` is true -- an included item has no price, which is not the same
   // as an item that is charged separately and happens to cost 0.
-  pricePerUnit  Decimal? @map("price_per_unit") @db.Decimal(12, 2)
-  isIncluded    Boolean  @default(false) @map("is_included")
-  unitLabel     String   @default("unidad") @map("unit_label")
-  stockQty      Int?     @map("stock_qty")
-  isActive      Boolean  @default(true) @map("is_active")
-  sortOrder     Int      @default(0) @map("sort_order")
-  createdAt     DateTime @default(now()) @map("created_at")
+  pricePerUnit  Decimal?              @map("price_per_unit") @db.Decimal(12, 2)
+  isIncluded    Boolean               @default(false) @map("is_included")
+  // How a booking of several days is charged: the price times the days, or once for the whole
+  // event. Means nothing on an included item, which has no price.
+  chargeBasis   RentalItemChargeBasis @default(PER_DAY) @map("charge_basis")
+  unitLabel     String                @default("unidad") @map("unit_label")
+  stockQty      Int?                  @map("stock_qty")
+  isActive      Boolean               @default(true) @map("is_active")
+  sortOrder     Int                   @default(0) @map("sort_order")
+  createdAt     DateTime              @default(now()) @map("created_at")
 
   venue    Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
   category VenueRentalItemCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -615,37 +623,37 @@ model SuggestedSeasonalEvent {
 }
 
 model Booking {
-  id              String        @id @default(uuid())
-  venueId         String        @map("venue_id")
-  clientId        String        @map("client_id")
-  eventType       String        @map("event_type")
-  eventDate       DateTime      @map("event_date") @db.Date
-  endDate         DateTime      @map("end_date") @db.Date
-  startTime       DateTime      @map("start_time") @db.Time
-  endTime         DateTime      @map("end_time") @db.Time
-  guestCount      Int           @map("guest_count")
-  basePrice       Decimal       @map("base_price") @db.Decimal(12, 2)
-  appliedPrice    Decimal       @map("applied_price") @db.Decimal(12, 2)
-  totalPrice      Decimal       @map("total_price") @db.Decimal(12, 2)
-  depositAmount   Decimal       @map("deposit_amount") @db.Decimal(12, 2)
-  depositPaid     Boolean       @default(false) @map("deposit_paid")
-  status          BookingStatus @default(PENDING)
-  specialRequests String?       @map("special_requests") @db.Text
+  id                  String        @id @default(uuid())
+  venueId             String        @map("venue_id")
+  clientId            String        @map("client_id")
+  eventType           String        @map("event_type")
+  eventDate           DateTime      @map("event_date") @db.Date
+  endDate             DateTime      @map("end_date") @db.Date
+  startTime           DateTime      @map("start_time") @db.Time
+  endTime             DateTime      @map("end_time") @db.Time
+  guestCount          Int           @map("guest_count")
+  basePrice           Decimal       @map("base_price") @db.Decimal(12, 2)
+  appliedPrice        Decimal       @map("applied_price") @db.Decimal(12, 2)
+  totalPrice          Decimal       @map("total_price") @db.Decimal(12, 2)
+  depositAmount       Decimal       @map("deposit_amount") @db.Decimal(12, 2)
+  depositPaid         Boolean       @default(false) @map("deposit_paid")
+  status              BookingStatus @default(PENDING)
+  specialRequests     String?       @map("special_requests") @db.Text
   // Snapshot of the extra-cost amenities picked at request time: [{amenityId, name, extraCost}].
   // Frozen at booking creation so it stays correct even if the venue later renames or removes
   // the amenity. Null when nothing extra was selected.
-  selectedExtras  Json?         @map("selected_extras")
+  selectedExtras      Json?         @map("selected_extras")
   // Snapshot of the catalog items picked at request time: [{rentalItemId, name, unitLabel,
   // unitPrice, quantity, subtotal}]. Same reasoning as selectedExtras: it keeps the quote correct
   // even if the owner later edits the price or deletes the item. Null when nothing was selected.
-  selectedRentalItems Json? @map("selected_rental_items")
-  contractUrl     String?       @map("contract_url")
-  contractSentAt  DateTime?     @map("contract_sent_at")
-  reminder7SentAt DateTime?     @map("reminder_7_sent_at")
-  reminder3SentAt DateTime?     @map("reminder_3_sent_at")
-  reminder1SentAt DateTime?     @map("reminder_1_sent_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  selectedRentalItems Json?         @map("selected_rental_items")
+  contractUrl         String?       @map("contract_url")
+  contractSentAt      DateTime?     @map("contract_sent_at")
+  reminder7SentAt     DateTime?     @map("reminder_7_sent_at")
+  reminder3SentAt     DateTime?     @map("reminder_3_sent_at")
+  reminder1SentAt     DateTime?     @map("reminder_1_sent_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
   venue    Venue         @relation(fields: [venueId], references: [id], onDelete: Restrict)
   client   User          @relation("ClientBookings", fields: [clientId], references: [id], onDelete: Restrict)
