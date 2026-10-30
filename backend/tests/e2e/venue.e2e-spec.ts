@@ -1021,6 +1021,74 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  describe('Season price dates', () => {
+    const season = (dates: object) =>
+      JSON.stringify([
+        { priceType: 'BASE', price: 300 },
+        { priceType: 'SEASON_HIGH', price: 500, discountLabel: 'Fin de ano', ...dates },
+      ]);
+
+    const create = (prices: string, name: string) =>
+      ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `${name} ${uniqueId}`)
+        .field('description', 'Local para probar las fechas de una temporada.')
+        .field('address', 'Av. de Prueba 123')
+        .field('district', 'Distrito')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .field('prices', prices);
+
+    it('creates a venue with a season, including one that crosses the year or lasts one day', async () => {
+      const res = await create(
+        JSON.stringify([
+          { priceType: 'BASE', price: 300 },
+          { priceType: 'SEASON_HIGH', price: 500, startDate: '2027-12-15', endDate: '2028-01-05' },
+          { priceType: 'SEASON_HIGH', price: 600, startDate: '2027-03-01', endDate: '2027-03-01' },
+        ]),
+        'Temporadas validas',
+      ).expect(201);
+
+      const seasons = res.body.prices.filter(
+        (price: { priceType: string }) => price.priceType === 'SEASON_HIGH',
+      );
+      expect(seasons).toHaveLength(2);
+    });
+
+    it.each([
+      ['ends before it starts', { startDate: '2028-01-05', endDate: '2027-12-15' }],
+      ['has no end date', { startDate: '2027-12-15' }],
+      ['has no start date', { endDate: '2027-12-15' }],
+      ['has no dates', {}],
+      ['has a date that is not valid', { startDate: 'abc', endDate: '2027-12-15' }],
+    ])('rejects creating a venue with a season that %s', async (_label, dates) => {
+      const name = `Temporada invalida ${JSON.stringify(dates).length}`;
+
+      await create(season(dates), name).expect(400);
+
+      const mine = await ownerAgent.get('/api/v1/venues/my/venues').expect(200);
+      const venues = mine.body.data ?? mine.body;
+      expect(venues.map((venue: { name: string }) => venue.name)).not.toContain(
+        `${name} ${uniqueId}`,
+      );
+    });
+
+    it('also rejects it when updating, keeping the previous prices', async () => {
+      const venueId = await createVerifiedVenue(ownerAgent, adminAgent, uniqueId);
+
+      const rejected = await ownerAgent
+        .put(`/api/v1/venues/${venueId}`)
+        .field('prices', season({ startDate: '2028-01-05', endDate: '2027-12-15' }))
+        .expect(400);
+      expect(JSON.stringify(rejected.body.message)).toContain('igual o posterior');
+
+      const stored = await ownerAgent.get(`/api/v1/venues/by-id/${venueId}`).expect(200);
+      expect(
+        stored.body.prices.map((price: { priceType: string }) => price.priceType),
+      ).not.toContain('SEASON_HIGH');
+    });
+  });
+
   describe('PUT /api/v1/venues/:id/features', () => {
     let featuresVenueId: string;
     let amenityA: string;
