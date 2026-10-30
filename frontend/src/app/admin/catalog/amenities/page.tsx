@@ -9,13 +9,17 @@ const AdminAmenitiesPage = () => {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumbs
-        items={[{ label: 'Panel admin', href: '/admin' }, { label: 'Catalogo' }, { label: 'Comodidades' }]}
+        items={[
+          { label: 'Panel admin', href: '/admin' },
+          { label: 'Catalogo' },
+          { label: 'Caracteristicas' },
+        ]}
       />
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Comodidades</h1>
+        <h1 className="text-2xl font-semibold">Caracteristicas</h1>
       </div>
       <CatalogManager
-        title="Comodidades"
+        title="Caracteristicas"
         description="Organizadas por categoria: instalaciones, confort, audio y video, catering, etc."
         queryKey="amenities"
         listFn={getAdminAmenities}

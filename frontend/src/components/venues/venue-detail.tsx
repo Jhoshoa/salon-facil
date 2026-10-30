@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Grid2x2, Map, MapPin, Plus, SearchX, Star, X } from 'lucide-react';
+import { Grid2x2, Map, MapPin, SearchX, Star, X } from 'lucide-react';
 import { checkAvailabilityRange } from '@/lib/api/bookings.api';
 import {
   getSimilarVenues,
@@ -17,7 +17,7 @@ import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency, formatTime12h } from '@/lib/formatters';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
-import { amenityCategoryLabels, departamentoLabels } from './venue-filter-labels';
+import { departamentoLabels } from './venue-filter-labels';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
@@ -31,12 +31,13 @@ import {
 } from '@/components/shared/brand-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AmenityCategory, ApiError, Venue } from '@/types/api';
+import type { ApiError, Venue } from '@/types/api';
 import { MobileBookingSheet } from './mobile-booking-sheet';
 import { PhotoLightbox } from './photo-lightbox';
 import { VenueSimilarCard } from './venue-similar-card';
 import { useRentalItemSelection } from '@/hooks/use-rental-item-selection';
 import { countBookingDays } from '@/lib/rental-items';
+import { VenueIncludedSection } from './venue-included-section';
 import { VenueRentalItemCatalog } from './venue-rental-item-catalog';
 import { FavoriteButton } from './favorite-button';
 import { ShareButton } from './share-button';
@@ -127,19 +128,6 @@ const getVenuePhotos = (venue: Venue) => {
     venue.media?.filter((item) => item.type === 'IMAGE').map((item) => item.url) ?? [];
   return mediaPhotos.length ? mediaPhotos : venue.photos;
 };
-
-const groupAmenities = (
-  venue: Venue,
-  predicate: (item: NonNullable<Venue['amenities']>[number]) => boolean,
-) =>
-  (venue.amenities ?? [])
-    .filter(predicate)
-    .reduce<Partial<Record<AmenityCategory, typeof venue.amenities>>>((groups, item) => {
-      const category = item.amenity.category;
-      groups[category] = groups[category] ?? [];
-      groups[category]?.push(item);
-      return groups;
-    }, {});
 
 export const VenueDetail = ({
   slug,
@@ -261,13 +249,6 @@ export const VenueDetail = ({
   const mosaicPhotos = photos.slice(0, 5);
   const mosaicExtraCount = photos.length - mosaicPhotos.length;
   const mosaicLayout = MOSAIC_LAYOUTS[mosaicPhotos.length] ?? MOSAIC_LAYOUTS[5];
-  const includedAmenityGroups = Object.entries(
-    groupAmenities(venue, (item) => item.isIncluded),
-  ) as [AmenityCategory, NonNullable<Venue['amenities']>][];
-  const extraAmenityGroups = Object.entries(groupAmenities(venue, (item) => !item.isIncluded)) as [
-    AmenityCategory,
-    NonNullable<Venue['amenities']>,
-  ][];
   const allUses = [
     ...(venue.uses?.filter((item) => item.isPrimary) ?? []),
     ...(venue.uses?.filter((item) => !item.isPrimary).slice(0, 6) ?? []),
@@ -556,62 +537,7 @@ export const VenueDetail = ({
             </section>
           ) : null}
 
-          {/* Amenities included in the base price */}
-          {includedAmenityGroups.length ? (
-            <section className="sf-detail-section">
-              <h2 className="sf-detail-title">Comodidades y servicios incluidos</h2>
-              <div>
-                {includedAmenityGroups.map(([category, amenities]) => (
-                  <div key={category}>
-                    <p className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground first:mt-0">
-                      {amenityCategoryLabels[category]}
-                    </p>
-                    {amenities.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-2.5 border-t border-border py-2.5 text-sm first:border-t-0"
-                      >
-                        <Check className="h-3.5 w-3.5 shrink-0 text-city-green" />
-                        <span>{item.amenity.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {/* Amenities available at an extra cost */}
-          {extraAmenityGroups.length ? (
-            <section className="sf-detail-section">
-              <h2 className="sf-detail-title">Comodidades y servicios con costo extra</h2>
-              <div>
-                {extraAmenityGroups.map(([category, amenities]) => (
-                  <div key={category}>
-                    <p className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground first:mt-0">
-                      {amenityCategoryLabels[category]}
-                    </p>
-                    {amenities.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <Plus className="h-3.5 w-3.5 shrink-0 text-accent-foreground" />
-                          {item.amenity.name}
-                        </span>
-                        {item.extraCost ? (
-                          <span className="font-serif italic text-accent-foreground">
-                            {formatCurrency(item.extraCost)}
-                          </span>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
+          <VenueIncludedSection venue={venue} items={rentalSelection.includedItems} />
 
           <VenueRentalItemCatalog
             venueId={venue.id}

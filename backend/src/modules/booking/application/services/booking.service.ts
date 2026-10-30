@@ -22,7 +22,7 @@ import {
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
 import { VenueEntity } from '../../../venue/domain/entities/venue.entity';
-import type { SelectedExtra, SelectedRentalItem } from '../../domain/entities/booking.entity';
+import type { SelectedRentalItem } from '../../domain/entities/booking.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import {
   PriceCalculatorService,
@@ -63,12 +63,10 @@ interface RentalItemSelectionEntry {
   quantity: number;
 }
 
-/** The date-based price calculation plus whatever extra-cost amenities and catalog items the
- * client picked — `totalPrice`/`depositAmount` here already include `extrasTotal` and
- * `rentalItemsTotal`, unlike the raw calculator result. */
+/** The date-based price calculation plus the catalog items the client picked —
+ * `totalPrice`/`depositAmount` here already include `rentalItemsTotal`, unlike the raw calculator
+ * result. */
 export interface BookingPriceResult extends RangePriceCalculationResult {
-  extras: SelectedExtra[];
-  extrasTotal: number;
   rentalItems: SelectedRentalItem[];
   rentalItemsTotal: number;
 }
@@ -102,7 +100,6 @@ export class BookingService {
       guestCount: number;
       specialRequests?: string;
       dailySchedule?: DailyScheduleEntry[];
-      selectedAmenityIds?: string[];
       selectedRentalItems?: RentalItemSelectionEntry[];
     },
   ): Promise<{ booking: BookingEntity; priceCalculation: BookingPriceResult }> {
@@ -185,12 +182,7 @@ export class BookingService {
       dto.selectedRentalItems,
       dates.length,
     );
-    const priceCalculation = this.applySelectedExtras(
-      venue,
-      dto.selectedAmenityIds,
-      rentalItems,
-      rangeCalculation,
-    );
+    const priceCalculation = this.applyRentalItems(venue, rentalItems, rangeCalculation);
 
     // Si el local tiene reserva inmediata activada, la solicitud nace ya aprobada -- el cliente
     // pasa directo a pagar, sin esperar que el propietario la revise a mano. No cambia nada de
@@ -217,7 +209,6 @@ export class BookingService {
       depositAmount: priceCalculation.depositAmount,
       status: initialStatus,
       specialRequests: dto.specialRequests,
-      selectedExtras: priceCalculation.extras.length ? priceCalculation.extras : undefined,
       selectedRentalItems: rentalItems.length ? rentalItems : undefined,
       dailyBreakdown: priceCalculation.days.map((day, index) => ({
         date: new Date(day.date),
@@ -301,7 +292,6 @@ export class BookingService {
       startTime: string;
       endTime: string;
       dailySchedule?: DailyScheduleEntry[];
-      selectedAmenityIds?: string[];
       selectedRentalItems?: RentalItemSelectionEntry[];
     },
   ): Promise<BookingPriceResult> {
@@ -341,7 +331,7 @@ export class BookingService {
       dto.selectedRentalItems,
       dates.length,
     );
-    return this.applySelectedExtras(venue, dto.selectedAmenityIds, rentalItems, rangeCalculation);
+    return this.applyRentalItems(venue, rentalItems, rangeCalculation);
   }
 
   /** Turns the client's catalog selection into the snapshot that gets priced and persisted, using
@@ -394,29 +384,15 @@ export class BookingService {
     });
   }
 
-  /** Folds the client's selected extra-cost amenities and catalog items into a date-based price
-   * result: sums them into `totalPrice`/`depositAmount` and attaches the amenity snapshot that
-   * gets persisted on the booking. Silently drops any amenity id that isn't an extra-cost amenity
-   * on this venue (already included, or not this venue's at all) — same lenient handling the rest
-   * of this flow already gives stale/foreign input, rather than erroring on it. */
-  private applySelectedExtras(
+  /** Folds the client's catalog items into a date-based price result: sums them into
+   * `totalPrice`/`depositAmount`. */
+  private applyRentalItems(
     venue: VenueEntity,
-    selectedAmenityIds: string[] | undefined,
     rentalItems: SelectedRentalItem[],
     priceCalculation: RangePriceCalculationResult,
   ): BookingPriceResult {
-    const selectedIds = new Set(selectedAmenityIds ?? []);
-    const extras: SelectedExtra[] = (venue.amenities ?? [])
-      .filter((item) => !item.isIncluded && selectedIds.has(item.amenity.id))
-      .map((item) => ({
-        amenityId: item.amenity.id,
-        name: item.amenity.name,
-        extraCost: item.extraCost ?? 0,
-      }));
-
-    const extrasTotal = this.round(extras.reduce((sum, extra) => sum + extra.extraCost, 0));
     const rentalItemsTotal = this.round(rentalItems.reduce((sum, item) => sum + item.subtotal, 0));
-    const totalPrice = this.round(priceCalculation.totalPrice + extrasTotal + rentalItemsTotal);
+    const totalPrice = this.round(priceCalculation.totalPrice + rentalItemsTotal);
     if (totalPrice > MAX_BOOKING_TOTAL) {
       throw new BadRequestException('El total de la reserva excede el maximo permitido');
     }
@@ -430,8 +406,6 @@ export class BookingService {
       ...priceCalculation,
       totalPrice,
       depositAmount,
-      extras,
-      extrasTotal,
       rentalItems,
       rentalItemsTotal,
     };

@@ -1,3 +1,4 @@
+import { AmenityCategory } from '@prisma/client';
 import {
   BadRequestException,
   ConflictException,
@@ -42,6 +43,13 @@ export interface VenueCompletion {
   missing: string[];
   canPublish: boolean;
 }
+
+const normalizeFeatureName = (name: string): string =>
+  name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 
 @Injectable()
 export class VenueService {
@@ -477,6 +485,31 @@ export class VenueService {
     }
   }
 
+  async updateVenueFeatures(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+    data: {
+      amenityIds: string[];
+      customFeatures: { name: string; category: AmenityCategory }[];
+    },
+  ): Promise<VenueEntity> {
+    await this.assertCanEditVenue(venueId, userId, userRole);
+
+    // Compared ignoring case, accents and symbols, so "Pista-de baile" can't sit next to
+    // "pista de baile": the database's unique index only sees exact matches.
+    const names = data.customFeatures.map((feature) => normalizeFeatureName(feature.name));
+    if (new Set(names).size !== names.length) {
+      throw new BadRequestException('Hay caracteristicas repetidas');
+    }
+
+    const result = await this.venueRepository.updateVenueFeatures(venueId, data);
+    if (result === 'invalid_amenity') {
+      throw new BadRequestException('Una de las caracteristicas ya no esta disponible');
+    }
+    return result;
+  }
+
   /** Public, read-only catalog -- only active items, and only for a venue a random visitor
    * could actually reach (same isPublic() gate as getVenueBySlug, so this can't be used to peek
    * at a draft/unverified venue's items via a guessed id). */
@@ -739,7 +772,11 @@ export class VenueService {
         done: (venue.openingHours ?? []).some((h) => !h.isClosed),
         required: true,
       },
-      { label: 'Comodidades', done: (venue.amenities?.length ?? 0) > 0, required: false },
+      {
+        label: 'Caracteristicas',
+        done: (venue.amenities?.length ?? 0) > 0 || (venue.customFeatures?.length ?? 0) > 0,
+        required: false,
+      },
       {
         label: 'Tipos de evento (ideal para)',
         done: (venue.uses?.length ?? 0) > 0,

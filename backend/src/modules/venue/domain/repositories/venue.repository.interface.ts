@@ -152,6 +152,15 @@ export interface IVenueRepository {
   ): Promise<VenueMediaEntity[]>;
   deleteMedia(venueId: string, mediaId: string): Promise<{ cloudinaryId: string | null } | null>;
   reorderMedia(venueId: string, order: string[], coverId?: string): Promise<VenueMediaEntity[]>;
+  /** Replaces what the venue offers as features. Returns 'invalid_amenity' if an id isn't an active
+   * amenity the venue could pick. */
+  updateVenueFeatures(
+    venueId: string,
+    data: {
+      amenityIds: string[];
+      customFeatures: { name: string; category: AmenityCategory }[];
+    },
+  ): Promise<VenueEntity | 'invalid_amenity'>;
   listRentalItems(
     venueId: string,
     options?: { activeOnly?: boolean },

@@ -498,12 +498,7 @@ async function main(): Promise<void> {
         venueId: venueImperial.id,
         amenityId: getAmenityId(key),
       })),
-      {
-        venueId: venueImperial.id,
-        amenityId: getAmenityId('professional-lighting'),
-        isIncluded: false,
-        extraCost: 250,
-      },
+      { venueId: venueImperial.id, amenityId: getAmenityId('professional-lighting') },
       ...['kitchen', 'bathrooms', 'wifi', 'furniture', 'external-catering'].map((key) => ({
         venueId: venueFiesta.id,
         amenityId: getAmenityId(key),

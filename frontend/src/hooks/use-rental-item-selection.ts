@@ -79,5 +79,7 @@ export const useRentalItemSelection = (venueId: string | undefined, bookingDays 
 
   const clear = () => setQuantities({});
 
-  return { quantities, lines, total, setQuantity, clear };
+  const includedItems = useMemo(() => (items ?? []).filter((item) => item.isIncluded), [items]);
+
+  return { quantities, lines, total, includedItems, setQuantity, clear };
 };
