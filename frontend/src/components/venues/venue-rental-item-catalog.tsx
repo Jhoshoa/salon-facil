@@ -99,10 +99,10 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
       {filteredItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ningun item coincide con tu busqueda.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {filteredItems.map((item) => (
-            <div key={item.id} className="overflow-hidden rounded-[var(--radius)] border">
-              <div className="relative aspect-[4/3] bg-muted">
+            <div key={item.id} className="flex gap-3 rounded-[var(--radius)] border p-2">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] bg-muted sm:h-20 sm:w-20">
                 {item.photoUrl ? (
                   <Image
                     src={item.photoUrl}
@@ -110,24 +110,24 @@ export const VenueRentalItemCatalog = ({ venueId }: VenueRentalItemCatalogProps)
                     fill
                     className="object-cover"
                     loader={cloudinaryImageLoader}
-                    sizes="(min-width: 1024px) 33vw, 50vw"
+                    sizes="80px"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-muted-foreground">
-                    <Package className="h-8 w-8" />
+                    <Package className="h-6 w-6" />
                   </div>
                 )}
               </div>
-              <div className="space-y-1 p-3">
-                <p className="text-sm font-medium">{item.name}</p>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
                 {item.description ? (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
                 ) : null}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 pt-0.5">
                   {item.pricePerUnit === null ? (
                     <Badge variant="secondary">Incluido con el local</Badge>
                   ) : (
-                    <span className="font-serif italic text-accent-foreground">
+                    <span className="font-serif text-sm italic text-accent-foreground">
                       {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
                     </span>
                   )}

@@ -78,6 +78,22 @@ describe('VenueRentalItemCatalog', () => {
     expect(screen.queryByText(/\/ unidad/)).not.toBeInTheDocument();
   });
 
+  it('muestra la foto del item o, si no tiene, solo el icono', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({
+        id: 'item-1',
+        name: 'Mesa redonda',
+        photoUrl: 'https://res.cloudinary.com/demo/image/upload/mesa.jpg',
+      }),
+      makeItem({ id: 'item-2', name: 'Mantel blanco', photoUrl: null }),
+    ]);
+    renderCatalog();
+
+    expect(await screen.findByRole('img', { name: 'Mesa redonda' })).toBeInTheDocument();
+    expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Mantel blanco' })).not.toBeInTheDocument();
+  });
+
   it('muestra las categorias en el orden que definio el dueño, no alfabetico', async () => {
     mockGetPublicRentalItems.mockResolvedValue([
       makeItem({
