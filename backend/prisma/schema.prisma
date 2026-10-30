@@ -145,21 +145,21 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   lastLoginAt     DateTime?  @map("last_login_at")
 
-  venues                 Venue[]                 @relation("VenueOwner")
-  verifiedVenues         Venue[]                 @relation("VenueVerifier")
-  bookings               Booking[]               @relation("ClientBookings")
-  reviews                Review[]                @relation("ClientReviews")
-  confirmedPayments      Payment[]               @relation("PaymentConfirmedBy")
-  refundedPayments       Payment[]               @relation("PaymentRefundedBy")
-  notifications          Notification[]
+  venues                  Venue[]                  @relation("VenueOwner")
+  verifiedVenues          Venue[]                  @relation("VenueVerifier")
+  bookings                Booking[]                @relation("ClientBookings")
+  reviews                 Review[]                 @relation("ClientReviews")
+  confirmedPayments       Payment[]                @relation("PaymentConfirmedBy")
+  refundedPayments        Payment[]                @relation("PaymentRefundedBy")
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  refreshTokens          RefreshToken[]
-  passwordResetTokens    PasswordResetToken[]
-  identities             UserIdentity[]
-  emailVerificationCodes EmailVerificationCode[]
-  favorites              VenueFavorite[]
-  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogActor")
-  ownerInviteTokens      OwnerInviteToken[]
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  identities              UserIdentity[]
+  emailVerificationCodes  EmailVerificationCode[]
+  favorites               VenueFavorite[]
+  adminAuditLogs          AdminAuditLog[]          @relation("AdminAuditLogActor")
+  ownerInviteTokens       OwnerInviteToken[]
 
   @@index([email])
   @@index([phone])
@@ -327,21 +327,23 @@ model Venue {
   // owner/admin can flip back to ACTIVE.
   deletedAt          DateTime?     @map("deleted_at")
 
-  owner          User               @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  verifiedBy     User?              @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
-  spaceType      SpaceType?         @relation(fields: [spaceTypeId], references: [id], onDelete: SetNull)
-  services       VenueService[]
-  amenities      VenueAmenity[]
-  uses           VenueUse[]
-  openingHours   VenueOpeningHour[]
-  media          VenueMedia[]
-  prices         VenuePrice[]
-  bookings       Booking[]
-  bookingDates   BookingDate[]
-  reviews        Review[]
-  calendarBlocks CalendarBlock[]
-  favoritedBy    VenueFavorite[]
-  previewTokens  VenuePreviewToken[]
+  owner                User                      @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  verifiedBy           User?                     @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  spaceType            SpaceType?                @relation(fields: [spaceTypeId], references: [id], onDelete: SetNull)
+  services             VenueService[]
+  amenities            VenueAmenity[]
+  uses                 VenueUse[]
+  openingHours         VenueOpeningHour[]
+  media                VenueMedia[]
+  prices               VenuePrice[]
+  rentalItems          VenueRentalItem[]
+  rentalItemCategories VenueRentalItemCategory[]
+  bookings             Booking[]
+  bookingDates         BookingDate[]
+  reviews              Review[]
+  calendarBlocks       CalendarBlock[]
+  favoritedBy          VenueFavorite[]
+  previewTokens        VenuePreviewToken[]
 
   @@index([ownerId])
   @@index([slug])
@@ -546,6 +548,58 @@ model VenuePrice {
   @@map("venue_prices")
 }
 
+// Un local vende/presta sus propios items (vajilla, mobiliario, decoracion) a quien reserve el
+// espacio -- separado de Amenity/VenueAmenity (catalogo global curado por el admin, usado para
+// filtros de busqueda). `category` es texto libre elegido por el propio dueno, no un enum: el
+// punto es que cada local pueda definir sus propias categorias sin depender de que el admin las
+// registre primero. Fase 1 (ver docs/brainstorm/catalogo-alquiler-items.md): catalogo
+// informativo, sin carrito ni reserva real de stock -- stockQty es solo un numero mostrado,
+// nunca se descuenta automaticamente.
+model VenueRentalItem {
+  id            String   @id @default(uuid())
+  venueId       String   @map("venue_id")
+  name          String
+  categoryId    String   @map("category_id")
+  description   String?  @db.Text
+  photoUrl      String?  @map("photo_url")
+  photoPublicId String?  @map("photo_public_id")
+  // Null only when `isIncluded` is true -- an included item has no price, which is not the same
+  // as an item that is charged separately and happens to cost 0.
+  pricePerUnit  Decimal? @map("price_per_unit") @db.Decimal(12, 2)
+  isIncluded    Boolean  @default(false) @map("is_included")
+  unitLabel     String   @default("unidad") @map("unit_label")
+  stockQty      Int?     @map("stock_qty")
+  isActive      Boolean  @default(true) @map("is_active")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  venue    Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  category VenueRentalItemCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([venueId])
+  @@index([venueId, categoryId])
+  @@map("venue_rental_items")
+}
+
+// Categorias de alquiler, propias de cada local (no un catalogo global curado por admin, a
+// proposito -- ver docs/brainstorm/catalogo-alquiler-items.md). El dueño las crea/renombra/borra
+// desde la pestaña "Catalogo"; onDelete: Restrict en VenueRentalItem.category evita borrar una
+// categoria todavia en uso.
+model VenueRentalItemCategory {
+  id        String   @id @default(uuid())
+  venueId   String   @map("venue_id")
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  venue Venue             @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  items VenueRentalItem[]
+
+  @@unique([venueId, name])
+  @@index([venueId])
+  @@map("venue_rental_item_categories")
+}
+
 model SuggestedSeasonalEvent {
   id        String   @id @default(uuid())
   name      String
@@ -581,6 +635,10 @@ model Booking {
   // Frozen at booking creation so it stays correct even if the venue later renames or removes
   // the amenity. Null when nothing extra was selected.
   selectedExtras  Json?         @map("selected_extras")
+  // Snapshot of the catalog items picked at request time: [{rentalItemId, name, unitLabel,
+  // unitPrice, quantity, subtotal}]. Same reasoning as selectedExtras: it keeps the quote correct
+  // even if the owner later edits the price or deletes the item. Null when nothing was selected.
+  selectedRentalItems Json? @map("selected_rental_items")
   contractUrl     String?       @map("contract_url")
   contractSentAt  DateTime?     @map("contract_sent_at")
   reminder7SentAt DateTime?     @map("reminder_7_sent_at")

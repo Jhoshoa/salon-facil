@@ -206,6 +206,9 @@ export class BookingRepository implements IBookingRepository {
           status: data.status,
           specialRequests: data.specialRequests,
           selectedExtras: data.selectedExtras as unknown as Prisma.InputJsonValue | undefined,
+          selectedRentalItems: data.selectedRentalItems as unknown as
+            | Prisma.InputJsonValue
+            | undefined,
         },
       });
 
@@ -423,6 +426,7 @@ export class BookingRepository implements IBookingRepository {
       status: raw.status as BookingStatus,
       specialRequests: raw.specialRequests,
       selectedExtras: raw.selectedExtras ?? null,
+      selectedRentalItems: raw.selectedRentalItems ?? null,
       contractUrl: raw.contractUrl,
       contractSentAt: raw.contractSentAt,
       reminder7SentAt: raw.reminder7SentAt,

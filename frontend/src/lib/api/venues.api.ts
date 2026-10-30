@@ -16,6 +16,10 @@ import type {
   VenueCompletion,
   VenueFormPayload,
   VenueMedia,
+  VenueRentalItem,
+  VenueRentalItemCategory,
+  VenueRentalItemInput,
+  VenueRentalItemUpdateInput,
   VenueSearchParams,
 } from '@/types/api';
 
@@ -176,6 +180,114 @@ export const reorderVenueMedia = async (
   return apiRequest<VenueMedia[]>(`/venues/${id}/media/order`, {
     method: 'PUT',
     body: JSON.stringify({ order, coverId }),
+  });
+};
+
+// ========== RENTAL ITEM CATALOG (Fase 1) ==========
+
+export const getPublicRentalItems = async (venueId: string): Promise<VenueRentalItem[]> => {
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items`, { auth: false });
+};
+
+export const getOwnerRentalItems = async (venueId: string): Promise<VenueRentalItem[]> => {
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/manage`);
+};
+
+const buildRentalItemFormData = (
+  payload: VenueRentalItemInput | VenueRentalItemUpdateInput,
+  photo?: File,
+): FormData => {
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined) return;
+    // Multipart can't carry a real null -- the backend reads an empty field as "clear this value".
+    formData.set(key, value === null ? '' : String(value));
+  });
+  if (photo) formData.append('photo', photo);
+  return formData;
+};
+
+export const createRentalItem = async (
+  venueId: string,
+  payload: VenueRentalItemInput,
+  photo?: File,
+): Promise<VenueRentalItem> => {
+  return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items`, {
+    method: 'POST',
+    body: buildRentalItemFormData(payload, photo),
+  });
+};
+
+export const updateRentalItem = async (
+  venueId: string,
+  itemId: string,
+  payload: VenueRentalItemUpdateInput,
+  photo?: File,
+): Promise<VenueRentalItem> => {
+  return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items/${itemId}`, {
+    method: 'PUT',
+    body: buildRentalItemFormData(payload, photo),
+  });
+};
+
+export const deleteRentalItem = async (venueId: string, itemId: string): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/rental-items/${itemId}`, { method: 'DELETE' });
+};
+
+export const reorderRentalItems = async (
+  venueId: string,
+  order: string[],
+): Promise<VenueRentalItem[]> => {
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ order }),
+  });
+};
+
+// Categorias del catalogo de alquiler -- propias de cada local, no un catalogo global
+export const getRentalItemCategories = async (
+  venueId: string,
+): Promise<VenueRentalItemCategory[]> => {
+  return apiRequest<VenueRentalItemCategory[]>(`/venues/${venueId}/rental-item-categories`);
+};
+
+export const createRentalItemCategory = async (
+  venueId: string,
+  payload: { name: string; sortOrder?: number },
+): Promise<VenueRentalItemCategory> => {
+  return apiRequest<VenueRentalItemCategory>(`/venues/${venueId}/rental-item-categories`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateRentalItemCategory = async (
+  venueId: string,
+  categoryId: string,
+  payload: { name?: string; sortOrder?: number },
+): Promise<VenueRentalItemCategory> => {
+  return apiRequest<VenueRentalItemCategory>(
+    `/venues/${venueId}/rental-item-categories/${categoryId}`,
+    { method: 'PUT', body: JSON.stringify(payload) },
+  );
+};
+
+export const deleteRentalItemCategory = async (
+  venueId: string,
+  categoryId: string,
+): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/rental-item-categories/${categoryId}`, {
+    method: 'DELETE',
+  });
+};
+
+export const reorderRentalItemCategories = async (
+  venueId: string,
+  order: string[],
+): Promise<VenueRentalItemCategory[]> => {
+  return apiRequest<VenueRentalItemCategory[]>(`/venues/${venueId}/rental-item-categories/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ order }),
   });
 };
 

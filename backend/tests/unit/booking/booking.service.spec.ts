@@ -125,6 +125,7 @@ describe('BookingService', () => {
   let mockVenueService: {
     getVenueById: jest.Mock;
     getOwnerContact: jest.Mock;
+    listPublicRentalItems: jest.Mock;
   };
   let mockPriceCalculator: {
     calculate: jest.Mock;
@@ -170,6 +171,7 @@ describe('BookingService', () => {
     mockVenueService = {
       getVenueById: jest.fn(),
       getOwnerContact: jest.fn().mockResolvedValue(null),
+      listPublicRentalItems: jest.fn().mockResolvedValue([]),
     };
 
     mockPriceCalculator = {
@@ -475,6 +477,163 @@ describe('BookingService', () => {
     });
   });
 
+  describe('catalog items in the quote (selectedRentalItems)', () => {
+    const bookingDto = {
+      eventType: 'Boda',
+      eventDate: ANCHOR_DATE,
+      startTime: '14:00',
+      endTime: '22:00',
+      guestCount: 100,
+    };
+    const previewDto = { eventDate: ANCHOR_DATE, startTime: '14:00', endTime: '22:00' };
+    const silla = {
+      id: 'silla',
+      name: 'Silla',
+      unitLabel: 'unidad',
+      pricePerUnit: 12.5,
+      isIncluded: false,
+      stockQty: 80,
+    };
+    const toldo = {
+      id: 'toldo',
+      name: 'Toldo',
+      unitLabel: 'por evento',
+      pricePerUnit: 300,
+      isIncluded: false,
+      stockQty: null,
+    };
+    const mesaIncluida = {
+      id: 'mesa',
+      name: 'Mesa',
+      unitLabel: 'unidad',
+      pricePerUnit: null,
+      isIncluded: true,
+      stockQty: 10,
+    };
+
+    beforeEach(() => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+      mockVenueService.listPublicRentalItems.mockResolvedValue([silla, toldo, mesaIncluida]);
+      mockBookingRepository.create.mockResolvedValue(makeBooking());
+    });
+
+    it('adds quantity x current price to the total and computes the deposit on that total', async () => {
+      mockPriceCalculator.resolveDeposit.mockReturnValue(1680);
+
+      const result = await service.previewPrice('venue-1', {
+        ...previewDto,
+        selectedRentalItems: [
+          { rentalItemId: 'silla', quantity: 4 },
+          { rentalItemId: 'toldo', quantity: 2 },
+        ],
+      });
+
+      expect(result.rentalItemsTotal).toBe(650);
+      expect(result.totalPrice).toBe(5650);
+      expect(mockPriceCalculator.resolveDeposit).toHaveBeenLastCalledWith(
+        'DEPOSIT_THEN_REMAINING',
+        30,
+        5650,
+      );
+      expect(result.depositAmount).toBe(1680);
+      expect(result.rentalItems[0]).toEqual({
+        rentalItemId: 'silla',
+        name: 'Silla',
+        unitLabel: 'unidad',
+        unitPrice: 12.5,
+        quantity: 4,
+        subtotal: 50,
+      });
+    });
+
+    it('does not query the catalog when nothing was selected', async () => {
+      const result = await service.previewPrice('venue-1', previewDto);
+
+      expect(mockVenueService.listPublicRentalItems).not.toHaveBeenCalled();
+      expect(result.rentalItems).toEqual([]);
+      expect(result.rentalItemsTotal).toBe(0);
+      expect(result.totalPrice).toBe(5000);
+    });
+
+    it('persists the snapshot on the booking', async () => {
+      await service.requestBooking('venue-1', 'client-1', {
+        ...bookingDto,
+        selectedRentalItems: [{ rentalItemId: 'toldo', quantity: 1 }],
+      });
+
+      const createCallArg = mockBookingRepository.create.mock.calls[0][0];
+      expect(createCallArg.totalPrice).toBe(5300);
+      expect(createCallArg.selectedRentalItems).toEqual([
+        {
+          rentalItemId: 'toldo',
+          name: 'Toldo',
+          unitLabel: 'por evento',
+          unitPrice: 300,
+          quantity: 1,
+          subtotal: 300,
+        },
+      ]);
+    });
+
+    it('leaves the snapshot unset when nothing was selected', async () => {
+      await service.requestBooking('venue-1', 'client-1', bookingDto);
+
+      expect(mockBookingRepository.create.mock.calls[0][0].selectedRentalItems).toBeUndefined();
+    });
+
+    it('accepts exactly the stock and rejects one more', async () => {
+      await expect(
+        service.previewPrice('venue-1', {
+          ...previewDto,
+          selectedRentalItems: [{ rentalItemId: 'silla', quantity: 80 }],
+        }),
+      ).resolves.toMatchObject({ rentalItemsTotal: 1000 });
+
+      await expect(
+        service.previewPrice('venue-1', {
+          ...previewDto,
+          selectedRentalItems: [{ rentalItemId: 'silla', quantity: 81 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it.each([
+      ['included with the venue', 'mesa'],
+      ['deleted, inactive or from another venue', 'no-existe'],
+    ])('rejects an item that is %s, without creating anything', async (_label, rentalItemId) => {
+      await expect(
+        service.requestBooking('venue-1', 'client-1', {
+          ...bookingDto,
+          selectedRentalItems: [{ rentalItemId, quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockBookingRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects the same item sent twice', async () => {
+      await expect(
+        service.previewPrice('venue-1', {
+          ...previewDto,
+          selectedRentalItems: [
+            { rentalItemId: 'silla', quantity: 1 },
+            { rentalItemId: 'silla', quantity: 2 },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('sends an instant-booking venue request to the owner when it includes catalog items', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue({ instantBooking: true }));
+
+      await service.requestBooking('venue-1', 'client-1', {
+        ...bookingDto,
+        selectedRentalItems: [{ rentalItemId: 'toldo', quantity: 1 }],
+      });
+
+      expect(mockBookingRepository.create.mock.calls[0][0].status).toBe(BookingStatus.PENDING);
+    });
+  });
+
   describe('requestBooking — deposit follows the venue payment policy', () => {
     const bookingDto = {
       eventType: 'Boda',
@@ -740,6 +899,7 @@ describe('BookingService', () => {
 
     it('should throw BadRequestException when booking is not approved', async () => {
       mockBookingRepository.findById.mockResolvedValue(makeBooking());
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
 
       await expect(service.markDepositPaid('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
         BadRequestException,
@@ -781,6 +941,7 @@ describe('BookingService', () => {
       mockBookingRepository.findById.mockResolvedValue(
         makeBooking({ status: BookingStatus.PENDING }),
       );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
 
       await expect(service.markAsCompleted('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
         BadRequestException,
@@ -833,6 +994,7 @@ describe('BookingService', () => {
       mockBookingRepository.findById.mockResolvedValue(
         makeBooking({ status: BookingStatus.PENDING }),
       );
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
 
       await expect(service.markAsNoShow('booking-1', 'owner-1', UserRole.OWNER)).rejects.toThrow(
         BadRequestException,

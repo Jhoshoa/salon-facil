@@ -17,7 +17,7 @@ import {
 import { BookingEntity, BookingStatus } from '../../domain/entities/booking.entity';
 import { CalendarBlockEntity } from '../../domain/entities/calendar-block.entity';
 import { VenueEntity } from '../../../venue/domain/entities/venue.entity';
-import type { SelectedExtra } from '../../domain/entities/booking.entity';
+import type { SelectedExtra, SelectedRentalItem } from '../../domain/entities/booking.entity';
 import { VenueService } from '../../../venue/application/services/venue.service';
 import {
   PriceCalculatorService,
@@ -30,6 +30,8 @@ import type { NotificationEmailMetadata } from '../../../notification/infrastruc
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
 const MAX_BOOKING_RANGE_DAYS = 30;
+// Booking.totalPrice is Decimal(12, 2): anything above this would make the insert fail.
+const MAX_BOOKING_TOTAL = 9999999999.99;
 
 const REMINDER_TIERS: { type: NotificationType; days: number; field: ReminderField }[] = [
   { type: NotificationType.REMINDER_7_DAYS, days: 7, field: 'reminder7SentAt' },
@@ -51,11 +53,19 @@ interface ResolvedDay {
   endTime: string;
 }
 
-/** The date-based price calculation plus whatever extra-cost amenities the client picked —
- * `totalPrice`/`depositAmount` here already include `extrasTotal`, unlike the raw calculator result. */
+interface RentalItemSelectionEntry {
+  rentalItemId: string;
+  quantity: number;
+}
+
+/** The date-based price calculation plus whatever extra-cost amenities and catalog items the
+ * client picked — `totalPrice`/`depositAmount` here already include `extrasTotal` and
+ * `rentalItemsTotal`, unlike the raw calculator result. */
 export interface BookingPriceResult extends RangePriceCalculationResult {
   extras: SelectedExtra[];
   extrasTotal: number;
+  rentalItems: SelectedRentalItem[];
+  rentalItemsTotal: number;
 }
 
 @Injectable()
@@ -88,6 +98,7 @@ export class BookingService {
       specialRequests?: string;
       dailySchedule?: DailyScheduleEntry[];
       selectedAmenityIds?: string[];
+      selectedRentalItems?: RentalItemSelectionEntry[];
     },
   ): Promise<{ booking: BookingEntity; priceCalculation: BookingPriceResult }> {
     const venue = await this.venueService.getVenueById(venueId);
@@ -164,16 +175,23 @@ export class BookingService {
       venue.paymentPolicy,
       venue.depositPercentage,
     );
+    const rentalItems = await this.resolveSelectedRentalItems(venueId, dto.selectedRentalItems);
     const priceCalculation = this.applySelectedExtras(
       venue,
       dto.selectedAmenityIds,
+      rentalItems,
       rangeCalculation,
     );
 
     // Si el local tiene reserva inmediata activada, la solicitud nace ya aprobada -- el cliente
     // pasa directo a pagar, sin esperar que el propietario la revise a mano. No cambia nada de
     // la validacion de disponibilidad ni del calculo de precio de arriba, solo el estado inicial.
-    const initialStatus = venue.instantBooking ? BookingStatus.APPROVED : BookingStatus.PENDING;
+    // La excepcion son los items del catalogo: su stock no se controla por fecha, asi que alguien
+    // tiene que confirmar que estan libres ese dia antes de que el cliente pague por ellos.
+    const initialStatus =
+      venue.instantBooking && rentalItems.length === 0
+        ? BookingStatus.APPROVED
+        : BookingStatus.PENDING;
 
     const bookingData: CreateBookingData = {
       venueId,
@@ -191,6 +209,7 @@ export class BookingService {
       status: initialStatus,
       specialRequests: dto.specialRequests,
       selectedExtras: priceCalculation.extras.length ? priceCalculation.extras : undefined,
+      selectedRentalItems: rentalItems.length ? rentalItems : undefined,
       dailyBreakdown: priceCalculation.days.map((day, index) => ({
         date: new Date(day.date),
         appliedPrice: day.appliedPrice,
@@ -223,7 +242,11 @@ export class BookingService {
         content:
           initialStatus === BookingStatus.APPROVED
             ? `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Se confirmo automaticamente porque tenes activada la reserva inmediata.`
-            : `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}. Revisala en tu panel de reservas.`,
+            : `${dto.eventType} para ${dto.guestCount} invitados, del ${this.toDateOnly(startDate)} al ${this.toDateOnly(endDate)}.${
+                rentalItems.length
+                  ? ` Incluye items del catalogo: confirma que los tenes disponibles para esa fecha.`
+                  : ''
+              } Revisala en tu panel de reservas.`,
         recipientEmail: ownerContact.email,
         metadata: {
           kind: 'bookingRequest',
@@ -233,6 +256,7 @@ export class BookingService {
           startDate: this.toDateOnly(startDate),
           endDate: this.toDateOnly(endDate),
           autoConfirmed: initialStatus === BookingStatus.APPROVED,
+          rentalItemCount: rentalItems.length,
         } satisfies NotificationEmailMetadata,
       });
     }
@@ -269,6 +293,7 @@ export class BookingService {
       endTime: string;
       dailySchedule?: DailyScheduleEntry[];
       selectedAmenityIds?: string[];
+      selectedRentalItems?: RentalItemSelectionEntry[];
     },
   ): Promise<BookingPriceResult> {
     const venue = await this.venueService.getVenueById(venueId);
@@ -302,17 +327,64 @@ export class BookingService {
       venue.paymentPolicy,
       venue.depositPercentage,
     );
-    return this.applySelectedExtras(venue, dto.selectedAmenityIds, rangeCalculation);
+    const rentalItems = await this.resolveSelectedRentalItems(venueId, dto.selectedRentalItems);
+    return this.applySelectedExtras(venue, dto.selectedAmenityIds, rentalItems, rangeCalculation);
   }
 
-  /** Folds the client's selected extra-cost amenities into a date-based price result: sums
-   * their `extraCost` into `totalPrice`/`depositAmount` and attaches the snapshot that gets
-   * persisted on the booking. Silently drops any id that isn't an extra-cost amenity on this
-   * venue (already included, or not this venue's at all) — same lenient handling the rest of
-   * this flow already gives stale/foreign input, rather than erroring on it. */
+  /** Turns the client's catalog selection into the snapshot that gets priced and persisted, using
+   * the current price from the database -- never one sent by the client. Stricter than the amenity
+   * handling below: dropping an item silently would leave a client believing they had requested
+   * something the owner never sees, so a stale selection is an error the form can show. Stock is
+   * the venue's total, not what's free on that date, so going over it can never be fulfilled;
+   * staying under it is still only an estimate the owner has to confirm. Each item is charged once
+   * per booking, however many days the booking spans. */
+  private async resolveSelectedRentalItems(
+    venueId: string,
+    selection: RentalItemSelectionEntry[] | undefined,
+  ): Promise<SelectedRentalItem[]> {
+    if (!selection?.length) return [];
+
+    const selectedIds = selection.map((entry) => entry.rentalItemId);
+    if (new Set(selectedIds).size !== selectedIds.length) {
+      throw new BadRequestException('Hay items repetidos en tu seleccion');
+    }
+
+    const available = new Map(
+      (await this.venueService.listPublicRentalItems(venueId)).map((item) => [item.id, item]),
+    );
+
+    return selection.map(({ rentalItemId, quantity }) => {
+      const item = available.get(rentalItemId);
+      if (!item || item.isIncluded || item.pricePerUnit === null) {
+        throw new BadRequestException(
+          'Uno de los items que elegiste ya no esta disponible. Actualiza tu seleccion.',
+        );
+      }
+      if (item.stockQty !== null && quantity > item.stockQty) {
+        throw new BadRequestException(
+          `El local tiene ${item.stockQty} en total de "${item.name}" y pediste ${quantity}`,
+        );
+      }
+      return {
+        rentalItemId: item.id,
+        name: item.name,
+        unitLabel: item.unitLabel,
+        unitPrice: item.pricePerUnit,
+        quantity,
+        subtotal: this.round(item.pricePerUnit * quantity),
+      };
+    });
+  }
+
+  /** Folds the client's selected extra-cost amenities and catalog items into a date-based price
+   * result: sums them into `totalPrice`/`depositAmount` and attaches the amenity snapshot that
+   * gets persisted on the booking. Silently drops any amenity id that isn't an extra-cost amenity
+   * on this venue (already included, or not this venue's at all) — same lenient handling the rest
+   * of this flow already gives stale/foreign input, rather than erroring on it. */
   private applySelectedExtras(
     venue: VenueEntity,
     selectedAmenityIds: string[] | undefined,
+    rentalItems: SelectedRentalItem[],
     priceCalculation: RangePriceCalculationResult,
   ): BookingPriceResult {
     const selectedIds = new Set(selectedAmenityIds ?? []);
@@ -325,14 +397,26 @@ export class BookingService {
       }));
 
     const extrasTotal = this.round(extras.reduce((sum, extra) => sum + extra.extraCost, 0));
-    const totalPrice = this.round(priceCalculation.totalPrice + extrasTotal);
+    const rentalItemsTotal = this.round(rentalItems.reduce((sum, item) => sum + item.subtotal, 0));
+    const totalPrice = this.round(priceCalculation.totalPrice + extrasTotal + rentalItemsTotal);
+    if (totalPrice > MAX_BOOKING_TOTAL) {
+      throw new BadRequestException('El total de la reserva excede el maximo permitido');
+    }
     const depositAmount = this.priceCalculator.resolveDeposit(
       venue.paymentPolicy,
       venue.depositPercentage,
       totalPrice,
     );
 
-    return { ...priceCalculation, totalPrice, depositAmount, extras, extrasTotal };
+    return {
+      ...priceCalculation,
+      totalPrice,
+      depositAmount,
+      extras,
+      extrasTotal,
+      rentalItems,
+      rentalItemsTotal,
+    };
   }
 
   private round(value: number): number {
@@ -552,13 +636,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (!booking.canBeApproved()) {
-      throw new BadRequestException('Esta reserva no puede ser aprobada');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para aprobar esta reserva');
+    }
+
+    if (!booking.canBeApproved()) {
+      throw new BadRequestException('Esta reserva no puede ser aprobada');
     }
 
     const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.APPROVED);
@@ -592,13 +676,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (booking.status !== BookingStatus.PENDING) {
-      throw new BadRequestException('Solo se pueden rechazar reservas pendientes');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para rechazar esta reserva');
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Solo se pueden rechazar reservas pendientes');
     }
 
     const updated = await this.bookingRepository.updateStatus(
@@ -680,13 +764,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (booking.status !== BookingStatus.APPROVED) {
-      throw new BadRequestException('Solo se puede registrar el anticipo en reservas aprobadas');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para registrar el anticipo de esta reserva');
+    }
+
+    if (booking.status !== BookingStatus.APPROVED) {
+      throw new BadRequestException('Solo se puede registrar el anticipo en reservas aprobadas');
     }
 
     return this.bookingRepository.markDepositPaid(bookingId);
@@ -702,13 +786,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (!booking.canBeCompleted()) {
-      throw new BadRequestException('Esta reserva no puede ser marcada como completada');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para completar esta reserva');
+    }
+
+    if (!booking.canBeCompleted()) {
+      throw new BadRequestException('Esta reserva no puede ser marcada como completada');
     }
 
     const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.COMPLETED);
@@ -740,15 +824,15 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
+    const venue = await this.venueService.getVenueById(booking.venueId);
+    if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para marcar esta reserva como no show');
+    }
+
     if (!booking.canBeMarkedNoShow()) {
       throw new BadRequestException(
         'Solo se puede marcar como no show reservas aprobadas o con pago registrado',
       );
-    }
-
-    const venue = await this.venueService.getVenueById(booking.venueId);
-    if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
-      throw new ForbiddenException('No tienes permiso para marcar esta reserva como no show');
     }
 
     return this.bookingRepository.updateStatus(bookingId, BookingStatus.NO_SHOW);

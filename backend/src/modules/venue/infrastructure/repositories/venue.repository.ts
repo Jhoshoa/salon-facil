@@ -4,11 +4,21 @@ import {
   AmenityCatalogItem,
   CatalogItem,
   CatalogItemInput,
+  CreateRentalItemCategoryInput,
+  CreateRentalItemInput,
   IVenueRepository,
   SeasonalEventCatalogItem,
   SeasonalEventInput,
+  UpdateRentalItemCategoryInput,
+  UpdateRentalItemInput,
 } from '../../domain/repositories/venue.repository.interface';
-import { VenueEntity, VenueMediaEntity, VenueStatus } from '../../domain/entities/venue.entity';
+import {
+  VenueEntity,
+  VenueMediaEntity,
+  VenueRentalItemCategoryEntity,
+  VenueRentalItemEntity,
+  VenueStatus,
+} from '../../domain/entities/venue.entity';
 import { VenueServiceEntity } from '../../domain/entities/venue-service.entity';
 import { VenuePriceEntity } from '../../domain/entities/venue-price.entity';
 import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dto';
@@ -67,6 +77,11 @@ interface RawVenueMedia {
   sortOrder: number;
   isCover: boolean;
 }
+
+// The public catalog isn't paginated, so this also bounds what one owner can make every visitor
+// download. Generous: the largest real catalog we know of has 56 items.
+const MAX_RENTAL_ITEMS_PER_VENUE = 500;
+const MAX_RENTAL_CATEGORIES_PER_VENUE = 100;
 
 @Injectable()
 export class VenueRepository implements IVenueRepository {
@@ -952,6 +967,298 @@ export class VenueRepository implements IVenueRepository {
       sortOrder: item.sortOrder,
       isCover: item.isCover,
     }));
+  }
+
+  async listRentalItems(
+    venueId: string,
+    options?: { activeOnly?: boolean },
+  ): Promise<VenueRentalItemEntity[]> {
+    const items = await this.prisma.venueRentalItem.findMany({
+      where: { venueId, ...(options?.activeOnly ? { isActive: true } : {}) },
+      include: { category: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    return items.map((item) => this.toRentalItemEntity(item));
+  }
+
+  async createRentalItem(
+    venueId: string,
+    data: CreateRentalItemInput,
+  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required' | 'limit_reached'> {
+    const category = await this.prisma.venueRentalItemCategory.findFirst({
+      where: { id: data.categoryId, venueId },
+    });
+    if (!category) return 'category_not_found';
+    if (!data.isIncluded && data.pricePerUnit == null) return 'price_required';
+
+    const existing = await this.prisma.venueRentalItem.findMany({
+      where: { venueId },
+      select: { sortOrder: true },
+    });
+    if (existing.length >= MAX_RENTAL_ITEMS_PER_VENUE) return 'limit_reached';
+
+    const sortOrder =
+      data.sortOrder ??
+      (existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0);
+
+    const item = await this.prisma.venueRentalItem.create({
+      data: {
+        venueId,
+        name: data.name,
+        categoryId: data.categoryId,
+        description: data.description,
+        photoUrl: data.photoUrl,
+        photoPublicId: data.photoPublicId,
+        pricePerUnit: data.isIncluded ? null : new Prisma.Decimal(data.pricePerUnit!),
+        isIncluded: data.isIncluded ?? false,
+        unitLabel: data.unitLabel ?? 'unidad',
+        stockQty: data.stockQty,
+        sortOrder,
+      },
+      include: { category: true },
+    });
+    return this.toRentalItemEntity(item);
+  }
+
+  async updateRentalItem(
+    venueId: string,
+    itemId: string,
+    data: UpdateRentalItemInput,
+  ): Promise<
+    | { entity: VenueRentalItemEntity; previousPhotoPublicId: string | null }
+    | 'not_found'
+    | 'category_not_found'
+    | 'price_required'
+  > {
+    const existing = await this.prisma.venueRentalItem.findFirst({
+      where: { id: itemId, venueId },
+    });
+    if (!existing) return 'not_found';
+
+    if (data.categoryId) {
+      const category = await this.prisma.venueRentalItemCategory.findFirst({
+        where: { id: data.categoryId, venueId },
+      });
+      if (!category) return 'category_not_found';
+    }
+
+    // Checked against the row's current state, not just this request: an edit that only sends
+    // `isIncluded: false` on an item with no price yet would otherwise leave it charged at nothing.
+    const isIncluded = data.isIncluded ?? existing.isIncluded;
+    if (!isIncluded && data.pricePerUnit == null && existing.pricePerUnit == null) {
+      return 'price_required';
+    }
+
+    // A new upload replaces the old photo; `removePhoto` clears it without a replacement. Either
+    // way, the old Cloudinary asset (if any) needs cleanup -- the caller does that best-effort
+    // using `previousPhotoPublicId` below.
+    const photoReplaced = data.photoUrl !== undefined;
+    const photoCleared = !photoReplaced && data.removePhoto === true;
+    const previousPhotoPublicId = photoReplaced || photoCleared ? existing.photoPublicId : null;
+
+    const item = await this.prisma.venueRentalItem.update({
+      where: { id: itemId },
+      data: {
+        name: data.name,
+        categoryId: data.categoryId,
+        description: data.description,
+        photoUrl: photoCleared ? null : data.photoUrl,
+        photoPublicId: photoCleared ? null : data.photoPublicId,
+        pricePerUnit: isIncluded
+          ? null
+          : data.pricePerUnit != null
+            ? new Prisma.Decimal(data.pricePerUnit)
+            : undefined,
+        isIncluded,
+        unitLabel: data.unitLabel,
+        stockQty: data.stockQty,
+        isActive: data.isActive,
+        sortOrder: data.sortOrder,
+      },
+      include: { category: true },
+    });
+    return { entity: this.toRentalItemEntity(item), previousPhotoPublicId };
+  }
+
+  /** Returns the deleted row's `photoPublicId` (or `null`) so the caller can also remove the
+   * asset from Cloudinary — the DB delete happens either way, unconditionally. */
+  async deleteRentalItem(
+    venueId: string,
+    itemId: string,
+  ): Promise<{ photoPublicId: string | null } | null> {
+    const item = await this.prisma.venueRentalItem.findFirst({ where: { id: itemId, venueId } });
+    if (!item) return null;
+
+    await this.prisma.venueRentalItem.delete({ where: { id: itemId } });
+
+    return { photoPublicId: item.photoPublicId };
+  }
+
+  async reorderRentalItems(
+    venueId: string,
+    order: string[],
+  ): Promise<VenueRentalItemEntity[] | 'invalid_order'> {
+    const existing = await this.prisma.venueRentalItem.findMany({
+      where: { venueId },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((item) => item.id));
+    if (order.length !== existingIds.size || order.some((id) => !existingIds.has(id))) {
+      return 'invalid_order';
+    }
+
+    await this.prisma.$transaction(
+      order.map((itemId, index) =>
+        this.prisma.venueRentalItem.updateMany({
+          where: { id: itemId, venueId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+    return this.listRentalItems(venueId);
+  }
+
+  async listRentalItemCategories(venueId: string): Promise<VenueRentalItemCategoryEntity[]> {
+    const categories = await this.prisma.venueRentalItemCategory.findMany({
+      where: { venueId },
+      include: { _count: { select: { items: true } } },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    return categories.map((category) => this.toRentalItemCategoryEntity(category));
+  }
+
+  async createRentalItemCategory(
+    venueId: string,
+    data: CreateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name' | 'limit_reached'> {
+    const duplicate = await this.prisma.venueRentalItemCategory.findFirst({
+      where: { venueId, name: { equals: data.name, mode: 'insensitive' } },
+    });
+    if (duplicate) return 'duplicate_name';
+
+    const existing = await this.prisma.venueRentalItemCategory.findMany({
+      where: { venueId },
+      select: { sortOrder: true },
+    });
+    if (existing.length >= MAX_RENTAL_CATEGORIES_PER_VENUE) return 'limit_reached';
+
+    const sortOrder =
+      data.sortOrder ??
+      (existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0);
+
+    const category = await this.prisma.venueRentalItemCategory.create({
+      data: { venueId, name: data.name, sortOrder },
+      include: { _count: { select: { items: true } } },
+    });
+    return this.toRentalItemCategoryEntity(category);
+  }
+
+  async updateRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+    data: UpdateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity | 'not_found' | 'duplicate_name'> {
+    const existing = await this.prisma.venueRentalItemCategory.findFirst({
+      where: { id: categoryId, venueId },
+    });
+    if (!existing) return 'not_found';
+
+    if (data.name) {
+      const duplicate = await this.prisma.venueRentalItemCategory.findFirst({
+        where: {
+          venueId,
+          name: { equals: data.name, mode: 'insensitive' },
+          NOT: { id: categoryId },
+        },
+      });
+      if (duplicate) return 'duplicate_name';
+    }
+
+    const category = await this.prisma.venueRentalItemCategory.update({
+      where: { id: categoryId },
+      data: { name: data.name, sortOrder: data.sortOrder },
+      include: { _count: { select: { items: true } } },
+    });
+    return this.toRentalItemCategoryEntity(category);
+  }
+
+  /** Only deletes when the category has zero items -- otherwise leaves it untouched and reports
+   * the blocking count so the service can turn it into a clear 409 instead of a raw FK error. */
+  async deleteRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+  ): Promise<{ itemCount: number } | 'not_found'> {
+    const category = await this.prisma.venueRentalItemCategory.findFirst({
+      where: { id: categoryId, venueId },
+      include: { _count: { select: { items: true } } },
+    });
+    if (!category) return 'not_found';
+
+    const itemCount = category._count.items;
+    if (itemCount > 0) return { itemCount };
+
+    await this.prisma.venueRentalItemCategory.delete({ where: { id: categoryId } });
+    return { itemCount: 0 };
+  }
+
+  async reorderRentalItemCategories(
+    venueId: string,
+    order: string[],
+  ): Promise<VenueRentalItemCategoryEntity[] | 'invalid_order'> {
+    const existing = await this.prisma.venueRentalItemCategory.findMany({
+      where: { venueId },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((category) => category.id));
+    if (order.length !== existingIds.size || order.some((id) => !existingIds.has(id))) {
+      return 'invalid_order';
+    }
+
+    await this.prisma.$transaction(
+      order.map((categoryId, index) =>
+        this.prisma.venueRentalItemCategory.updateMany({
+          where: { id: categoryId, venueId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+    return this.listRentalItemCategories(venueId);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private toRentalItemEntity(raw: any): VenueRentalItemEntity {
+    return {
+      id: raw.id,
+      venueId: raw.venueId,
+      name: raw.name,
+      category: {
+        id: raw.category.id,
+        name: raw.category.name,
+        sortOrder: raw.category.sortOrder,
+      },
+      description: raw.description,
+      photoUrl: raw.photoUrl,
+      photoPublicId: raw.photoPublicId,
+      pricePerUnit: raw.pricePerUnit === null ? null : Number(raw.pricePerUnit),
+      isIncluded: raw.isIncluded,
+      unitLabel: raw.unitLabel,
+      stockQty: raw.stockQty,
+      isActive: raw.isActive,
+      sortOrder: raw.sortOrder,
+      createdAt: raw.createdAt,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private toRentalItemCategoryEntity(raw: any): VenueRentalItemCategoryEntity {
+    return {
+      id: raw.id,
+      venueId: raw.venueId,
+      name: raw.name,
+      sortOrder: raw.sortOrder,
+      itemCount: raw._count.items,
+      createdAt: raw.createdAt,
+    };
   }
 
   async updateStatus(

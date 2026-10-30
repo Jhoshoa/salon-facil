@@ -225,6 +225,23 @@ export const BookingDetailClient = ({ bookingId }: BookingDetailClientProps) => 
             </ul>
           </div>
         ) : null}
+        {booking.selectedRentalItems?.length ? (
+          <div className="mt-3">
+            <p className="text-xs text-muted-foreground">Items del catalogo</p>
+            <ul className="mt-1 space-y-1 text-sm">
+              {booking.selectedRentalItems.map((item) => (
+                <li key={item.rentalItemId} className="flex items-center justify-between gap-3">
+                  <span>
+                    {item.name} × {item.quantity}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatCurrency(item.subtotal)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-md border bg-card p-4 shadow-sm">

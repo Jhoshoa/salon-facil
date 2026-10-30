@@ -194,6 +194,51 @@ export interface VenueMedia {
   isCover: boolean;
 }
 
+export interface VenueRentalItem {
+  id: string;
+  venueId: string;
+  name: string;
+  category: { id: string; name: string; sortOrder: number };
+  description: string | null;
+  photoUrl: string | null;
+  // Null only when `isIncluded` is true: an included item has no price.
+  pricePerUnit: number | null;
+  isIncluded: boolean;
+  unitLabel: string;
+  stockQty: number | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface VenueRentalItemInput {
+  name: string;
+  categoryId: string;
+  description?: string;
+  pricePerUnit?: number;
+  isIncluded?: boolean;
+  unitLabel?: string;
+  stockQty?: number;
+  sortOrder?: number;
+}
+
+// `null` clears an optional value on edit -- `undefined` leaves it as it was.
+export interface VenueRentalItemUpdateInput extends Partial<
+  Omit<VenueRentalItemInput, 'description' | 'stockQty'>
+> {
+  description?: string | null;
+  stockQty?: number | null;
+  isActive?: boolean;
+  removePhoto?: boolean;
+}
+
+export interface VenueRentalItemCategory {
+  id: string;
+  venueId: string;
+  name: string;
+  sortOrder: number;
+  itemCount: number;
+}
+
 export interface Venue {
   id: string;
   ownerId: string;
@@ -409,6 +454,21 @@ export interface SelectedExtra {
   extraCost: number;
 }
 
+/** Foto del item del catalogo al momento de la solicitud: no cambia si el dueño lo edita despues. */
+export interface SelectedRentalItem {
+  rentalItemId: string;
+  name: string;
+  unitLabel: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface RentalItemSelectionEntry {
+  rentalItemId: string;
+  quantity: number;
+}
+
 export interface Booking {
   id: string;
   venueId: string;
@@ -427,6 +487,7 @@ export interface Booking {
   status: BookingStatus;
   specialRequests: string | null;
   selectedExtras: SelectedExtra[] | null;
+  selectedRentalItems: SelectedRentalItem[] | null;
   venue?: Venue;
   client?: { id: string; fullName: string; email: string; phone: string | null };
   /** The backend always includes this (every booking query eager-loads payments), so it's safe
@@ -475,6 +536,8 @@ export interface CreateBookingPayload {
   dailySchedule?: DailyScheduleEntry[];
   /** IDs de comodidades con costo extra elegidas por el cliente. */
   selectedAmenityIds?: string[];
+  /** Items del catalogo elegidos por el cliente, con su cantidad. */
+  selectedRentalItems?: RentalItemSelectionEntry[];
 }
 
 export interface DailyPriceBreakdown {
@@ -492,6 +555,8 @@ export interface RangePriceCalculation {
   days: DailyPriceBreakdown[];
   extras?: SelectedExtra[];
   extrasTotal?: number;
+  rentalItems?: SelectedRentalItem[];
+  rentalItemsTotal?: number;
 }
 
 export interface CreateBookingResponse {

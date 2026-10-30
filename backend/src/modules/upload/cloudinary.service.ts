@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import { Express } from 'express';
@@ -58,6 +64,11 @@ export class CloudinaryService implements OnModuleInit {
           ],
         },
         (error, result) => {
+          // The MIME type we checked is only what the client declared. Cloudinary inspects the
+          // real content, so its 400 means the file itself is bad, not that the server failed.
+          if (error?.http_code === 400) {
+            return reject(new BadRequestException('El archivo no es una imagen valida'));
+          }
           if (error) return reject(error);
           if (!result) return reject(new Error('No result from Cloudinary'));
           resolve({
@@ -91,6 +102,10 @@ export class CloudinaryService implements OnModuleInit {
           allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
         },
         (error, result) => {
+          // Same as uploadImage: a 400 here means the file itself isn't an allowed format.
+          if (error?.http_code === 400) {
+            return reject(new BadRequestException('El archivo no es una imagen o PDF valido'));
+          }
           if (error) return reject(error);
           if (!result) return reject(new Error('No result from Cloudinary'));
           resolve({

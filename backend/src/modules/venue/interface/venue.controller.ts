@@ -11,10 +11,11 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../shared/decorators/public.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
@@ -34,6 +35,16 @@ import {
   UpdateCatalogItemDto,
   UpdateSeasonalEventDto,
 } from '../application/dto/catalog.dto';
+import {
+  CreateRentalItemDto,
+  ReorderRentalItemsDto,
+  UpdateRentalItemDto,
+} from '../application/dto/rental-item.dto';
+import {
+  CreateRentalItemCategoryDto,
+  ReorderRentalItemCategoriesDto,
+  UpdateRentalItemCategoryDto,
+} from '../application/dto/rental-item-category.dto';
 import { VenueService } from '../application/services/venue.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
 import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slug.use-case';
@@ -66,6 +77,21 @@ function validateFiles(files: Express.Multer.File[] | undefined): void {
         `Archivo "${file.originalname}" excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB`,
       );
     }
+  }
+}
+
+function validateSingleFile(file: Express.Multer.File | undefined): void {
+  if (!file) return;
+
+  if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    throw new BadRequestException(
+      `Tipo MIME no permitido: ${file.mimetype}. Solo se aceptan: ${ALLOWED_MIME_TYPES.join(', ')}`,
+    );
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    throw new BadRequestException(
+      `Archivo "${file.originalname}" excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+    );
   }
 }
 
@@ -362,8 +388,15 @@ export class VenueController {
     }
     validateFiles(files);
 
+    await this.venueService.assertCanEditVenue(id, user.id, user.role);
+
     const uploaded = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
-    return this.venueService.addVenueMedia(id, user.id, user.role, uploaded);
+    try {
+      return await this.venueService.addVenueMedia(id, user.id, user.role, uploaded);
+    } catch (error) {
+      await Promise.all(uploaded.map((photo) => this.discardUpload(photo.publicId)));
+      throw error;
+    }
   }
 
   @Put(':id/media/order')
@@ -395,6 +428,207 @@ export class VenueController {
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
     await this.venueService.deleteVenueMedia(id, mediaId, user.id, user.role);
+  }
+
+  // ========== RENTAL ITEM CATALOG (Fase 1 -- ver docs/brainstorm/catalogo-alquiler-items.md) ==========
+
+  @Get(':id/rental-items')
+  @Public()
+  @ApiOperation({ summary: 'Catalogo de items de alquiler de un local (publico)' })
+  @ApiResponse({ status: 200, description: 'Items activos del catalogo' })
+  async getRentalItems(@Param('id') id: string) {
+    const items = await this.venueService.listPublicRentalItems(id);
+    return items.map(({ photoPublicId: _photoPublicId, ...item }) => item);
+  }
+
+  @Get(':id/rental-items/manage')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Catalogo completo de items de alquiler, incluye inactivos (OWNER/ADMIN)',
+  })
+  @ApiResponse({ status: 200, description: 'Todos los items del catalogo' })
+  async getRentalItemsForManage(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.listRentalItemsForOwner(id, user.id, user.role);
+  }
+
+  @Post(':id/rental-items')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: MAX_FILE_SIZE } }))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Agregar un item al catalogo de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 201, description: 'Item creado' })
+  async createRentalItem(
+    @Param('id') id: string,
+    @Body() dto: CreateRentalItemDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    validateSingleFile(file);
+    await this.venueService.assertCanEditVenue(id, user.id, user.role);
+    const uploaded = file
+      ? await this.cloudinaryService.uploadImage(file, `venues/${user.id}/rental-items`)
+      : undefined;
+
+    try {
+      return await this.venueService.createRentalItem(id, user.id, user.role, {
+        ...dto,
+        photoUrl: uploaded?.url,
+        photoPublicId: uploaded?.publicId,
+      });
+    } catch (error) {
+      await this.discardUpload(uploaded?.publicId);
+      throw error;
+    }
+  }
+
+  /** Best-effort cleanup of a photo whose item never got saved. A failure here must not replace
+   * the error the client actually needs to see. */
+  private async discardUpload(publicId: string | undefined): Promise<void> {
+    if (!publicId) return;
+    await this.cloudinaryService.deleteImage(publicId).catch(() => {});
+  }
+
+  // This must be registered before `PUT :id/rental-items/:itemId` -- Nest/Express match routes
+  // in registration order, and a `:itemId` param route would otherwise greedily swallow
+  // "order" as if it were an item id, so this literal path would never be reached.
+  @Put(':id/rental-items/order')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reordenar items del catalogo de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Items reordenados' })
+  async reorderRentalItems(
+    @Param('id') id: string,
+    @Body() dto: ReorderRentalItemsDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.reorderRentalItems(id, user.id, user.role, dto.order);
+  }
+
+  @Put(':id/rental-items/:itemId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: MAX_FILE_SIZE } }))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Editar un item del catalogo de alquiler (OWNER/ADMIN) -- la foto es opcional, si no se envia se conserva la que ya tenia',
+  })
+  @ApiResponse({ status: 200, description: 'Item actualizado' })
+  async updateRentalItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateRentalItemDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    validateSingleFile(file);
+    await this.venueService.assertCanEditVenue(id, user.id, user.role);
+    const uploaded = file
+      ? await this.cloudinaryService.uploadImage(file, `venues/${user.id}/rental-items`)
+      : undefined;
+
+    try {
+      return await this.venueService.updateRentalItem(id, itemId, user.id, user.role, {
+        ...dto,
+        ...(uploaded ? { photoUrl: uploaded.url, photoPublicId: uploaded.publicId } : {}),
+      });
+    } catch (error) {
+      await this.discardUpload(uploaded?.publicId);
+      throw error;
+    }
+  }
+
+  @Delete(':id/rental-items/:itemId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eliminar un item del catalogo de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 204, description: 'Item eliminado' })
+  async deleteRentalItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    await this.venueService.deleteRentalItem(id, itemId, user.id, user.role);
+  }
+
+  // ========== RENTAL ITEM CATEGORIES -- propias de cada local, no un catalogo global curado
+  // por admin (ver docs/brainstorm/catalogo-alquiler-items.md y el plan de esta feature) ==========
+
+  @Get(':id/rental-item-categories')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Categorias del catalogo de alquiler de un local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Categorias del local' })
+  async getRentalItemCategories(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.listRentalItemCategories(id, user.id, user.role);
+  }
+
+  @Post(':id/rental-item-categories')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Crear una categoria de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 201, description: 'Categoria creada' })
+  async createRentalItemCategory(
+    @Param('id') id: string,
+    @Body() dto: CreateRentalItemCategoryDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.createRentalItemCategory(id, user.id, user.role, dto);
+  }
+
+  // Registrado antes de `:categoryId` por el mismo motivo que `rental-items/order`: una ruta
+  // con parametro registrada primero se comeria "order" como si fuera un categoryId.
+  @Put(':id/rental-item-categories/order')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reordenar categorias de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Categorias reordenadas' })
+  async reorderRentalItemCategories(
+    @Param('id') id: string,
+    @Body() dto: ReorderRentalItemCategoriesDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.reorderRentalItemCategories(id, user.id, user.role, dto.order);
+  }
+
+  @Put(':id/rental-item-categories/:categoryId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Renombrar/reordenar una categoria de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Categoria actualizada' })
+  async updateRentalItemCategory(
+    @Param('id') id: string,
+    @Param('categoryId') categoryId: string,
+    @Body() dto: UpdateRentalItemCategoryDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.updateRentalItemCategory(id, categoryId, user.id, user.role, dto);
+  }
+
+  @Delete(':id/rental-item-categories/:categoryId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Eliminar una categoria de alquiler sin items (OWNER/ADMIN)',
+  })
+  @ApiResponse({ status: 204, description: 'Categoria eliminada' })
+  @ApiResponse({ status: 409, description: 'La categoria todavia tiene items' })
+  async deleteRentalItemCategory(
+    @Param('id') id: string,
+    @Param('categoryId') categoryId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    await this.venueService.deleteRentalItemCategory(id, categoryId, user.id, user.role);
   }
 
   // ========== ADMIN ENDPOINTS ==========

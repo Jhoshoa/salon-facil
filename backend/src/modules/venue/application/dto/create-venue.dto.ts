@@ -48,7 +48,7 @@ function parseJsonArray<T extends object>(value: unknown, dtoClass?: Constructor
 // BEFORE this @Transform and coerces any non-empty string to `true` via `Boolean(value)`
 // (e.g. `Boolean('false') === true`) — which breaks multipart/form-data bodies where every
 // field arrives as a string. Read the untouched raw value from `obj` to parse it correctly.
-function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
+export function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
   const raw = obj[key];
   if (typeof raw === 'boolean') return raw;
   if (typeof raw === 'string') {
@@ -56,6 +56,32 @@ function parseBoolean({ obj, key }: { obj: Record<string, unknown>; key: string 
     if (raw === 'false') return false;
   }
   return raw;
+}
+
+/** Trims string input before length validators run, so a whitespace-only value (e.g. two
+ * spaces) can't slip past `@MinLength` just because it technically has that many characters. */
+export function trimString({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
+/** For optional text a form can clear: multipart can't carry a real null, so an empty field means
+ * "clear this value" (`null` skips the validators via `@IsOptional`). */
+export function trimStringOrNull({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() || null : value;
+}
+
+/** Same idea for optional integers. Reads the raw value from `obj`, like `parseBoolean` above:
+ * implicit conversion has already turned an empty string into `0` by the time this runs. */
+export function parseIntOrNull({
+  obj,
+  key,
+}: {
+  obj: Record<string, unknown>;
+  key: string;
+}): unknown {
+  const raw = obj[key];
+  if (typeof raw !== 'string') return raw;
+  return raw.trim() === '' ? null : Number(raw);
 }
 
 export class CreateVenueServiceDto {
