@@ -35,7 +35,11 @@ import {
   UpdateCatalogItemDto,
   UpdateSeasonalEventDto,
 } from '../application/dto/catalog.dto';
-import { CreateRentalItemDto, UpdateRentalItemDto } from '../application/dto/rental-item.dto';
+import {
+  CreateRentalItemDto,
+  ReorderRentalItemsDto,
+  UpdateRentalItemDto,
+} from '../application/dto/rental-item.dto';
 import {
   CreateRentalItemCategoryDto,
   ReorderRentalItemCategoriesDto,
@@ -384,8 +388,15 @@ export class VenueController {
     }
     validateFiles(files);
 
+    await this.venueService.assertCanEditVenue(id, user.id, user.role);
+
     const uploaded = await this.cloudinaryService.uploadMultiple(files, `venues/${user.id}`);
-    return this.venueService.addVenueMedia(id, user.id, user.role, uploaded);
+    try {
+      return await this.venueService.addVenueMedia(id, user.id, user.role, uploaded);
+    } catch (error) {
+      await Promise.all(uploaded.map((photo) => this.discardUpload(photo.publicId)));
+      throw error;
+    }
   }
 
   @Put(':id/media/order')
@@ -426,7 +437,8 @@ export class VenueController {
   @ApiOperation({ summary: 'Catalogo de items de alquiler de un local (publico)' })
   @ApiResponse({ status: 200, description: 'Items activos del catalogo' })
   async getRentalItems(@Param('id') id: string) {
-    return this.venueService.listPublicRentalItems(id);
+    const items = await this.venueService.listPublicRentalItems(id);
+    return items.map(({ photoPublicId: _photoPublicId, ...item }) => item);
   }
 
   @Get(':id/rental-items/manage')
@@ -457,15 +469,28 @@ export class VenueController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     validateSingleFile(file);
+    await this.venueService.assertCanEditVenue(id, user.id, user.role);
     const uploaded = file
       ? await this.cloudinaryService.uploadImage(file, `venues/${user.id}/rental-items`)
       : undefined;
 
-    return this.venueService.createRentalItem(id, user.id, user.role, {
-      ...dto,
-      photoUrl: uploaded?.url,
-      photoPublicId: uploaded?.publicId,
-    });
+    try {
+      return await this.venueService.createRentalItem(id, user.id, user.role, {
+        ...dto,
+        photoUrl: uploaded?.url,
+        photoPublicId: uploaded?.publicId,
+      });
+    } catch (error) {
+      await this.discardUpload(uploaded?.publicId);
+      throw error;
+    }
+  }
+
+  /** Best-effort cleanup of a photo whose item never got saved. A failure here must not replace
+   * the error the client actually needs to see. */
+  private async discardUpload(publicId: string | undefined): Promise<void> {
+    if (!publicId) return;
+    await this.cloudinaryService.deleteImage(publicId).catch(() => {});
   }
 
   // This must be registered before `PUT :id/rental-items/:itemId` -- Nest/Express match routes
@@ -478,13 +503,10 @@ export class VenueController {
   @ApiResponse({ status: 200, description: 'Items reordenados' })
   async reorderRentalItems(
     @Param('id') id: string,
-    @Body('order') order: string[],
+    @Body() dto: ReorderRentalItemsDto,
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
-    if (!Array.isArray(order) || order.length === 0) {
-      throw new BadRequestException('order debe ser un arreglo con los IDs de los items');
-    }
-    return this.venueService.reorderRentalItems(id, user.id, user.role, order);
+    return this.venueService.reorderRentalItems(id, user.id, user.role, dto.order);
   }
 
   @Put(':id/rental-items/:itemId')
@@ -505,14 +527,20 @@ export class VenueController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     validateSingleFile(file);
+    await this.venueService.assertCanEditVenue(id, user.id, user.role);
     const uploaded = file
       ? await this.cloudinaryService.uploadImage(file, `venues/${user.id}/rental-items`)
       : undefined;
 
-    return this.venueService.updateRentalItem(id, itemId, user.id, user.role, {
-      ...dto,
-      ...(uploaded ? { photoUrl: uploaded.url, photoPublicId: uploaded.publicId } : {}),
-    });
+    try {
+      return await this.venueService.updateRentalItem(id, itemId, user.id, user.role, {
+        ...dto,
+        ...(uploaded ? { photoUrl: uploaded.url, photoPublicId: uploaded.publicId } : {}),
+      });
+    } catch (error) {
+      await this.discardUpload(uploaded?.publicId);
+      throw error;
+    }
   }
 
   @Delete(':id/rental-items/:itemId')

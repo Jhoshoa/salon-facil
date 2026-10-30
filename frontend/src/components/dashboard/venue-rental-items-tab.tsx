@@ -290,6 +290,8 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
     const price = Number(form.pricePerUnit);
     if (!form.isIncluded && (!form.pricePerUnit.trim() || Number.isNaN(price) || price < 0)) {
       errors.pricePerUnit = 'Ingresa un precio valido (0 o mas).';
+    } else if (!form.isIncluded && Math.round(price * 100) / 100 !== price) {
+      errors.pricePerUnit = 'El precio puede tener hasta 2 decimales.';
     }
     if (form.stockQty.trim()) {
       const stock = Number(form.stockQty);
@@ -340,8 +342,8 @@ export const VenueRentalItemsTab = ({ venue }: VenueRentalItemsTabProps) => {
           <h3 className="text-base font-semibold">Catalogo de alquiler</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             Items que ofreces (vajilla, mobiliario, decoracion), incluidos con el local o con precio
-            aparte, y su stock informativo. El visitante los ve en la ficha publica y te contacta
-            por WhatsApp para pedir los que se cobran aparte.
+            aparte, y su stock informativo. El visitante los ve en la ficha publica y puede agregar
+            a su solicitud los que se cobran aparte. Tu confirmas la disponibilidad al revisarla.
           </p>
         </div>
         <div className="flex gap-2">

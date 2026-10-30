@@ -153,6 +153,23 @@ describe('VenueRentalItemsTab', () => {
     expect(await screen.findByLabelText(/^categoria/i)).toHaveValue('cat-nueva');
   });
 
+  it('no acepta un precio con mas de 2 decimales', async () => {
+    const user = userEvent.setup();
+    mockGetOwnerRentalItems.mockResolvedValue([]);
+    renderTab();
+
+    await screen.findByText('Sin items todavia');
+    await user.click(screen.getByRole('button', { name: /agregar item/i }));
+    await user.type(screen.getByLabelText(/^nombre/i), 'Mesa redonda');
+    await user.selectOptions(screen.getByLabelText(/^categoria/i), 'cat-mobiliario');
+    await user.type(screen.getByLabelText(/^precio/i), '1.234');
+
+    await user.click(screen.getByRole('button', { name: 'Crear' }));
+
+    expect(screen.getByText(/hasta 2 decimales/i)).toBeInTheDocument();
+    expect(mockCreateRentalItem).not.toHaveBeenCalled();
+  });
+
   it('crea un item incluido con el local, sin pedir precio ni unidad', async () => {
     const user = userEvent.setup();
     mockGetOwnerRentalItems.mockResolvedValue([]);

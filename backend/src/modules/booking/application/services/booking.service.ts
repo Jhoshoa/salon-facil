@@ -30,6 +30,8 @@ import type { NotificationEmailMetadata } from '../../../notification/infrastruc
 
 const MAX_CALENDAR_RANGE_DAYS = 120;
 const MAX_BOOKING_RANGE_DAYS = 30;
+// Booking.totalPrice is Decimal(12, 2): anything above this would make the insert fail.
+const MAX_BOOKING_TOTAL = 9999999999.99;
 
 const REMINDER_TIERS: { type: NotificationType; days: number; field: ReminderField }[] = [
   { type: NotificationType.REMINDER_7_DAYS, days: 7, field: 'reminder7SentAt' },
@@ -397,6 +399,9 @@ export class BookingService {
     const extrasTotal = this.round(extras.reduce((sum, extra) => sum + extra.extraCost, 0));
     const rentalItemsTotal = this.round(rentalItems.reduce((sum, item) => sum + item.subtotal, 0));
     const totalPrice = this.round(priceCalculation.totalPrice + extrasTotal + rentalItemsTotal);
+    if (totalPrice > MAX_BOOKING_TOTAL) {
+      throw new BadRequestException('El total de la reserva excede el maximo permitido');
+    }
     const depositAmount = this.priceCalculator.resolveDeposit(
       venue.paymentPolicy,
       venue.depositPercentage,
@@ -631,13 +636,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (!booking.canBeApproved()) {
-      throw new BadRequestException('Esta reserva no puede ser aprobada');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para aprobar esta reserva');
+    }
+
+    if (!booking.canBeApproved()) {
+      throw new BadRequestException('Esta reserva no puede ser aprobada');
     }
 
     const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.APPROVED);
@@ -671,13 +676,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (booking.status !== BookingStatus.PENDING) {
-      throw new BadRequestException('Solo se pueden rechazar reservas pendientes');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para rechazar esta reserva');
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Solo se pueden rechazar reservas pendientes');
     }
 
     const updated = await this.bookingRepository.updateStatus(
@@ -759,13 +764,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (booking.status !== BookingStatus.APPROVED) {
-      throw new BadRequestException('Solo se puede registrar el anticipo en reservas aprobadas');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para registrar el anticipo de esta reserva');
+    }
+
+    if (booking.status !== BookingStatus.APPROVED) {
+      throw new BadRequestException('Solo se puede registrar el anticipo en reservas aprobadas');
     }
 
     return this.bookingRepository.markDepositPaid(bookingId);
@@ -781,13 +786,13 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    if (!booking.canBeCompleted()) {
-      throw new BadRequestException('Esta reserva no puede ser marcada como completada');
-    }
-
     const venue = await this.venueService.getVenueById(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para completar esta reserva');
+    }
+
+    if (!booking.canBeCompleted()) {
+      throw new BadRequestException('Esta reserva no puede ser marcada como completada');
     }
 
     const updated = await this.bookingRepository.updateStatus(bookingId, BookingStatus.COMPLETED);
@@ -819,15 +824,15 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
+    const venue = await this.venueService.getVenueById(booking.venueId);
+    if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para marcar esta reserva como no show');
+    }
+
     if (!booking.canBeMarkedNoShow()) {
       throw new BadRequestException(
         'Solo se puede marcar como no show reservas aprobadas o con pago registrado',
       );
-    }
-
-    const venue = await this.venueService.getVenueById(booking.venueId);
-    if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
-      throw new ForbiddenException('No tienes permiso para marcar esta reserva como no show');
     }
 
     return this.bookingRepository.updateStatus(bookingId, BookingStatus.NO_SHOW);

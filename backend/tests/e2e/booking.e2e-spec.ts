@@ -272,6 +272,99 @@ describe('Bookings (e2e)', () => {
       await previewWith([{ rentalItemId: otherVenueItemId, quantity: 1 }]).expect(400);
     });
 
+    it('answers 400, not 500, when the total would not fit in the booking', async () => {
+      const expensive = await createItem(itemsVenueId, {
+        name: 'Carisimo',
+        pricePerUnit: '999999.99',
+      });
+
+      await users.clientAgent
+        .post(`/api/v1/venues/${itemsVenueId}/bookings`)
+        .send({
+          eventType: 'Boda',
+          eventDate: futureDate(72),
+          startTime: '14:00',
+          endTime: '20:00',
+          guestCount: 50,
+          selectedRentalItems: [{ rentalItemId: expensive, quantity: 100000 }],
+        })
+        .expect(400);
+    });
+
+    it('rejects malformed selections without a server error', async () => {
+      const preview = (selectedRentalItems: string) =>
+        request(app.getHttpServer())
+          .get(`/api/v1/venues/${itemsVenueId}/bookings/preview-price`)
+          .query({
+            eventDate: futureDate(70),
+            startTime: '14:00',
+            endTime: '20:00',
+            selectedRentalItems,
+          });
+
+      await preview('not json').expect(400);
+      await preview('{"rentalItemId":"x"}').expect(400);
+      await preview('[1]').expect(400);
+      await preview('[null]').expect(400);
+      await preview(`[{"__proto__":{"quantity":1},"rentalItemId":"${chargedItemId}"}]`).expect(400);
+      await preview(
+        JSON.stringify(
+          Array.from({ length: 51 }, () => ({ rentalItemId: chargedItemId, quantity: 1 })),
+        ),
+      ).expect(400);
+    });
+
+    it('shows a booking and its items only to its client, the venue owner and admins', async () => {
+      const created = await users.clientAgent
+        .post(`/api/v1/venues/${itemsVenueId}/bookings`)
+        .send({
+          eventType: 'Boda',
+          eventDate: futureDate(73),
+          startTime: '14:00',
+          endTime: '20:00',
+          guestCount: 50,
+          selectedRentalItems: [{ rentalItemId: chargedItemId, quantity: 1 }],
+        })
+        .expect(201);
+      const url = `/api/v1/bookings/${created.body.booking.id}`;
+
+      const otherClient = request.agent(app.getHttpServer());
+      await otherClient.post('/api/v1/auth/register').send({
+        email: `items-other-client-${uniqueId}@email.com`,
+        password: 'TestPass123!',
+        fullName: 'Otro Cliente',
+        phone: `+5916${String(uniqueId).slice(-7)}`,
+        role: 'CLIENT',
+      });
+
+      await request(app.getHttpServer()).get(url).expect(401);
+      await otherClient.get(url).expect(403);
+      await users.otherOwnerAgent.get(url).expect(403);
+      await users.clientAgent.get(url).expect(200);
+      await users.ownerAgent.get(url).expect(200);
+      await users.otherOwnerAgent.get(`/api/v1/venues/${itemsVenueId}/bookings`).expect(403);
+    });
+
+    it('gives another owner a 403 whatever state the booking is in', async () => {
+      const created = await users.clientAgent
+        .post(`/api/v1/venues/${itemsVenueId}/bookings`)
+        .send({
+          eventType: 'Boda',
+          eventDate: futureDate(74),
+          startTime: '14:00',
+          endTime: '20:00',
+          guestCount: 50,
+        })
+        .expect(201);
+      const url = `/api/v1/bookings/${created.body.booking.id}`;
+      await users.ownerAgent.put(`${url}/approve`).expect(200);
+
+      // Answering 400 here would reveal the booking's current state to someone with no access.
+      await users.otherOwnerAgent.put(`${url}/approve`).expect(403);
+      await users.otherOwnerAgent.put(`${url}/reject`).send({}).expect(403);
+      await users.otherOwnerAgent.put(`${url}/complete`).expect(403);
+    });
+
     it('rejects a client-sent price and an invalid quantity', async () => {
       await previewWith([{ rentalItemId: chargedItemId, quantity: 1, unitPrice: 1 }]).expect(400);
       await previewWith([{ rentalItemId: chargedItemId, quantity: 0 }]).expect(400);

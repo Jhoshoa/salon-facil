@@ -78,6 +78,11 @@ interface RawVenueMedia {
   isCover: boolean;
 }
 
+// The public catalog isn't paginated, so this also bounds what one owner can make every visitor
+// download. Generous: the largest real catalog we know of has 56 items.
+const MAX_RENTAL_ITEMS_PER_VENUE = 500;
+const MAX_RENTAL_CATEGORIES_PER_VENUE = 100;
+
 @Injectable()
 export class VenueRepository implements IVenueRepository {
   constructor(
@@ -979,21 +984,22 @@ export class VenueRepository implements IVenueRepository {
   async createRentalItem(
     venueId: string,
     data: CreateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required'> {
+  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required' | 'limit_reached'> {
     const category = await this.prisma.venueRentalItemCategory.findFirst({
       where: { id: data.categoryId, venueId },
     });
     if (!category) return 'category_not_found';
     if (!data.isIncluded && data.pricePerUnit == null) return 'price_required';
 
-    let sortOrder = data.sortOrder;
-    if (sortOrder === undefined) {
-      const existing = await this.prisma.venueRentalItem.findMany({
-        where: { venueId },
-        select: { sortOrder: true },
-      });
-      sortOrder = existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0;
-    }
+    const existing = await this.prisma.venueRentalItem.findMany({
+      where: { venueId },
+      select: { sortOrder: true },
+    });
+    if (existing.length >= MAX_RENTAL_ITEMS_PER_VENUE) return 'limit_reached';
+
+    const sortOrder =
+      data.sortOrder ??
+      (existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0);
 
     const item = await this.prisma.venueRentalItem.create({
       data: {
@@ -1088,7 +1094,19 @@ export class VenueRepository implements IVenueRepository {
     return { photoPublicId: item.photoPublicId };
   }
 
-  async reorderRentalItems(venueId: string, order: string[]): Promise<VenueRentalItemEntity[]> {
+  async reorderRentalItems(
+    venueId: string,
+    order: string[],
+  ): Promise<VenueRentalItemEntity[] | 'invalid_order'> {
+    const existing = await this.prisma.venueRentalItem.findMany({
+      where: { venueId },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((item) => item.id));
+    if (order.length !== existingIds.size || order.some((id) => !existingIds.has(id))) {
+      return 'invalid_order';
+    }
+
     await this.prisma.$transaction(
       order.map((itemId, index) =>
         this.prisma.venueRentalItem.updateMany({
@@ -1112,20 +1130,21 @@ export class VenueRepository implements IVenueRepository {
   async createRentalItemCategory(
     venueId: string,
     data: CreateRentalItemCategoryInput,
-  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name'> {
+  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name' | 'limit_reached'> {
     const duplicate = await this.prisma.venueRentalItemCategory.findFirst({
       where: { venueId, name: { equals: data.name, mode: 'insensitive' } },
     });
     if (duplicate) return 'duplicate_name';
 
-    let sortOrder = data.sortOrder;
-    if (sortOrder === undefined) {
-      const existing = await this.prisma.venueRentalItemCategory.findMany({
-        where: { venueId },
-        select: { sortOrder: true },
-      });
-      sortOrder = existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0;
-    }
+    const existing = await this.prisma.venueRentalItemCategory.findMany({
+      where: { venueId },
+      select: { sortOrder: true },
+    });
+    if (existing.length >= MAX_RENTAL_CATEGORIES_PER_VENUE) return 'limit_reached';
+
+    const sortOrder =
+      data.sortOrder ??
+      (existing.length ? Math.max(...existing.map((item) => item.sortOrder)) + 1 : 0);
 
     const category = await this.prisma.venueRentalItemCategory.create({
       data: { venueId, name: data.name, sortOrder },

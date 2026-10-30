@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import Redis from 'ioredis';
 import { AppController } from './app.controller';
+import { PrismaExceptionFilter } from './shared/filters/prisma-exception.filter';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/interface/auth.module';
@@ -85,6 +86,10 @@ import { validationSchema } from './config/validation.schema';
     {
       provide: APP_FILTER,
       useClass: ForbiddenLoggingFilter,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: PrismaExceptionFilter,
     },
   ],
 })
