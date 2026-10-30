@@ -1,8 +1,16 @@
+// The whole platform charges in one currency today. Keeping it here means amounts and price
+// fields change together the day a venue can charge in another one.
+export const CURRENCY = { code: 'BOB', symbol: 'Bs', locale: 'es-BO' } as const;
+
 export const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('es-BO', {
+  // Whole amounts stay clean, but cents are never rounded away: a Bs 0,50 item isn't "Bs 1", and a
+  // quote has to show exactly what will be charged.
+  const fractionDigits = Number.isInteger(value) ? 0 : 2;
+  return new Intl.NumberFormat(CURRENCY.locale, {
     style: 'currency',
-    currency: 'BOB',
-    maximumFractionDigits: 0,
+    currency: CURRENCY.code,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(value);
 };
 
@@ -23,7 +31,8 @@ const UTC_MIDNIGHT_PATTERN = /^\d{4}-\d{2}-\d{2}T00:00:00(\.000)?Z$/;
 
 const parseDateValue = (value: string | Date): Date => {
   const isDateOnly =
-    typeof value === 'string' && (DATE_ONLY_PATTERN.test(value) || UTC_MIDNIGHT_PATTERN.test(value));
+    typeof value === 'string' &&
+    (DATE_ONLY_PATTERN.test(value) || UTC_MIDNIGHT_PATTERN.test(value));
 
   if (isDateOnly) {
     const [year, month, day] = (value as string).split('T')[0].split('-').map(Number);

@@ -635,6 +635,10 @@ model Booking {
   // Frozen at booking creation so it stays correct even if the venue later renames or removes
   // the amenity. Null when nothing extra was selected.
   selectedExtras  Json?         @map("selected_extras")
+  // Snapshot of the catalog items picked at request time: [{rentalItemId, name, unitLabel,
+  // unitPrice, quantity, subtotal}]. Same reasoning as selectedExtras: it keeps the quote correct
+  // even if the owner later edits the price or deletes the item. Null when nothing was selected.
+  selectedRentalItems Json? @map("selected_rental_items")
   contractUrl     String?       @map("contract_url")
   contractSentAt  DateTime?     @map("contract_sent_at")
   reminder7SentAt DateTime?     @map("reminder_7_sent_at")

@@ -2,11 +2,8 @@
 
 import { X } from 'lucide-react';
 import { BookingForm } from '@/components/booking/booking-form';
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import type { RentalItemLine } from '@/hooks/use-rental-item-selection';
 import type { Venue } from '@/types/api';
 
 interface MobileBookingSheetProps {
@@ -16,6 +13,9 @@ interface MobileBookingSheetProps {
   selectedRange?: { start: string; end: string };
   onDatesChange: (start: string, end: string) => void;
   onPriceChange: (total: number | null) => void;
+  rentalItemLines: RentalItemLine[];
+  onRentalItemQuantityChange: (itemId: string, quantity: number) => void;
+  onBookingCreated: () => void;
   staleRangeNotice: string | null;
   onDismissStaleNotice: () => void;
 }
@@ -27,6 +27,9 @@ export const MobileBookingSheet = ({
   selectedRange,
   onDatesChange,
   onPriceChange,
+  rentalItemLines,
+  onRentalItemQuantityChange,
+  onBookingCreated,
   staleRangeNotice,
   onDismissStaleNotice,
 }: MobileBookingSheetProps) => {
@@ -35,7 +38,7 @@ export const MobileBookingSheet = ({
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-0">
         <SheetTitle className="sr-only">Solicitar reserva</SheetTitle>
         {staleRangeNotice ? (
-          <div className="m-4 flex items-start justify-between gap-2 border-l-2 border-warning bg-warning/10 p-3 text-sm text-foreground">
+          <div className="border-warning bg-warning/10 m-4 flex items-start justify-between gap-2 border-l-2 p-3 text-sm text-foreground">
             <p>{staleRangeNotice}</p>
             <button
               type="button"
@@ -53,6 +56,9 @@ export const MobileBookingSheet = ({
             selectedRange={selectedRange}
             onDatesChange={onDatesChange}
             onPriceChange={onPriceChange}
+            rentalItemLines={rentalItemLines}
+            onRentalItemQuantityChange={onRentalItemQuantityChange}
+            onBookingCreated={onBookingCreated}
             stickyHeader
           />
         ) : null}

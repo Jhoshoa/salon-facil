@@ -29,11 +29,18 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   ...overrides,
 });
 
-const renderCatalog = () => {
+const renderCatalog = (
+  quantities: Record<string, number> = {},
+  onQuantityChange: (itemId: string, quantity: number) => void = jest.fn(),
+) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <VenueRentalItemCatalog venueId="venue-1" />
+      <VenueRentalItemCatalog
+        venueId="venue-1"
+        quantities={quantities}
+        onQuantityChange={onQuantityChange}
+      />
     </QueryClientProvider>,
   );
 };
@@ -92,6 +99,64 @@ describe('VenueRentalItemCatalog', () => {
     expect(await screen.findByRole('img', { name: 'Mesa redonda' })).toBeInTheDocument();
     expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Mantel blanco' })).not.toBeInTheDocument();
+  });
+
+  it('agrega un item cobrado aparte con cantidad 1', async () => {
+    const user = userEvent.setup();
+    const onQuantityChange = jest.fn();
+    mockGetPublicRentalItems.mockResolvedValue([makeItem({ id: 'item-1', name: 'Mesa redonda' })]);
+    renderCatalog({}, onQuantityChange);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Agregar Mesa redonda a la cotizacion' }),
+    );
+
+    expect(onQuantityChange).toHaveBeenCalledWith('item-1', 1);
+  });
+
+  it('marca el item agregado y permite cambiar la cantidad hasta el stock', async () => {
+    const user = userEvent.setup();
+    const onQuantityChange = jest.fn();
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ id: 'item-1', name: 'Mesa redonda', stockQty: 3 }),
+    ]);
+    renderCatalog({ 'item-1': 3 }, onQuantityChange);
+
+    expect(await screen.findByText('Agregado')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cantidad de Mesa redonda')).toHaveValue('3');
+    expect(
+      screen.getByRole('button', { name: 'Aumentar cantidad de Mesa redonda' }),
+    ).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Reducir cantidad de Mesa redonda' }));
+    expect(onQuantityChange).toHaveBeenCalledWith('item-1', 2);
+  });
+
+  it('limita al stock la cantidad escrita', async () => {
+    const user = userEvent.setup();
+    const onQuantityChange = jest.fn();
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ id: 'item-1', name: 'Mesa redonda', stockQty: 5 }),
+    ]);
+    renderCatalog({ 'item-1': 1 }, onQuantityChange);
+
+    const input = await screen.findByLabelText('Cantidad de Mesa redonda');
+    await user.clear(input);
+    await user.type(input, '9');
+
+    expect(onQuantityChange).toHaveBeenLastCalledWith('item-1', 5);
+    expect(input).toHaveValue('5');
+  });
+
+  it('no ofrece agregar un item incluido ni uno sin stock', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ id: 'item-1', name: 'Silla', pricePerUnit: null, isIncluded: true }),
+      makeItem({ id: 'item-2', name: 'Toldo', stockQty: 0 }),
+    ]);
+    renderCatalog();
+
+    expect(await screen.findByText('Sin stock')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Agregar/ })).not.toBeInTheDocument();
   });
 
   it('muestra las categorias en el orden que definio el dueño, no alfabetico', async () => {

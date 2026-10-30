@@ -14,6 +14,7 @@ jest.mock('@/lib/api/venues.api', () => ({
   getVenueBySlug: jest.fn(),
   getVenueBySharePreviewToken: jest.fn(),
   getSimilarVenues: jest.fn(),
+  getPublicRentalItems: jest.fn().mockResolvedValue([]),
 }));
 
 // Heavy/unrelated child components stubbed out -- this test is about which sections VenueDetail

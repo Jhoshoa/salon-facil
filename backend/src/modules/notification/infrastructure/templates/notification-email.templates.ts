@@ -20,6 +20,7 @@ export type NotificationEmailMetadata =
       startDate: string;
       endDate: string;
       autoConfirmed: boolean;
+      rentalItemCount?: number;
     }
   | {
       kind: 'bookingConfirmed';
@@ -151,6 +152,9 @@ export const buildNotificationEmailHtml = (
           { label: 'Tipo de evento', value: metadata.eventType },
           { label: 'Invitados', value: String(metadata.guestCount) },
           { label: 'Fechas', value: `${metadata.startDate} — ${metadata.endDate}` },
+          ...(metadata.rentalItemCount
+            ? [{ label: 'Items del catálogo', value: String(metadata.rentalItemCount) }]
+            : []),
         ])}
         ${button({ label: 'Ver en mi panel', url: `${frontendUrl}/dashboard/bookings` })}`;
       return renderEmailLayout({

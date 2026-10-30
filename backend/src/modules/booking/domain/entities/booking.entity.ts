@@ -18,6 +18,16 @@ export interface SelectedExtra {
   extraCost: number;
 }
 
+/** Snapshot of one catalog item (VenueRentalItem) picked when the booking was requested. */
+export interface SelectedRentalItem {
+  rentalItemId: string;
+  name: string;
+  unitLabel: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}
+
 export interface BookingPayment {
   id: string;
   bookingId: string;
@@ -49,6 +59,7 @@ export class BookingEntity {
   status: BookingStatus = BookingStatus.PENDING;
   specialRequests: string | null = null;
   selectedExtras: SelectedExtra[] | null = null;
+  selectedRentalItems: SelectedRentalItem[] | null = null;
   contractUrl: string | null = null;
   contractSentAt: Date | null = null;
   reminder7SentAt: Date | null = null;

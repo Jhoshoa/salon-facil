@@ -56,6 +56,7 @@ export class BookingController {
       specialRequests: dto.specialRequests,
       dailySchedule: dto.dailySchedule,
       selectedAmenityIds: dto.selectedAmenityIds,
+      selectedRentalItems: dto.selectedRentalItems,
     });
   }
 

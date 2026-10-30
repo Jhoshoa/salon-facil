@@ -1,5 +1,10 @@
 import { CalendarBlockStatus } from '@prisma/client';
-import { BookingEntity, BookingStatus, SelectedExtra } from '../entities/booking.entity';
+import {
+  BookingEntity,
+  BookingStatus,
+  SelectedExtra,
+  SelectedRentalItem,
+} from '../entities/booking.entity';
 import { CalendarBlockEntity } from '../entities/calendar-block.entity';
 
 export const BOOKING_REPOSITORY = Symbol('BOOKING_REPOSITORY');
@@ -93,6 +98,7 @@ export interface CreateBookingData {
   status: BookingStatus;
   specialRequests?: string;
   selectedExtras?: SelectedExtra[];
+  selectedRentalItems?: SelectedRentalItem[];
   /** One entry per day in [startDate, endDate], used to create the BookingDate rows. */
   dailyBreakdown: { date: Date; appliedPrice: number; startTime: string; endTime: string }[];
 }

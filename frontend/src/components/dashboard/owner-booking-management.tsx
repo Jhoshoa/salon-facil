@@ -78,6 +78,9 @@ interface RejectState {
   type: 'booking' | 'payment';
 }
 
+const rentalItemsTotalOf = (booking: Booking) =>
+  booking.selectedRentalItems?.reduce((sum, item) => sum + item.subtotal, 0) ?? 0;
+
 const extrasTotalOf = (booking: Booking) =>
   booking.selectedExtras?.reduce((sum, extra) => sum + extra.extraCost, 0) ?? 0;
 
@@ -162,6 +165,14 @@ const OwnerBookingRow = ({
                 · {booking.selectedExtras.length} extra
                 {booking.selectedExtras.length === 1 ? '' : 's'} (
                 {formatCurrency(extrasTotalOf(booking))})
+              </>
+            ) : null}
+            {booking.selectedRentalItems?.length ? (
+              <>
+                {' '}
+                · {booking.selectedRentalItems.length} item
+                {booking.selectedRentalItems.length === 1 ? '' : 's'} del catalogo (
+                {formatCurrency(rentalItemsTotalOf(booking))})
               </>
             ) : null}
           </p>
@@ -323,13 +334,22 @@ const BookingDetailModal = ({
               </p>
               <ul className="mt-1 space-y-1">
                 <li className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Precio base</span>
-                  <span>{formatCurrency(booking.basePrice)}</span>
+                  <span className="text-muted-foreground">Alquiler del local</span>
+                  <span>{formatCurrency(booking.appliedPrice)}</span>
                 </li>
                 {booking.selectedExtras?.map((extra) => (
                   <li key={extra.amenityId} className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">{extra.name}</span>
                     <span>{formatCurrency(extra.extraCost)}</span>
+                  </li>
+                ))}
+                {booking.selectedRentalItems?.map((item) => (
+                  <li key={item.rentalItemId} className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      {item.name} × {item.quantity} ({formatCurrency(item.unitPrice)} /{' '}
+                      {item.unitLabel})
+                    </span>
+                    <span className="shrink-0">{formatCurrency(item.subtotal)}</span>
                   </li>
                 ))}
                 <li className="flex items-center justify-between gap-3 border-t pt-1 font-medium">

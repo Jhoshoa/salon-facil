@@ -1,8 +1,9 @@
 # Catalogo de alquiler de items por local (idea de plan pago)
 
-Estado: Fase 1 construida (catalogo informativo con categorias propias de cada local). Fases 2 y
-3 siguen siendo solo ideas, sin decidir. Las secciones de abajo son el analisis original: donde
-la implementacion se aparto de el, se aclara ahi mismo.
+Estado: Fases 1 y 2 construidas (catalogo con categorias propias de cada local, y seleccion de
+items con total en la solicitud de reserva). La Fase 3 sigue siendo solo una idea, sin decidir. Las
+secciones de abajo son el analisis original: donde la implementacion se aparto de el, se aclara
+ahi mismo.
 
 ## 1. De donde sale la idea
 
@@ -85,6 +86,14 @@ un segundo pago separado). El stock sigue siendo informativo, no se bloquea por 
 el dueno confirma manualmente si tiene todo disponible para esa fecha, igual que hace hoy por
 WhatsApp, solo que ahora la lista ya le llega armada.
 
+> **Decisiones al construir la Fase 2:** la seleccion se guarda como foto en
+> `Booking.selectedRentalItems`, con el precio de la base de datos (nunca el que envia el cliente).
+> Los items entran en el total y en el calculo del anticipo, y se cobran una sola vez por reserva,
+> aunque dure varios dias. La cantidad no puede superar `stockQty`: es el total del local, y como el
+> dueno no puede editar el monto de una solicitud, pedir mas dejaria un total imposible de cumplir.
+> Una solicitud con items nunca se confirma sola, aunque el local tenga reserva inmediata: el stock
+> no se controla por fecha, asi que el dueno tiene que confirmarlo antes de que el cliente pague.
+
 **Fase 3 -- stock real reservado por fecha (recien aca, paridad completa con Le Dome):**
 El stock se descuenta/reserva por rango de fechas, igual de estricto que la disponibilidad del
 local (`CalendarBlock`/`BookingDate`), pero con la diferencia de que es un conteo por cantidad
@@ -161,5 +170,8 @@ resolverlo ahora.
   `VenueRentalItem.isIncluded`. Un item incluido no tiene precio (`pricePerUnit` queda en null, no
   en 0) y en la Fase 2 no se podra seleccionar ni sumara al total. Si un cliente pide mas de lo
   incluido, por ahora el dueno crea dos items ("Sillas (incluidas)" y "Sillas adicionales").
-- En fase 2/3, la seleccion de items entra al mismo flujo de pago (`Payment`) que la reserva del
-  local, o se liquida aparte directo entre dueno y cliente (como hoy via WhatsApp)?
+- ~~En fase 2/3, la seleccion de items entra al mismo flujo de pago (`Payment`) que la reserva del
+  local, o se liquida aparte directo entre dueno y cliente (como hoy via WhatsApp)?~~ Resuelto: entra
+  al mismo flujo, sumada al total y al anticipo, igual que las comodidades con costo extra.
+- El dueno solo puede aprobar o rechazar la solicitud completa. Hace falta que pueda quitar un item
+  sin rechazar todo, o ajustar el monto? Hoy tiene que rechazarla y el cliente volver a enviarla.
