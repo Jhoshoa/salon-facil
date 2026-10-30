@@ -198,10 +198,12 @@ export interface VenueRentalItem {
   id: string;
   venueId: string;
   name: string;
-  category: string;
+  category: { id: string; name: string; sortOrder: number };
   description: string | null;
   photoUrl: string | null;
-  pricePerUnit: number;
+  // Null only when `isIncluded` is true: an included item has no price.
+  pricePerUnit: number | null;
+  isIncluded: boolean;
   unitLabel: string;
   stockQty: number | null;
   isActive: boolean;
@@ -210,12 +212,31 @@ export interface VenueRentalItem {
 
 export interface VenueRentalItemInput {
   name: string;
-  category: string;
+  categoryId: string;
   description?: string;
-  pricePerUnit: number;
+  pricePerUnit?: number;
+  isIncluded?: boolean;
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;
+}
+
+// `null` clears an optional value on edit -- `undefined` leaves it as it was.
+export interface VenueRentalItemUpdateInput extends Partial<
+  Omit<VenueRentalItemInput, 'description' | 'stockQty'>
+> {
+  description?: string | null;
+  stockQty?: number | null;
+  isActive?: boolean;
+  removePhoto?: boolean;
+}
+
+export interface VenueRentalItemCategory {
+  id: string;
+  venueId: string;
+  name: string;
+  sortOrder: number;
+  itemCount: number;
 }
 
 export interface Venue {

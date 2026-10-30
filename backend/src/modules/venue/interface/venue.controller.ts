@@ -36,6 +36,11 @@ import {
   UpdateSeasonalEventDto,
 } from '../application/dto/catalog.dto';
 import { CreateRentalItemDto, UpdateRentalItemDto } from '../application/dto/rental-item.dto';
+import {
+  CreateRentalItemCategoryDto,
+  ReorderRentalItemCategoriesDto,
+  UpdateRentalItemCategoryDto,
+} from '../application/dto/rental-item-category.dto';
 import { VenueService } from '../application/services/venue.service';
 import { CreateVenueUseCase } from '../application/use-cases/create-venue.use-case';
 import { GetVenueBySlugUseCase } from '../application/use-cases/get-venue-by-slug.use-case';
@@ -522,6 +527,80 @@ export class VenueController {
     @CurrentUser() user: { id: string; role: UserRole },
   ) {
     await this.venueService.deleteRentalItem(id, itemId, user.id, user.role);
+  }
+
+  // ========== RENTAL ITEM CATEGORIES -- propias de cada local, no un catalogo global curado
+  // por admin (ver docs/brainstorm/catalogo-alquiler-items.md y el plan de esta feature) ==========
+
+  @Get(':id/rental-item-categories')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Categorias del catalogo de alquiler de un local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Categorias del local' })
+  async getRentalItemCategories(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.listRentalItemCategories(id, user.id, user.role);
+  }
+
+  @Post(':id/rental-item-categories')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Crear una categoria de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 201, description: 'Categoria creada' })
+  async createRentalItemCategory(
+    @Param('id') id: string,
+    @Body() dto: CreateRentalItemCategoryDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.createRentalItemCategory(id, user.id, user.role, dto);
+  }
+
+  // Registrado antes de `:categoryId` por el mismo motivo que `rental-items/order`: una ruta
+  // con parametro registrada primero se comeria "order" como si fuera un categoryId.
+  @Put(':id/rental-item-categories/order')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reordenar categorias de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Categorias reordenadas' })
+  async reorderRentalItemCategories(
+    @Param('id') id: string,
+    @Body() dto: ReorderRentalItemCategoriesDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.reorderRentalItemCategories(id, user.id, user.role, dto.order);
+  }
+
+  @Put(':id/rental-item-categories/:categoryId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Renombrar/reordenar una categoria de alquiler (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Categoria actualizada' })
+  async updateRentalItemCategory(
+    @Param('id') id: string,
+    @Param('categoryId') categoryId: string,
+    @Body() dto: UpdateRentalItemCategoryDto,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.venueService.updateRentalItemCategory(id, categoryId, user.id, user.role, dto);
+  }
+
+  @Delete(':id/rental-item-categories/:categoryId')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Eliminar una categoria de alquiler sin items (OWNER/ADMIN)',
+  })
+  @ApiResponse({ status: 204, description: 'Categoria eliminada' })
+  @ApiResponse({ status: 409, description: 'La categoria todavia tiene items' })
+  async deleteRentalItemCategory(
+    @Param('id') id: string,
+    @Param('categoryId') categoryId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    await this.venueService.deleteRentalItemCategory(id, categoryId, user.id, user.role);
   }
 
   // ========== ADMIN ENDPOINTS ==========

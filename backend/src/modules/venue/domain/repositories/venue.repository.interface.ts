@@ -1,6 +1,7 @@
 import {
   VenueEntity,
   VenueMediaEntity,
+  VenueRentalItemCategoryEntity,
   VenueRentalItemEntity,
   VenueStatus,
 } from '../entities/venue.entity';
@@ -55,11 +56,12 @@ export interface SeasonalEventInput {
 
 export interface CreateRentalItemInput {
   name: string;
-  category: string;
+  categoryId: string;
   description?: string;
   photoUrl?: string;
   photoPublicId?: string;
-  pricePerUnit: number;
+  pricePerUnit?: number;
+  isIncluded?: boolean;
   unitLabel?: string;
   stockQty?: number;
   sortOrder?: number;
@@ -67,14 +69,26 @@ export interface CreateRentalItemInput {
 
 export interface UpdateRentalItemInput {
   name?: string;
-  category?: string;
-  description?: string;
+  categoryId?: string;
+  description?: string | null;
   photoUrl?: string;
   photoPublicId?: string;
+  removePhoto?: boolean;
   pricePerUnit?: number;
+  isIncluded?: boolean;
   unitLabel?: string;
-  stockQty?: number;
+  stockQty?: number | null;
   isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface CreateRentalItemCategoryInput {
+  name: string;
+  sortOrder?: number;
+}
+
+export interface UpdateRentalItemCategoryInput {
+  name?: string;
   sortOrder?: number;
 }
 
@@ -140,17 +154,50 @@ export interface IVenueRepository {
     venueId: string,
     options?: { activeOnly?: boolean },
   ): Promise<VenueRentalItemEntity[]>;
-  createRentalItem(venueId: string, data: CreateRentalItemInput): Promise<VenueRentalItemEntity>;
+  createRentalItem(
+    venueId: string,
+    data: CreateRentalItemInput,
+  ): Promise<VenueRentalItemEntity | 'category_not_found' | 'price_required'>;
+  /** `previousPhotoPublicId` is the Cloudinary id that was replaced or cleared by this update
+   * (or `null` if the photo didn't change) -- the caller best-effort-deletes it from Cloudinary,
+   * same as `deleteRentalItem` already does for a fully deleted item. */
   updateRentalItem(
     venueId: string,
     itemId: string,
     data: UpdateRentalItemInput,
-  ): Promise<VenueRentalItemEntity | null>;
+  ): Promise<
+    | { entity: VenueRentalItemEntity; previousPhotoPublicId: string | null }
+    | 'not_found'
+    | 'category_not_found'
+    | 'price_required'
+  >;
   deleteRentalItem(
     venueId: string,
     itemId: string,
   ): Promise<{ photoPublicId: string | null } | null>;
   reorderRentalItems(venueId: string, order: string[]): Promise<VenueRentalItemEntity[]>;
+  listRentalItemCategories(venueId: string): Promise<VenueRentalItemCategoryEntity[]>;
+  createRentalItemCategory(
+    venueId: string,
+    data: CreateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity | 'duplicate_name'>;
+  updateRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+    data: UpdateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity | 'not_found' | 'duplicate_name'>;
+  /** Deletes the category only when it has zero items -- otherwise leaves it untouched and
+   * reports how many items are blocking the delete, so the service can surface a clear 409. */
+  deleteRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+  ): Promise<{ itemCount: number } | 'not_found'>;
+  /** `order` must list every category of the venue exactly once -- a partial list would leave the
+   * ones it omits with a `sortOrder` that collides with the new positions. */
+  reorderRentalItemCategories(
+    venueId: string,
+    order: string[],
+  ): Promise<VenueRentalItemCategoryEntity[] | 'invalid_order'>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   /** Only for the admin "attach a real owner" flow -- not exposed through the generic update(),

@@ -1,7 +1,8 @@
 # Catalogo de alquiler de items por local (idea de plan pago)
 
-Estado: idea / analisis inicial, sin decidir, sin construir. Este documento es para pulir la
-idea antes de convertirla en un plan de implementacion real.
+Estado: Fase 1 construida (catalogo informativo con categorias propias de cada local). Fases 2 y
+3 siguen siendo solo ideas, sin decidir. Las secciones de abajo son el analisis original: donde
+la implementacion se aparto de el, se aclara ahi mismo.
 
 ## 1. De donde sale la idea
 
@@ -95,6 +96,12 @@ empezar.
 
 ## 5. Modelo de datos propuesto (boceto, no final)
 
+> **Actualizacion:** `category` ya no es texto libre. Se reemplazo por `VenueRentalItemCategory`
+> (`backend/prisma/schema.prisma`), una tabla propia de cada local que el dueno crea, renombra,
+> ordena y borra desde la pestana "Catalogo". Sigue sin depender del admin -- que era el objetivo
+> del texto libre -- pero evita variantes como "Vajilla" y "vajilla", y permite que el orden
+> elegido por el dueno se respete en la ficha publica. No se puede borrar una categoria con items.
+
 Nuevo modelo, no reemplaza a `Amenity`/`VenueAmenity` (esos siguen sirviendo para filtros de
 busqueda globales -- "locales con parqueo" sigue siendo util y es un concepto distinto). Boceto:
 
@@ -150,8 +157,9 @@ resolverlo ahora.
   (`backend/src/modules/upload/cloudinary.service.ts`), en una carpeta/preset separado?
 - `unitLabel` libre (como "por modulo" en el ejemplo de Le Dome) o una lista cerrada de
   unidades comunes (unidad, modulo, hora, dia)?
-- Conviene permitir que el dueno marque un item como "incluido sin costo" ademas de los que se
-  alquilan aparte (como ya hace `VenueAmenity.isIncluded`), o eso se queda exclusivamente en
-  `VenueAmenity` y este catalogo nuevo es solo para lo que tiene costo?
+- ~~Conviene permitir que el dueno marque un item como "incluido sin costo"?~~ Resuelto: si, con
+  `VenueRentalItem.isIncluded`. Un item incluido no tiene precio (`pricePerUnit` queda en null, no
+  en 0) y en la Fase 2 no se podra seleccionar ni sumara al total. Si un cliente pide mas de lo
+  incluido, por ahora el dueno crea dos items ("Sillas (incluidas)" y "Sillas adicionales").
 - En fase 2/3, la seleccion de items entra al mismo flujo de pago (`Payment`) que la reserva del
   local, o se liquida aparte directo entre dueno y cliente (como hoy via WhatsApp)?

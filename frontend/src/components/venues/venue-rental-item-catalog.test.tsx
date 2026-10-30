@@ -17,10 +17,11 @@ const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
   id: 'item-1',
   venueId: 'venue-1',
   name: 'Mesa redonda',
-  category: 'Mobiliario',
+  category: { id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 },
   description: null,
   photoUrl: null,
   pricePerUnit: 50,
+  isIncluded: false,
   unitLabel: 'unidad',
   stockQty: null,
   isActive: true,
@@ -53,7 +54,12 @@ describe('VenueRentalItemCatalog', () => {
   it('muestra los items activos con su precio', async () => {
     mockGetPublicRentalItems.mockResolvedValue([
       makeItem({ id: 'item-1', name: 'Mesa redonda', pricePerUnit: 50, unitLabel: 'unidad' }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', category: 'Decoracion', pricePerUnit: 20 }),
+      makeItem({
+        id: 'item-2',
+        name: 'Mantel blanco',
+        category: { id: 'cat-decoracion', name: 'Decoracion', sortOrder: 1 },
+        pricePerUnit: 20,
+      }),
     ]);
     renderCatalog();
 
@@ -61,14 +67,91 @@ describe('VenueRentalItemCatalog', () => {
     expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
   });
 
+  it('muestra "Incluido con el local" en vez de un precio, y conserva el stock', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ name: 'Silla tiffany', pricePerUnit: null, isIncluded: true, stockQty: 80 }),
+    ]);
+    renderCatalog();
+
+    expect(await screen.findByText('Incluido con el local')).toBeInTheDocument();
+    expect(screen.getByText('Stock: 80')).toBeInTheDocument();
+    expect(screen.queryByText(/\/ unidad/)).not.toBeInTheDocument();
+  });
+
+  it('muestra la foto del item o, si no tiene, solo el icono', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({
+        id: 'item-1',
+        name: 'Mesa redonda',
+        photoUrl: 'https://res.cloudinary.com/demo/image/upload/mesa.jpg',
+      }),
+      makeItem({ id: 'item-2', name: 'Mantel blanco', photoUrl: null }),
+    ]);
+    renderCatalog();
+
+    expect(await screen.findByRole('img', { name: 'Mesa redonda' })).toBeInTheDocument();
+    expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Mantel blanco' })).not.toBeInTheDocument();
+  });
+
+  it('muestra las categorias en el orden que definio el dueño, no alfabetico', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({
+        id: 'item-1',
+        name: 'Mantel blanco',
+        category: { id: 'cat-a', name: 'Aaa', sortOrder: 2 },
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Mesa redonda',
+        category: { id: 'cat-z', name: 'Zzz', sortOrder: 0 },
+      }),
+      makeItem({
+        id: 'item-3',
+        name: 'Copa',
+        category: { id: 'cat-m', name: 'Mmm', sortOrder: 1 },
+      }),
+    ]);
+    renderCatalog();
+
+    await screen.findByText('Mesa redonda');
+
+    const labels = screen.getAllByRole('button').map((button) => button.textContent);
+    expect(labels.filter((label) => ['Aaa', 'Mmm', 'Zzz'].includes(label ?? ''))).toEqual([
+      'Zzz',
+      'Mmm',
+      'Aaa',
+    ]);
+  });
+
   it('filtra por categoria al hacer click en una pildora', async () => {
     const user = userEvent.setup();
     mockGetPublicRentalItems.mockResolvedValue([
-      makeItem({ id: 'item-1', name: 'Mesa redonda', category: 'Mobiliario' }),
-      makeItem({ id: 'item-2', name: 'Mantel blanco', category: 'Decoracion' }),
-      makeItem({ id: 'item-3', name: 'Silla plegable', category: 'Mobiliario' }),
-      makeItem({ id: 'item-4', name: 'Centro de mesa', category: 'Decoracion' }),
-      makeItem({ id: 'item-5', name: 'Vajilla', category: 'Mobiliario' }),
+      makeItem({
+        id: 'item-1',
+        name: 'Mesa redonda',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 },
+      }),
+      makeItem({
+        id: 'item-2',
+        name: 'Mantel blanco',
+        category: { id: 'cat-decoracion', name: 'Decoracion', sortOrder: 1 },
+      }),
+      makeItem({
+        id: 'item-3',
+        name: 'Silla plegable',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 },
+      }),
+      makeItem({
+        id: 'item-4',
+        name: 'Centro de mesa',
+        category: { id: 'cat-decoracion', name: 'Decoracion', sortOrder: 1 },
+      }),
+      makeItem({
+        id: 'item-5',
+        name: 'Vajilla',
+        category: { id: 'cat-mobiliario', name: 'Mobiliario', sortOrder: 0 },
+      }),
     ]);
     renderCatalog();
 

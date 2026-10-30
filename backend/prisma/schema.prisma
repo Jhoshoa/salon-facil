@@ -145,21 +145,21 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   lastLoginAt     DateTime?  @map("last_login_at")
 
-  venues                 Venue[]                 @relation("VenueOwner")
-  verifiedVenues         Venue[]                 @relation("VenueVerifier")
-  bookings               Booking[]               @relation("ClientBookings")
-  reviews                Review[]                @relation("ClientReviews")
-  confirmedPayments      Payment[]               @relation("PaymentConfirmedBy")
-  refundedPayments       Payment[]               @relation("PaymentRefundedBy")
-  notifications          Notification[]
+  venues                  Venue[]                  @relation("VenueOwner")
+  verifiedVenues          Venue[]                  @relation("VenueVerifier")
+  bookings                Booking[]                @relation("ClientBookings")
+  reviews                 Review[]                 @relation("ClientReviews")
+  confirmedPayments       Payment[]                @relation("PaymentConfirmedBy")
+  refundedPayments        Payment[]                @relation("PaymentRefundedBy")
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  refreshTokens          RefreshToken[]
-  passwordResetTokens    PasswordResetToken[]
-  identities             UserIdentity[]
-  emailVerificationCodes EmailVerificationCode[]
-  favorites              VenueFavorite[]
-  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditLogActor")
-  ownerInviteTokens      OwnerInviteToken[]
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  identities              UserIdentity[]
+  emailVerificationCodes  EmailVerificationCode[]
+  favorites               VenueFavorite[]
+  adminAuditLogs          AdminAuditLog[]          @relation("AdminAuditLogActor")
+  ownerInviteTokens       OwnerInviteToken[]
 
   @@index([email])
   @@index([phone])
@@ -327,22 +327,23 @@ model Venue {
   // owner/admin can flip back to ACTIVE.
   deletedAt          DateTime?     @map("deleted_at")
 
-  owner          User               @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  verifiedBy     User?              @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
-  spaceType      SpaceType?         @relation(fields: [spaceTypeId], references: [id], onDelete: SetNull)
-  services       VenueService[]
-  amenities      VenueAmenity[]
-  uses           VenueUse[]
-  openingHours   VenueOpeningHour[]
-  media          VenueMedia[]
-  prices         VenuePrice[]
-  rentalItems    VenueRentalItem[]
-  bookings       Booking[]
-  bookingDates   BookingDate[]
-  reviews        Review[]
-  calendarBlocks CalendarBlock[]
-  favoritedBy    VenueFavorite[]
-  previewTokens  VenuePreviewToken[]
+  owner                User                      @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  verifiedBy           User?                     @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  spaceType            SpaceType?                @relation(fields: [spaceTypeId], references: [id], onDelete: SetNull)
+  services             VenueService[]
+  amenities            VenueAmenity[]
+  uses                 VenueUse[]
+  openingHours         VenueOpeningHour[]
+  media                VenueMedia[]
+  prices               VenuePrice[]
+  rentalItems          VenueRentalItem[]
+  rentalItemCategories VenueRentalItemCategory[]
+  bookings             Booking[]
+  bookingDates         BookingDate[]
+  reviews              Review[]
+  calendarBlocks       CalendarBlock[]
+  favoritedBy          VenueFavorite[]
+  previewTokens        VenuePreviewToken[]
 
   @@index([ownerId])
   @@index([slug])
@@ -558,22 +559,45 @@ model VenueRentalItem {
   id            String   @id @default(uuid())
   venueId       String   @map("venue_id")
   name          String
-  category      String
+  categoryId    String   @map("category_id")
   description   String?  @db.Text
   photoUrl      String?  @map("photo_url")
   photoPublicId String?  @map("photo_public_id")
-  pricePerUnit  Decimal  @map("price_per_unit") @db.Decimal(12, 2)
+  // Null only when `isIncluded` is true -- an included item has no price, which is not the same
+  // as an item that is charged separately and happens to cost 0.
+  pricePerUnit  Decimal? @map("price_per_unit") @db.Decimal(12, 2)
+  isIncluded    Boolean  @default(false) @map("is_included")
   unitLabel     String   @default("unidad") @map("unit_label")
   stockQty      Int?     @map("stock_qty")
   isActive      Boolean  @default(true) @map("is_active")
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venue    Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  category VenueRentalItemCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@index([venueId])
-  @@index([venueId, category])
+  @@index([venueId, categoryId])
   @@map("venue_rental_items")
+}
+
+// Categorias de alquiler, propias de cada local (no un catalogo global curado por admin, a
+// proposito -- ver docs/brainstorm/catalogo-alquiler-items.md). El dueño las crea/renombra/borra
+// desde la pestaña "Catalogo"; onDelete: Restrict en VenueRentalItem.category evita borrar una
+// categoria todavia en uso.
+model VenueRentalItemCategory {
+  id        String   @id @default(uuid())
+  venueId   String   @map("venue_id")
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  venue Venue             @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  items VenueRentalItem[]
+
+  @@unique([venueId, name])
+  @@index([venueId])
+  @@map("venue_rental_item_categories")
 }
 
 model SuggestedSeasonalEvent {

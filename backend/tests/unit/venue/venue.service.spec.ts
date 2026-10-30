@@ -3,7 +3,12 @@ import { VenueService } from '../../../src/modules/venue/application/services/ve
 import { SlugService } from '../../../src/modules/venue/application/services/slug.service';
 import { VENUE_REPOSITORY } from '../../../src/modules/venue/domain/repositories/venue.repository.interface';
 import { CloudinaryService } from '../../../src/modules/upload/cloudinary.service';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   MAX_VENUE_PHOTOS,
   VenueStatus,
@@ -68,6 +73,11 @@ describe('VenueService', () => {
       updateRentalItem: jest.fn(),
       deleteRentalItem: jest.fn(),
       reorderRentalItems: jest.fn(),
+      listRentalItemCategories: jest.fn(),
+      createRentalItemCategory: jest.fn(),
+      updateRentalItemCategory: jest.fn(),
+      deleteRentalItemCategory: jest.fn(),
+      reorderRentalItemCategories: jest.fn(),
       createPreviewToken: jest.fn(),
       findVenueIdByPreviewToken: jest.fn(),
       reassignOwner: jest.fn(),
@@ -589,11 +599,12 @@ describe('VenueService', () => {
       id: 'item-1',
       venueId: 'venue-1',
       name: 'Vaso largo',
-      category: 'Cristaleria',
+      category: { id: 'cat-1', name: 'Cristaleria', sortOrder: 0 },
       description: null,
       photoUrl: 'https://cdn/vaso.jpg',
       photoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
       pricePerUnit: 0.5,
+      isIncluded: false,
       unitLabel: 'unidad',
       stockQty: 325,
       isActive: true,
@@ -647,6 +658,19 @@ describe('VenueService', () => {
     });
 
     describe('createRentalItem', () => {
+      it('throws BadRequestException when the item has no price and is not included', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.createRentalItem.mockResolvedValue('price_required');
+
+        await expect(
+          service.createRentalItem('venue-1', 'owner-1', UserRole.OWNER, {
+            name: 'Vaso largo',
+            categoryId: 'cat-1',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
       it('delegates to the repository when the caller can edit the venue', async () => {
         mockRepository.findById.mockResolvedValue(mockVenue);
         mockVenue.canBeEditedBy.mockReturnValue(true);
@@ -654,14 +678,14 @@ describe('VenueService', () => {
 
         const result = await service.createRentalItem('venue-1', 'owner-1', UserRole.OWNER, {
           name: 'Vaso largo',
-          category: 'Cristaleria',
+          categoryId: 'cat-1',
           pricePerUnit: 0.5,
         });
 
         expect(result).toEqual(rentalItem);
         expect(mockRepository.createRentalItem).toHaveBeenCalledWith('venue-1', {
           name: 'Vaso largo',
-          category: 'Cristaleria',
+          categoryId: 'cat-1',
           pricePerUnit: 0.5,
         });
       });
@@ -673,19 +697,48 @@ describe('VenueService', () => {
         await expect(
           service.createRentalItem('venue-1', 'other-user', UserRole.OWNER, {
             name: 'Vaso largo',
-            category: 'Cristaleria',
+            categoryId: 'cat-1',
             pricePerUnit: 0.5,
           }),
         ).rejects.toThrow(ForbiddenException);
         expect(mockRepository.createRentalItem).not.toHaveBeenCalled();
       });
+
+      it('throws NotFoundException when the categoryId does not belong to this venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.createRentalItem.mockResolvedValue('category_not_found');
+
+        await expect(
+          service.createRentalItem('venue-1', 'owner-1', UserRole.OWNER, {
+            name: 'Vaso largo',
+            categoryId: 'other-venue-category',
+            pricePerUnit: 0.5,
+          }),
+        ).rejects.toThrow(NotFoundException);
+      });
     });
 
     describe('updateRentalItem', () => {
+      it('throws BadRequestException when the item would end up charged with no price', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue('price_required');
+
+        await expect(
+          service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+            isIncluded: false,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
       it('returns the updated item when the caller can edit the venue', async () => {
         mockRepository.findById.mockResolvedValue(mockVenue);
         mockVenue.canBeEditedBy.mockReturnValue(true);
-        mockRepository.updateRentalItem.mockResolvedValue({ ...rentalItem, pricePerUnit: 0.75 });
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, pricePerUnit: 0.75 },
+          previousPhotoPublicId: null,
+        });
 
         const result = await service.updateRentalItem(
           'venue-1',
@@ -696,6 +749,56 @@ describe('VenueService', () => {
         );
 
         expect(result.pricePerUnit).toBe(0.75);
+      });
+
+      it('deletes the old Cloudinary photo when a new one replaces it', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, photoUrl: 'https://cdn/new.jpg', photoPublicId: 'new-id' },
+          previousPhotoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
+        });
+
+        await service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+          photoUrl: 'https://cdn/new.jpg',
+          photoPublicId: 'new-id',
+        });
+
+        expect(mockCloudinaryService.deleteImage).toHaveBeenCalledWith(
+          'salon-facil/venues/owner-1/rental-items/vaso',
+        );
+      });
+
+      it('deletes the old Cloudinary photo when removePhoto clears it', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, photoUrl: null, photoPublicId: null },
+          previousPhotoPublicId: 'salon-facil/venues/owner-1/rental-items/vaso',
+        });
+
+        await service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+          removePhoto: true,
+        });
+
+        expect(mockCloudinaryService.deleteImage).toHaveBeenCalledWith(
+          'salon-facil/venues/owner-1/rental-items/vaso',
+        );
+      });
+
+      it('does not call Cloudinary when the photo did not change', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue({
+          entity: { ...rentalItem, name: 'Vaso corto' },
+          previousPhotoPublicId: null,
+        });
+
+        await service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+          name: 'Vaso corto',
+        });
+
+        expect(mockCloudinaryService.deleteImage).not.toHaveBeenCalled();
       });
 
       it('throws ForbiddenException for a different owner', async () => {
@@ -711,10 +814,22 @@ describe('VenueService', () => {
       it('throws NotFoundException when the item does not exist or belongs to another venue', async () => {
         mockRepository.findById.mockResolvedValue(mockVenue);
         mockVenue.canBeEditedBy.mockReturnValue(true);
-        mockRepository.updateRentalItem.mockResolvedValue(null);
+        mockRepository.updateRentalItem.mockResolvedValue('not_found');
 
         await expect(
           service.updateRentalItem('venue-1', 'missing-item', 'owner-1', UserRole.OWNER, {}),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws NotFoundException when the new categoryId does not belong to this venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItem.mockResolvedValue('category_not_found');
+
+        await expect(
+          service.updateRentalItem('venue-1', 'item-1', 'owner-1', UserRole.OWNER, {
+            categoryId: 'other-venue-category',
+          }),
         ).rejects.toThrow(NotFoundException);
       });
     });
@@ -788,6 +903,217 @@ describe('VenueService', () => {
           service.reorderRentalItems('venue-1', 'other-user', UserRole.OWNER, ['item-1']),
         ).rejects.toThrow(ForbiddenException);
         expect(mockRepository.reorderRentalItems).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('rental item categories', () => {
+    const category = {
+      id: 'cat-1',
+      venueId: 'venue-1',
+      name: 'Mobiliario',
+      sortOrder: 0,
+      itemCount: 0,
+      createdAt: new Date(),
+    };
+
+    describe('listRentalItemCategories', () => {
+      it('returns the categories when the caller can edit the venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.listRentalItemCategories.mockResolvedValue([category]);
+
+        const result = await service.listRentalItemCategories('venue-1', 'owner-1', UserRole.OWNER);
+
+        expect(result).toEqual([category]);
+      });
+
+      it('throws ForbiddenException for a different owner', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(false);
+
+        await expect(
+          service.listRentalItemCategories('venue-1', 'other-user', UserRole.OWNER),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockRepository.listRentalItemCategories).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('createRentalItemCategory', () => {
+      it('delegates to the repository when the caller can edit the venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.createRentalItemCategory.mockResolvedValue(category);
+
+        const result = await service.createRentalItemCategory(
+          'venue-1',
+          'owner-1',
+          UserRole.OWNER,
+          {
+            name: 'Mobiliario',
+          },
+        );
+
+        expect(result).toEqual(category);
+      });
+
+      it('throws ForbiddenException for a different owner', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(false);
+
+        await expect(
+          service.createRentalItemCategory('venue-1', 'other-user', UserRole.OWNER, {
+            name: 'Mobiliario',
+          }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockRepository.createRentalItemCategory).not.toHaveBeenCalled();
+      });
+
+      it('throws ConflictException when the name already exists (case-insensitive)', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.createRentalItemCategory.mockResolvedValue('duplicate_name');
+
+        await expect(
+          service.createRentalItemCategory('venue-1', 'owner-1', UserRole.OWNER, {
+            name: 'mobiliario',
+          }),
+        ).rejects.toThrow(ConflictException);
+      });
+    });
+
+    describe('updateRentalItemCategory', () => {
+      it('returns the updated category when the caller can edit the venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItemCategory.mockResolvedValue({
+          ...category,
+          name: 'Muebles',
+        });
+
+        const result = await service.updateRentalItemCategory(
+          'venue-1',
+          'cat-1',
+          'owner-1',
+          UserRole.OWNER,
+          { name: 'Muebles' },
+        );
+
+        expect(result.name).toBe('Muebles');
+      });
+
+      it('throws ForbiddenException for a different owner', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(false);
+
+        await expect(
+          service.updateRentalItemCategory('venue-1', 'cat-1', 'other-user', UserRole.OWNER, {}),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockRepository.updateRentalItemCategory).not.toHaveBeenCalled();
+      });
+
+      it('throws NotFoundException when the category does not exist or belongs to another venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItemCategory.mockResolvedValue('not_found');
+
+        await expect(
+          service.updateRentalItemCategory('venue-1', 'missing-cat', 'owner-1', UserRole.OWNER, {}),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws ConflictException when renaming to a name that already exists', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.updateRentalItemCategory.mockResolvedValue('duplicate_name');
+
+        await expect(
+          service.updateRentalItemCategory('venue-1', 'cat-1', 'owner-1', UserRole.OWNER, {
+            name: 'Decoracion',
+          }),
+        ).rejects.toThrow(ConflictException);
+      });
+    });
+
+    describe('deleteRentalItemCategory', () => {
+      it('deletes the category when it has no items', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.deleteRentalItemCategory.mockResolvedValue({ itemCount: 0 });
+
+        await service.deleteRentalItemCategory('venue-1', 'cat-1', 'owner-1', UserRole.OWNER);
+
+        expect(mockRepository.deleteRentalItemCategory).toHaveBeenCalledWith('venue-1', 'cat-1');
+      });
+
+      it('throws ForbiddenException for a different owner', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(false);
+
+        await expect(
+          service.deleteRentalItemCategory('venue-1', 'cat-1', 'other-user', UserRole.OWNER),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockRepository.deleteRentalItemCategory).not.toHaveBeenCalled();
+      });
+
+      it('throws NotFoundException when the category does not exist or belongs to another venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.deleteRentalItemCategory.mockResolvedValue('not_found');
+
+        await expect(
+          service.deleteRentalItemCategory('venue-1', 'missing-cat', 'owner-1', UserRole.OWNER),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws ConflictException when the category still has items', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.deleteRentalItemCategory.mockResolvedValue({ itemCount: 4 });
+
+        await expect(
+          service.deleteRentalItemCategory('venue-1', 'cat-1', 'owner-1', UserRole.OWNER),
+        ).rejects.toThrow(ConflictException);
+      });
+    });
+
+    describe('reorderRentalItemCategories', () => {
+      it('delegates to the repository when the caller can edit the venue', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.reorderRentalItemCategories.mockResolvedValue([category]);
+
+        const result = await service.reorderRentalItemCategories(
+          'venue-1',
+          'owner-1',
+          UserRole.OWNER,
+          ['cat-1'],
+        );
+
+        expect(result).toEqual([category]);
+        expect(mockRepository.reorderRentalItemCategories).toHaveBeenCalledWith('venue-1', [
+          'cat-1',
+        ]);
+      });
+
+      it('throws BadRequestException when the order does not match the venue categories', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(true);
+        mockRepository.reorderRentalItemCategories.mockResolvedValue('invalid_order');
+
+        await expect(
+          service.reorderRentalItemCategories('venue-1', 'owner-1', UserRole.OWNER, ['cat-1']),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws ForbiddenException for a different owner', async () => {
+        mockRepository.findById.mockResolvedValue(mockVenue);
+        mockVenue.canBeEditedBy.mockReturnValue(false);
+
+        await expect(
+          service.reorderRentalItemCategories('venue-1', 'other-user', UserRole.OWNER, ['cat-1']),
+        ).rejects.toThrow(ForbiddenException);
+        expect(mockRepository.reorderRentalItemCategories).not.toHaveBeenCalled();
       });
     });
   });

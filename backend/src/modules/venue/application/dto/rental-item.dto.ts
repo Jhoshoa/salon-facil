@@ -6,12 +6,15 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  Max,
   Min,
   MinLength,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { parseBoolean } from './create-venue.dto';
+import { parseBoolean, parseIntOrNull, trimString, trimStringOrNull } from './create-venue.dto';
 
 // Arrives as multipart/form-data (the photo travels alongside these fields in the same
 // request), so every field lands as a string — the global ValidationPipe's
@@ -21,26 +24,35 @@ import { parseBoolean } from './create-venue.dto';
 // coerce to `true`.
 
 export class CreateRentalItemDto {
+  @Transform(trimString)
   @IsString()
   @MinLength(2)
   @MaxLength(120)
   name!: string;
 
-  @IsString()
-  @MinLength(2)
-  @MaxLength(60)
-  category!: string;
+  @IsUUID()
+  categoryId!: string;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(1000)
   description?: string;
 
+  // Required unless the item comes included with the venue, which has no price to give.
+  @ValidateIf((dto: CreateRentalItemDto) => !dto.isIncluded)
   @IsNumber()
   @Min(0)
-  pricePerUnit!: number;
+  @Max(999999.99)
+  pricePerUnit?: number;
 
   @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  isIncluded?: boolean;
+
+  @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(30)
   unitLabel?: string;
@@ -48,6 +60,7 @@ export class CreateRentalItemDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(100000)
   stockQty?: number;
 
   @IsOptional()
@@ -58,41 +71,57 @@ export class CreateRentalItemDto {
 
 export class UpdateRentalItemDto {
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MinLength(2)
   @MaxLength(120)
   name?: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(60)
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
+  @Transform(trimStringOrNull)
   @IsString()
   @MaxLength(1000)
-  description?: string;
+  description?: string | null;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(999999.99)
   pricePerUnit?: number;
 
   @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  isIncluded?: boolean;
+
+  @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(30)
   unitLabel?: string;
 
   @IsOptional()
+  @Transform(parseIntOrNull)
   @IsInt()
   @Min(0)
-  stockQty?: number;
+  @Max(100000)
+  stockQty?: number | null;
 
   @IsOptional()
   @Transform(parseBoolean)
   @IsBoolean()
   isActive?: boolean;
+
+  // Clears the current photo without uploading a replacement. Ignored if a new photo is also
+  // sent in the same request -- the new upload wins.
+  @IsOptional()
+  @Transform(parseBoolean)
+  @IsBoolean()
+  removePhoto?: boolean;
 
   @IsOptional()
   @IsInt()

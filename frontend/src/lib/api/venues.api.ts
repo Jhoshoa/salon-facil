@@ -17,7 +17,9 @@ import type {
   VenueFormPayload,
   VenueMedia,
   VenueRentalItem,
+  VenueRentalItemCategory,
   VenueRentalItemInput,
+  VenueRentalItemUpdateInput,
   VenueSearchParams,
 } from '@/types/api';
 
@@ -192,13 +194,14 @@ export const getOwnerRentalItems = async (venueId: string): Promise<VenueRentalI
 };
 
 const buildRentalItemFormData = (
-  payload: Partial<VenueRentalItemInput> & { isActive?: boolean },
+  payload: VenueRentalItemInput | VenueRentalItemUpdateInput,
   photo?: File,
 ): FormData => {
   const formData = new FormData();
   Object.entries(payload).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-    formData.set(key, String(value));
+    if (value === undefined) return;
+    // Multipart can't carry a real null -- the backend reads an empty field as "clear this value".
+    formData.set(key, value === null ? '' : String(value));
   });
   if (photo) formData.append('photo', photo);
   return formData;
@@ -218,7 +221,7 @@ export const createRentalItem = async (
 export const updateRentalItem = async (
   venueId: string,
   itemId: string,
-  payload: Partial<VenueRentalItemInput> & { isActive?: boolean },
+  payload: VenueRentalItemUpdateInput,
   photo?: File,
 ): Promise<VenueRentalItem> => {
   return apiRequest<VenueRentalItem>(`/venues/${venueId}/rental-items/${itemId}`, {
@@ -236,6 +239,53 @@ export const reorderRentalItems = async (
   order: string[],
 ): Promise<VenueRentalItem[]> => {
   return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ order }),
+  });
+};
+
+// Categorias del catalogo de alquiler -- propias de cada local, no un catalogo global
+export const getRentalItemCategories = async (
+  venueId: string,
+): Promise<VenueRentalItemCategory[]> => {
+  return apiRequest<VenueRentalItemCategory[]>(`/venues/${venueId}/rental-item-categories`);
+};
+
+export const createRentalItemCategory = async (
+  venueId: string,
+  payload: { name: string; sortOrder?: number },
+): Promise<VenueRentalItemCategory> => {
+  return apiRequest<VenueRentalItemCategory>(`/venues/${venueId}/rental-item-categories`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateRentalItemCategory = async (
+  venueId: string,
+  categoryId: string,
+  payload: { name?: string; sortOrder?: number },
+): Promise<VenueRentalItemCategory> => {
+  return apiRequest<VenueRentalItemCategory>(
+    `/venues/${venueId}/rental-item-categories/${categoryId}`,
+    { method: 'PUT', body: JSON.stringify(payload) },
+  );
+};
+
+export const deleteRentalItemCategory = async (
+  venueId: string,
+  categoryId: string,
+): Promise<void> => {
+  return apiRequest<void>(`/venues/${venueId}/rental-item-categories/${categoryId}`, {
+    method: 'DELETE',
+  });
+};
+
+export const reorderRentalItemCategories = async (
+  venueId: string,
+  order: string[],
+): Promise<VenueRentalItemCategory[]> => {
+  return apiRequest<VenueRentalItemCategory[]>(`/venues/${venueId}/rental-item-categories/order`, {
     method: 'PUT',
     body: JSON.stringify({ order }),
   });

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -7,8 +8,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CreateRentalItemCategoryInput,
   CreateRentalItemInput,
   IVenueRepository,
+  UpdateRentalItemCategoryInput,
   UpdateRentalItemInput,
   VENUE_REPOSITORY,
 } from '../../domain/repositories/venue.repository.interface';
@@ -21,6 +24,7 @@ import { AdminVenueStatusCountsQueryDto } from '../dto/admin-venue-status-counts
 import {
   MAX_VENUE_PHOTOS,
   VenueEntity,
+  VenueRentalItemCategoryEntity,
   VenueRentalItemEntity,
   VenueStatus,
 } from '../../domain/entities/venue.entity';
@@ -499,7 +503,14 @@ export class VenueService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
-    return this.venueRepository.createRentalItem(venueId, data);
+    const result = await this.venueRepository.createRentalItem(venueId, data);
+    if (result === 'category_not_found') {
+      throw new NotFoundException(`Categoria con ID '${data.categoryId}' no encontrada`);
+    }
+    if (result === 'price_required') {
+      throw new BadRequestException('Indica un precio o marca el item como incluido con el local');
+    }
+    return result;
   }
 
   async updateRentalItem(
@@ -513,11 +524,21 @@ export class VenueService {
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
-    const updated = await this.venueRepository.updateRentalItem(venueId, itemId, data);
-    if (!updated) {
+    const result = await this.venueRepository.updateRentalItem(venueId, itemId, data);
+    if (result === 'not_found') {
       throw new NotFoundException(`Item de catalogo con ID '${itemId}' no encontrado`);
     }
-    return updated;
+    if (result === 'category_not_found') {
+      throw new NotFoundException(`Categoria con ID '${data.categoryId}' no encontrada`);
+    }
+    if (result === 'price_required') {
+      throw new BadRequestException('Indica un precio o marca el item como incluido con el local');
+    }
+    // Best-effort, same criteria as deleteRentalItem: the DB row is already updated either way.
+    if (result.previousPhotoPublicId) {
+      await this.cloudinaryService.deleteImage(result.previousPhotoPublicId).catch(() => {});
+    }
+    return result.entity;
   }
 
   async deleteRentalItem(
@@ -551,6 +572,94 @@ export class VenueService {
       throw new ForbiddenException('No tienes permiso para editar este local');
     }
     return this.venueRepository.reorderRentalItems(venueId, order);
+  }
+
+  async listRentalItemCategories(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<VenueRentalItemCategoryEntity[]> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para ver las categorias de este local');
+    }
+    return this.venueRepository.listRentalItemCategories(venueId);
+  }
+
+  async createRentalItemCategory(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+    data: CreateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    const result = await this.venueRepository.createRentalItemCategory(venueId, data);
+    if (result === 'duplicate_name') {
+      throw new ConflictException(`Ya existe una categoria llamada '${data.name}'`);
+    }
+    return result;
+  }
+
+  async updateRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+    userId: string,
+    userRole: UserRole,
+    data: UpdateRentalItemCategoryInput,
+  ): Promise<VenueRentalItemCategoryEntity> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    const result = await this.venueRepository.updateRentalItemCategory(venueId, categoryId, data);
+    if (result === 'not_found') {
+      throw new NotFoundException(`Categoria con ID '${categoryId}' no encontrada`);
+    }
+    if (result === 'duplicate_name') {
+      throw new ConflictException(`Ya existe una categoria llamada '${data.name}'`);
+    }
+    return result;
+  }
+
+  async deleteRentalItemCategory(
+    venueId: string,
+    categoryId: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<void> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    const result = await this.venueRepository.deleteRentalItemCategory(venueId, categoryId);
+    if (result === 'not_found') {
+      throw new NotFoundException(`Categoria con ID '${categoryId}' no encontrada`);
+    }
+    if (result.itemCount > 0) {
+      throw new ConflictException(
+        `No puedes eliminar esta categoria porque tiene ${result.itemCount} item${result.itemCount === 1 ? '' : 's'}. Movelos o borralos primero.`,
+      );
+    }
+  }
+
+  async reorderRentalItemCategories(
+    venueId: string,
+    userId: string,
+    userRole: UserRole,
+    order: string[],
+  ): Promise<VenueRentalItemCategoryEntity[]> {
+    const venue = await this.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para editar este local');
+    }
+    const result = await this.venueRepository.reorderRentalItemCategories(venueId, order);
+    if (result === 'invalid_order') {
+      throw new BadRequestException('order debe incluir todas las categorias del local');
+    }
+    return result;
   }
 
   async getVenueCompletion(
