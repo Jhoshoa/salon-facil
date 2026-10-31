@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { departamentoLabels } from './venue-filter-labels';
 import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 import { BookingForm } from '@/components/booking/booking-form';
+import type { PricePreviewAccess } from '@/lib/api/bookings.api';
 import { VenueReviews } from '@/components/reviews/venue-reviews';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
@@ -144,6 +145,12 @@ export const VenueDetail = ({
       return venueId ? getVenueById(venueId) : getVenueBySlug(slug!);
     },
   });
+
+  const pricePreviewAccess: PricePreviewAccess | undefined = shareToken
+    ? { mode: 'share', token: shareToken }
+    : venueId
+      ? { mode: 'manage' }
+      : undefined;
 
   const similarQuery = useQuery({
     queryKey: ['venue', slug, 'similar'],
@@ -680,6 +687,7 @@ export const VenueDetail = ({
               rentalItemLines={rentalSelection.lines}
               onRentalItemQuantityChange={handleRentalItemQuantityChange}
               onBookingCreated={rentalSelection.clear}
+              pricePreviewAccess={pricePreviewAccess}
             />
           </aside>
         ) : null}
@@ -719,6 +727,7 @@ export const VenueDetail = ({
             onBookingCreated={rentalSelection.clear}
             staleRangeNotice={staleRangeNotice}
             onDismissStaleNotice={() => setStaleRangeNotice(null)}
+            pricePreviewAccess={pricePreviewAccess}
           />
         </>
       ) : null}

@@ -201,6 +201,13 @@ export class PreviewPriceDto {
   @ValidateNested({ each: true })
   @Type(() => SelectedRentalItemDto)
   selectedRentalItems?: SelectedRentalItemDto[];
+
+  // The share-preview link being viewed: the only way to quote a venue that isn't public without
+  // being its owner or an admin.
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  previewToken?: string;
 }
 
 export class CreateCalendarBlockDto {

@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { CalendarBlockStatus, VenueCalendar } from '@/types/api';
+import type { CalendarBlockStatus, PublicVenueCalendar, VenueCalendar } from '@/types/api';
 
 export interface CreateCalendarBlockPayload {
   date: string;
@@ -7,8 +7,17 @@ export interface CreateCalendarBlockPayload {
   useTypeId?: string;
 }
 
+export const getPublicVenueCalendar = async (
+  venueId: string,
+  month: string,
+): Promise<PublicVenueCalendar> => {
+  return apiRequest<PublicVenueCalendar>(`/venues/${venueId}/calendar?month=${month}`, {
+    auth: false,
+  });
+};
+
 export const getVenueCalendar = async (venueId: string, month: string): Promise<VenueCalendar> => {
-  return apiRequest<VenueCalendar>(`/venues/${venueId}/calendar?month=${month}`, { auth: false });
+  return apiRequest<VenueCalendar>(`/venues/${venueId}/calendar/manage?month=${month}`);
 };
 
 export const createCalendarBlock = async (

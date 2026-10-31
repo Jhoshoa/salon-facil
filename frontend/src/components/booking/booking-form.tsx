@@ -10,7 +10,11 @@ import {
   rentalItemsQueryKey,
   type RentalItemLine,
 } from '@/hooks/use-rental-item-selection';
-import { createBooking, previewBookingPrice } from '@/lib/api/bookings.api';
+import {
+  createBooking,
+  previewBookingPrice,
+  type PricePreviewAccess,
+} from '@/lib/api/bookings.api';
 import { formatRentalItemBreakdown } from '@/lib/rental-items';
 import { formatCurrency, formatDate, formatDateInput, formatTime12h } from '@/lib/formatters';
 import {
@@ -45,6 +49,8 @@ interface BookingFormProps {
    * long enough to scroll and the price is worth keeping in view. The desktop sticky aside
    * doesn't scroll independently, so it leaves this off. */
   stickyHeader?: boolean;
+  /** Set when this form is shown in a preview, where the venue may not be public yet. */
+  pricePreviewAccess?: PricePreviewAccess;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -96,6 +102,7 @@ export const BookingForm = ({
   onRentalItemQuantityChange,
   onBookingCreated,
   stickyHeader,
+  pricePreviewAccess,
 }: BookingFormProps) => {
   const { isAuthenticated, role } = useAuthStore();
   const queryClient = useQueryClient();
@@ -204,14 +211,18 @@ export const BookingForm = ({
       selectedRentalItems,
     ],
     queryFn: () =>
-      previewBookingPrice(venue.id, {
-        eventDate: values.eventDate,
-        endDate: values.endDate,
-        startTime: values.startTime,
-        endTime: values.endTime,
-        dailySchedule: dailyScheduleEntries,
-        selectedRentalItems,
-      }),
+      previewBookingPrice(
+        venue.id,
+        {
+          eventDate: values.eventDate,
+          endDate: values.endDate,
+          startTime: values.startTime,
+          endTime: values.endTime,
+          dailySchedule: dailyScheduleEntries,
+          selectedRentalItems,
+        },
+        pricePreviewAccess,
+      ),
     enabled: canPreview,
     // Adding an item or nudging a date changes the query key, which would otherwise blank
     // the price card back to its "no preview yet" state for a beat while the new total loads —

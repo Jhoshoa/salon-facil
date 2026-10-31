@@ -82,7 +82,9 @@ export const OwnerCalendar = () => {
 
   const venuesQuery = useQuery({ queryKey: ['owner-venues'], queryFn: getMyVenues });
   const calendarQuery = useQuery({
-    queryKey: ['venue-calendar', venueId, month],
+    // Its own entry so it never reads the public calendar's cached (reduced) version of this month;
+    // the shared prefix keeps invalidating both after a change here.
+    queryKey: ['venue-calendar', venueId, month, 'manage'],
     queryFn: () => getVenueCalendar(venueId, month),
     enabled: Boolean(venueId),
     placeholderData: keepPreviousData,

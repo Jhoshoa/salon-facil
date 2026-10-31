@@ -1,67 +1,33 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import type { VenueCalendar, VenueOpeningHour } from '@/types/api';
+import type { PublicVenueCalendar, VenueOpeningHour } from '@/types/api';
 import { AvailabilityCalendar } from './availability-calendar';
-import { getVenueCalendar } from '@/lib/api/calendar.api';
+import { getPublicVenueCalendar } from '@/lib/api/calendar.api';
 
 jest.mock('@/lib/api/calendar.api', () => ({
-  getVenueCalendar: jest.fn(),
+  getPublicVenueCalendar: jest.fn(),
 }));
 
-const mockGetVenueCalendar = getVenueCalendar as jest.MockedFunction<typeof getVenueCalendar>;
+const mockGetVenueCalendar = getPublicVenueCalendar as jest.MockedFunction<
+  typeof getPublicVenueCalendar
+>;
 
 // Fixed "today" so past/future and the visible month (June 2026) are deterministic.
 const FIXED_TODAY = new Date('2026-06-15T12:00:00');
 
-const calendarData: VenueCalendar = {
+const calendarData: PublicVenueCalendar = {
   venueId: 'venue-1',
   startDate: '2026-06-01',
   endDate: '2026-06-30',
   bookings: [
-    { id: 'b-pending', date: '2026-06-20', type: 'booking', status: 'PENDING', eventType: 'Boda' },
-    {
-      id: 'b-approved',
-      date: '2026-06-21',
-      type: 'booking',
-      status: 'APPROVED',
-      eventType: 'Cumpleanos',
-    },
-    {
-      id: 'b-past',
-      date: '2026-06-05',
-      type: 'booking',
-      status: 'COMPLETED',
-      eventType: 'Quince anos',
-    },
+    { date: '2026-06-20', type: 'booking', status: 'PENDING' },
+    { date: '2026-06-21', type: 'booking', status: 'CONFIRMED' },
+    { date: '2026-06-05', type: 'booking', status: 'CONFIRMED' },
   ],
   blocks: [
-    {
-      id: 'block-1',
-      date: '2026-06-18',
-      type: 'block',
-      status: 'BLOCKED',
-      useTypeId: null,
-      useTypeName: null,
-      reason: 'Mantenimiento',
-    },
-    {
-      id: 'block-2',
-      date: '2026-06-26',
-      type: 'block',
-      status: 'CONFIRMED',
-      useTypeId: 'use-wedding',
-      useTypeName: 'Boda',
-      reason: null,
-    },
-    {
-      id: 'block-3',
-      date: '2026-06-27',
-      type: 'block',
-      status: 'TENTATIVE',
-      useTypeId: null,
-      useTypeName: null,
-      reason: null,
-    },
+    { date: '2026-06-18', type: 'block', status: 'BLOCKED' },
+    { date: '2026-06-26', type: 'block', status: 'CONFIRMED' },
+    { date: '2026-06-27', type: 'block', status: 'TENTATIVE' },
   ],
 };
 
@@ -97,14 +63,14 @@ describe('AvailabilityCalendar - mapeo de estados de reserva a variantes visuale
     expect(pendingCell).toBeInTheDocument();
     // Different wording/state from a firm booking -- regression guard for the PENDING-vs-rest split.
     expect(
-      screen.queryByRole('button', { name: /20 de junio: Aprobada/i }),
+      screen.queryByRole('button', { name: /20 de junio: Reservado/i }),
     ).not.toBeInTheDocument();
   });
 
-  it('una reserva APPROVED se muestra como "Reservado" (no pendiente)', async () => {
+  it('una reserva en firme se muestra como "Reservado" (no pendiente)', async () => {
     renderCalendar();
 
-    const approvedCell = await screen.findByRole('button', { name: /21 de junio: Aprobada/i });
+    const approvedCell = await screen.findByRole('button', { name: /21 de junio: Reservado/i });
     expect(approvedCell).toBeInTheDocument();
 
     const pendingCell = await screen.findByRole('button', { name: /20 de junio: Pendiente/i });
@@ -115,7 +81,7 @@ describe('AvailabilityCalendar - mapeo de estados de reserva a variantes visuale
   it('un dia pasado con una reserva se distingue de un dia pasado libre ("tuvo un evento")', async () => {
     renderCalendar();
 
-    const pastEventCell = await screen.findByRole('button', { name: /5 de junio: Completada/i });
+    const pastEventCell = await screen.findByRole('button', { name: /5 de junio: Reservado/i });
     const plainPastCell = await screen.findByRole('button', { name: /^1 de junio$/i });
     expect(pastEventCell.className).not.toBe(plainPastCell.className);
   });
@@ -130,9 +96,11 @@ describe('AvailabilityCalendar - mapeo de estados de reserva a variantes visuale
   it('un bloqueo CONFIRMED del dueno se ve como "Reservado", con el mismo estilo que una reserva en firme', async () => {
     renderCalendar();
 
-    const confirmedBlockCell = await screen.findByRole('button', { name: /26 de junio: Boda/i });
+    const confirmedBlockCell = await screen.findByRole('button', {
+      name: /26 de junio: Reservado/i,
+    });
     const approvedBookingCell = await screen.findByRole('button', {
-      name: /21 de junio: Aprobada/i,
+      name: /21 de junio: Reservado/i,
     });
     expect(confirmedBlockCell.className).toBe(approvedBookingCell.className);
   });
@@ -165,7 +133,7 @@ describe('AvailabilityCalendar - mapeo de estados de reserva a variantes visuale
     renderCalendar(openingHours);
 
     const ownerBlockedCell = await screen.findByRole('button', {
-      name: /18 de junio: Mantenimiento/i,
+      name: /18 de junio: Bloqueado/i,
     });
     const closedWeekdayCell = await screen.findByRole('button', {
       name: /24 de junio: Local cerrado/i,

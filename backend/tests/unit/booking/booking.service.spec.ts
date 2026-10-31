@@ -124,6 +124,7 @@ describe('BookingService', () => {
   };
   let mockVenueService: {
     getVenueById: jest.Mock;
+    getVenueByPreviewToken: jest.Mock;
     getOwnerContact: jest.Mock;
     listPublicRentalItems: jest.Mock;
   };
@@ -170,6 +171,7 @@ describe('BookingService', () => {
 
     mockVenueService = {
       getVenueById: jest.fn(),
+      getVenueByPreviewToken: jest.fn(),
       getOwnerContact: jest.fn().mockResolvedValue(null),
       listPublicRentalItems: jest.fn().mockResolvedValue([]),
     };
@@ -1303,14 +1305,20 @@ describe('BookingService', () => {
     });
   });
 
-  describe('getCalendar', () => {
-    it('should return bookings and blocks mapped to date-only entries', async () => {
+  describe('calendar', () => {
+    beforeEach(() => {
       mockBookingRepository.findActiveByVenueInRange.mockResolvedValue([
         {
           bookingId: 'booking-1',
           date: new Date('2026-09-15T00:00:00.000Z'),
           status: 'APPROVED',
           eventType: 'Boda',
+        },
+        {
+          bookingId: 'booking-2',
+          date: new Date('2026-09-16T00:00:00.000Z'),
+          status: 'PENDING',
+          eventType: 'Cumpleanos',
         },
       ]);
       mockBookingRepository.getCalendarBlocks.mockResolvedValue([
@@ -1320,25 +1328,45 @@ describe('BookingService', () => {
           status: CalendarBlockStatus.CONFIRMED,
           useTypeId: 'use-wedding',
           useType: { id: 'use-wedding', name: 'Boda' },
-          reason: null,
+          reason: 'Boda de un familiar',
         },
       ]);
+    });
 
-      const result = await service.getCalendar(
+    it('should only tell the public which days are taken and how firmly', async () => {
+      const result = await service.getPublicCalendar(
         'venue-1',
         new Date('2026-09-01'),
         new Date('2026-09-30'),
       );
 
       expect(result.bookings).toEqual([
-        {
-          id: 'booking-1',
-          date: '2026-09-15',
-          type: 'booking',
-          status: 'APPROVED',
-          eventType: 'Boda',
-        },
+        { date: '2026-09-15', type: 'booking', status: 'CONFIRMED' },
+        { date: '2026-09-16', type: 'booking', status: 'PENDING' },
       ]);
+      expect(result.blocks).toEqual([
+        { date: '2026-09-20', type: 'block', status: CalendarBlockStatus.CONFIRMED },
+      ]);
+    });
+
+    it('should give the owner the details of each entry', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+
+      const result = await service.getCalendarForManager(
+        'venue-1',
+        new Date('2026-09-01'),
+        new Date('2026-09-30'),
+        'owner-1',
+        UserRole.OWNER,
+      );
+
+      expect(result.bookings[0]).toEqual({
+        id: 'booking-1',
+        date: '2026-09-15',
+        type: 'booking',
+        status: 'APPROVED',
+        eventType: 'Boda',
+      });
       expect(result.blocks).toEqual([
         {
           id: 'block-1',
@@ -1347,27 +1375,88 @@ describe('BookingService', () => {
           status: CalendarBlockStatus.CONFIRMED,
           useTypeId: 'use-wedding',
           useTypeName: 'Boda',
-          reason: null,
+          reason: 'Boda de un familiar',
         },
       ]);
     });
 
+    it('should not give another owner the details', async () => {
+      mockVenueService.getVenueById.mockResolvedValue(makeVenue());
+
+      await expect(
+        service.getCalendarForManager(
+          'venue-1',
+          new Date('2026-09-01'),
+          new Date('2026-09-30'),
+          'other-owner',
+          UserRole.OWNER,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockBookingRepository.findActiveByVenueInRange).not.toHaveBeenCalled();
+    });
+
     it('should throw BadRequestException when the range exceeds the max allowed days', async () => {
       await expect(
-        service.getCalendar('venue-1', new Date('2026-01-01'), new Date('2027-01-01')),
+        service.getPublicCalendar('venue-1', new Date('2026-01-01'), new Date('2027-01-01')),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when endDate is before startDate', async () => {
       await expect(
-        service.getCalendar('venue-1', new Date('2026-09-30'), new Date('2026-09-01')),
+        service.getPublicCalendar('venue-1', new Date('2026-09-30'), new Date('2026-09-01')),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when a date is invalid', async () => {
       await expect(
-        service.getCalendar('venue-1', new Date('not-a-date'), new Date('2026-09-30')),
+        service.getPublicCalendar('venue-1', new Date('not-a-date'), new Date('2026-09-30')),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('price preview of a venue that is not public', () => {
+    const dto = {
+      eventDate: toISODate(addDaysUTC(startOfTodayUTC(), 40)),
+      startTime: '14:00',
+      endTime: '20:00',
+    };
+
+    beforeEach(() => {
+      mockVenueService.getVenueById.mockResolvedValue(
+        makeVenue({ status: VenueStatus.DRAFT, isVerified: false }),
+      );
+    });
+
+    it('should answer 404 to someone who only has the ID', async () => {
+      await expect(service.previewPrice('venue-1', dto)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should accept the share-preview link of that venue', async () => {
+      mockVenueService.getVenueByPreviewToken.mockResolvedValue(makeVenue());
+
+      await expect(
+        service.previewPrice('venue-1', { ...dto, previewToken: 'link-token' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('should reject the share-preview link of another venue', async () => {
+      mockVenueService.getVenueByPreviewToken.mockResolvedValue(makeVenue({ id: 'venue-2' }));
+
+      await expect(
+        service.previewPrice('venue-1', { ...dto, previewToken: 'link-token' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should let its owner preview it', async () => {
+      await expect(
+        service.previewPriceForManager('venue-1', dto, 'owner-1', UserRole.OWNER),
+      ).resolves.toBeDefined();
+    });
+
+    it('should not let another owner preview it', async () => {
+      await expect(
+        service.previewPriceForManager('venue-1', dto, 'other-owner', UserRole.OWNER),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

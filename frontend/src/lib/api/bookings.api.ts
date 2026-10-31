@@ -32,6 +32,10 @@ export const checkAvailabilityRange = async (
   );
 };
 
+/** How a venue that isn't public yet gets a quote: the owner/admin through their session, a visitor
+ * through the share-preview link they opened. Without it, only a public venue answers. */
+export type PricePreviewAccess = { mode: 'manage' } | { mode: 'share'; token: string };
+
 export const previewBookingPrice = async (
   venueId: string,
   params: {
@@ -42,6 +46,7 @@ export const previewBookingPrice = async (
     dailySchedule?: DailyScheduleEntry[];
     selectedRentalItems?: RentalItemSelectionEntry[];
   },
+  access?: PricePreviewAccess,
 ): Promise<RangePriceCalculation> => {
   const search = new URLSearchParams({
     eventDate: params.eventDate,
@@ -54,7 +59,13 @@ export const previewBookingPrice = async (
     ...(params.selectedRentalItems?.length
       ? { selectedRentalItems: JSON.stringify(params.selectedRentalItems) }
       : {}),
+    ...(access?.mode === 'share' ? { previewToken: access.token } : {}),
   });
+  if (access?.mode === 'manage') {
+    return apiRequest<RangePriceCalculation>(
+      `/venues/${venueId}/bookings/preview-price/manage?${search.toString()}`,
+    );
+  }
   return apiRequest<RangePriceCalculation>(
     `/venues/${venueId}/bookings/preview-price?${search.toString()}`,
     { auth: false },

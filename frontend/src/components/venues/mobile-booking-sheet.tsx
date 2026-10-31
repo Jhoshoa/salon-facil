@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { BookingForm } from '@/components/booking/booking-form';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import type { RentalItemLine } from '@/hooks/use-rental-item-selection';
+import type { PricePreviewAccess } from '@/lib/api/bookings.api';
 import type { Venue } from '@/types/api';
 
 interface MobileBookingSheetProps {
@@ -18,6 +19,7 @@ interface MobileBookingSheetProps {
   onBookingCreated: () => void;
   staleRangeNotice: string | null;
   onDismissStaleNotice: () => void;
+  pricePreviewAccess?: PricePreviewAccess;
 }
 
 export const MobileBookingSheet = ({
@@ -32,6 +34,7 @@ export const MobileBookingSheet = ({
   onBookingCreated,
   staleRangeNotice,
   onDismissStaleNotice,
+  pricePreviewAccess,
 }: MobileBookingSheetProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -60,6 +63,7 @@ export const MobileBookingSheet = ({
             onRentalItemQuantityChange={onRentalItemQuantityChange}
             onBookingCreated={onBookingCreated}
             stickyHeader
+            pricePreviewAccess={pricePreviewAccess}
           />
         ) : null}
       </SheetContent>

@@ -13,9 +13,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
-import { getVenueCalendar } from '@/lib/api/calendar.api';
+import { getPublicVenueCalendar } from '@/lib/api/calendar.api';
 import { formatDate, getCurrentMonth } from '@/lib/formatters';
-import type { BookingStatus, CalendarBlockStatus, VenueOpeningHour } from '@/types/api';
+import type { CalendarBlockStatus, PublicVenueCalendar, VenueOpeningHour } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/shared/error-state';
 import {
@@ -40,15 +40,9 @@ type RangeSelection =
 
 const MAX_MONTHS_AHEAD = 18;
 
-const statusLabel: Record<BookingStatus, string> = {
+const statusLabel: Record<PublicVenueCalendar['bookings'][number]['status'], string> = {
   PENDING: 'Pendiente',
-  APPROVED: 'Aprobada',
-  DEPOSIT_PAID: 'Anticipo',
-  FULLY_PAID: 'Pagada',
-  CANCELLED_BY_CLIENT: 'Cancelada',
-  CANCELLED_BY_OWNER: 'Cancelada',
-  COMPLETED: 'Completada',
-  NO_SHOW: 'No show',
+  CONFIRMED: 'Reservado',
 };
 
 // Same status -> variant mapping the owner's own calendar uses, so a date the owner marked
@@ -103,7 +97,7 @@ export const AvailabilityCalendar = ({
 
   const query = useQuery({
     queryKey: ['venue-calendar', venueId, month],
-    queryFn: () => getVenueCalendar(venueId, month),
+    queryFn: () => getPublicVenueCalendar(venueId, month),
     placeholderData: keepPreviousData,
   });
 
@@ -126,7 +120,7 @@ export const AvailabilityCalendar = ({
 
     if (dateKey < today) {
       if (booking) return { variant: 'pastEvent', label: statusLabel[booking.status] };
-      return { variant: 'past', label: block?.useTypeName ?? block?.reason ?? undefined };
+      return { variant: 'past' };
     }
     if (booking) {
       // PENDING hasn't been accepted by the owner yet -- it could still fall through, so it
@@ -137,7 +131,7 @@ export const AvailabilityCalendar = ({
     if (block) {
       return {
         variant: blockStatusToVariant[block.status],
-        label: block.useTypeName ?? block.reason ?? blockStatusLabel[block.status],
+        label: blockStatusLabel[block.status],
       };
     }
     // Same variant as an owner block -- from the renter's side both just mean "can't book this
