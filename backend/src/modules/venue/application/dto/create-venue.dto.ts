@@ -15,7 +15,12 @@ import {
   MaxLength,
   Min,
   MinLength,
+  Validate,
+  ValidateIf,
   ValidateNested,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Departamento, PaymentPolicy, PriceUnit } from '@prisma/client';
@@ -112,6 +117,27 @@ export class CreateVenueServiceDto {
   sortOrder?: number;
 }
 
+/** A range ending before it starts matches no date at all, so the price would silently never
+ * apply. Unparseable dates are left to `@IsDateString`, which reports them on its own. */
+@ValidatorConstraint({ name: 'endDateNotBeforeStartDate' })
+class EndDateNotBeforeStartDate implements ValidatorConstraintInterface {
+  validate(endDate: unknown, args: ValidationArguments): boolean {
+    const { startDate } = args.object as CreateVenuePriceDto;
+    const start = Date.parse(String(startDate));
+    const end = Date.parse(String(endDate));
+    return Number.isNaN(start) || Number.isNaN(end) || end >= start;
+  }
+
+  defaultMessage(): string {
+    return 'La fecha de fin debe ser igual o posterior a la de inicio';
+  }
+}
+
+const isSeasonOrHasDate =
+  (field: 'startDate' | 'endDate') =>
+  (dto: CreateVenuePriceDto): boolean =>
+    dto.priceType === 'SEASON_HIGH' || dto[field] != null;
+
 export class CreateVenuePriceDto {
   @IsIn(['BASE', 'WEEKEND', 'HOLIDAY', 'CUSTOM_DATE', 'SEASON_HIGH', 'EARLY_BIRD'])
   priceType!: string;
@@ -126,12 +152,13 @@ export class CreateVenuePriceDto {
   @IsDateString()
   specificDate?: string;
 
-  @IsOptional()
-  @IsDateString()
+  @ValidateIf(isSeasonOrHasDate('startDate'))
+  @IsDateString({}, { message: 'La fecha de inicio de la temporada no es valida' })
   startDate?: string;
 
-  @IsOptional()
-  @IsDateString()
+  @ValidateIf(isSeasonOrHasDate('endDate'))
+  @IsDateString({}, { message: 'La fecha de fin de la temporada no es valida' })
+  @Validate(EndDateNotBeforeStartDate)
   endDate?: string;
 
   @IsNumber()
