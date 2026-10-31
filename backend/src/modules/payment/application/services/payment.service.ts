@@ -74,6 +74,11 @@ export class PaymentService {
       throw new BadRequestException('Esta reserva no admite pagos en su estado actual');
     }
 
+    const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
+    if (venue.isDeleted()) {
+      throw new BadRequestException('Este local ya no esta disponible, no se pueden crear pagos');
+    }
+
     // Cada tipo de pago solo tiene sentido en un estado exacto de la reserva -- nunca se infiere
     // del lado del cliente. Sin este chequeo, un REMAINING creado desde APPROVED (sin pasar por
     // DEPOSIT_PAID primero) cobraria solo el saldo pero, al confirmarse, igual saltaria a
@@ -210,7 +215,7 @@ export class PaymentService {
     }
 
     const isClient = booking.clientId === userId;
-    const venue = await this.venueService.getVenueById(booking.venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
     const isVenueOwner = venue.canBeEditedBy(userId, userRole);
 
     if (!isClient && !isVenueOwner) {
@@ -420,7 +425,7 @@ export class PaymentService {
       throw new BadRequestException('El pago no tiene reserva asociada');
     }
 
-    const venue = await this.venueService.getVenueById(payment.booking.venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(payment.booking.venueId);
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para gestionar este pago');
     }

@@ -225,7 +225,7 @@ export const OwnerVenueList = () => {
       <ConfirmDialog
         open={Boolean(venueToDelete)}
         title="Eliminar local"
-        description={`"${venueToDelete?.name}" se va a eliminar. Esta accion no se puede deshacer.`}
+        description={`"${venueToDelete?.name}" se va a eliminar. Esta accion no se puede deshacer. Si tiene reservas activas o pagos por revisar, hay que resolverlos antes.`}
         confirmLabel="Eliminar"
         isLoading={deleteMutation.isPending}
         onOpenChange={(open) => {

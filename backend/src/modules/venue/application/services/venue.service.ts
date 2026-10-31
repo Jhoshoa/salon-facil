@@ -84,6 +84,17 @@ export class VenueService {
     return venue;
   }
 
+  /** For bookings and payments, which outlive their venue: their history stays reachable and an
+   * old booking can still be resolved after the venue is gone. Not for anything that shows the
+   * venue or starts something new in it. */
+  async getVenueIncludingDeleted(id: string): Promise<VenueEntity> {
+    const venue = await this.venueRepository.findByIdIncludingDeleted(id);
+    if (!venue) {
+      throw new NotFoundException(`Local con ID '${id}' no encontrado`);
+    }
+    return venue;
+  }
+
   /** Backs the authenticated by-id preview route — unlike getVenueBySlug, this never gates on
    * isPublic() (a draft/pending/deactivated venue is exactly what its owner or an admin needs
    * to preview), it gates on ownership instead. */
@@ -269,6 +280,26 @@ export class VenueService {
 
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para eliminar este local');
+    }
+
+    // Once deleted, nobody could manage what's still open on it. Deactivating stays available
+    // because it keeps the venue reachable for its owner while hiding it from new clients.
+    const { activeBookings, paymentsToReview } =
+      await this.venueRepository.countUnresolvedActivity(id);
+    if (activeBookings > 0 || paymentsToReview > 0) {
+      const pending = [
+        activeBookings > 0
+          ? `${activeBookings} ${activeBookings === 1 ? 'reserva activa' : 'reservas activas'}`
+          : null,
+        paymentsToReview > 0
+          ? `${paymentsToReview} ${paymentsToReview === 1 ? 'pago por revisar' : 'pagos por revisar'}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' y ');
+      throw new ConflictException(
+        `Este local tiene ${pending}. Resuelve eso antes de eliminarlo, o desactivalo para que deje de aparecer en las busquedas.`,
+      );
     }
 
     await this.venueRepository.softDelete(id);

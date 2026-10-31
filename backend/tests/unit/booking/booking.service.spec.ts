@@ -125,6 +125,7 @@ describe('BookingService', () => {
   let mockVenueService: {
     getVenueById: jest.Mock;
     getVenueByPreviewToken: jest.Mock;
+    getVenueIncludingDeleted: jest.Mock;
     getOwnerContact: jest.Mock;
     listActiveRentalItems: jest.Mock;
   };
@@ -172,6 +173,7 @@ describe('BookingService', () => {
     mockVenueService = {
       getVenueById: jest.fn(),
       getVenueByPreviewToken: jest.fn(),
+      getVenueIncludingDeleted: jest.fn((id: string) => mockVenueService.getVenueById(id)),
       getOwnerContact: jest.fn().mockResolvedValue(null),
       listActiveRentalItems: jest.fn().mockResolvedValue([]),
     };

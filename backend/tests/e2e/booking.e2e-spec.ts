@@ -4,7 +4,14 @@ import * as request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import cookieParser = require('cookie-parser');
 import { AppModule } from '../../src/app.module';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { BookingEntity } from '../../src/modules/booking/domain/entities/booking.entity';
 import {
+  BOOKING_REPOSITORY,
+  IBookingRepository,
+} from '../../src/modules/booking/domain/repositories/booking.repository.interface';
+import {
+  createApprovedBooking,
   createVerifiedVenue,
   loginAdmin,
   registerFixtureUsers,
@@ -309,6 +316,108 @@ describe('Bookings (e2e)', () => {
       it('someone with only the ID still gets a 404', () => {
         return publicPreview(draftVenueId, { selectedRentalItems }).expect(404);
       });
+    });
+  });
+
+  describe('Deleting a venue with bookings', () => {
+    let adminAgent: Awaited<ReturnType<typeof loginAdmin>>;
+    let deletableVenueId: string;
+    let historyBookingId: string;
+
+    const book = (id: string, days: number) =>
+      users.clientAgent
+        .post(`/api/v1/venues/${id}/bookings`)
+        .send({
+          eventType: 'Cumpleanos',
+          eventDate: futureDate(days),
+          startTime: '14:00',
+          endTime: '20:00',
+          guestCount: 10,
+        })
+        .expect(201);
+
+    beforeAll(async () => {
+      adminAgent = await loginAdmin(app);
+      deletableVenueId = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
+        capacityMax: 100,
+        basePrice: 1000,
+      });
+    });
+
+    it('refuses while a booking is active, for the owner and the admin', async () => {
+      const created = await book(deletableVenueId, 90);
+      historyBookingId = created.body.booking.id;
+
+      const res = await users.ownerAgent.delete(`/api/v1/venues/${deletableVenueId}`).expect(409);
+      expect(res.body.message).toContain('1 reserva activa');
+      await adminAgent.delete(`/api/v1/venues/${deletableVenueId}`).expect(409);
+      await request(app.getHttpServer())
+        .get(`/api/v1/venues/${deletableVenueId}/calendar`)
+        .query({ month: futureDate(90).slice(0, 7) })
+        .expect(200);
+    });
+
+    it('allows it once the booking is resolved, keeping the history reachable', async () => {
+      await users.clientAgent.put(`/api/v1/bookings/${historyBookingId}/cancel`).expect(200);
+      await users.ownerAgent.delete(`/api/v1/venues/${deletableVenueId}`).expect(204);
+
+      const path = `/api/v1/bookings/${historyBookingId}`;
+      await users.clientAgent.get(path).expect(200);
+      await users.ownerAgent.get(path).expect(200);
+      await adminAgent.get(path).expect(200);
+      await users.clientAgent.get(`/api/v1/payments/booking/${historyBookingId}`).expect(200);
+      await users.ownerAgent.get(`/api/v1/venues/${deletableVenueId}/bookings`).expect(200);
+    });
+
+    it('a deleted venue takes no new bookings and stays hidden', async () => {
+      await users.clientAgent
+        .post(`/api/v1/venues/${deletableVenueId}/bookings`)
+        .send({
+          eventType: 'Cumpleanos',
+          eventDate: futureDate(91),
+          startTime: '14:00',
+          endTime: '20:00',
+          guestCount: 10,
+        })
+        .expect(404);
+    });
+
+    it('a booking left open by an older deletion can be resolved but not paid', async () => {
+      const legacyVenueId = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId, {
+        capacityMax: 100,
+        basePrice: 1000,
+      });
+      const pending = await book(legacyVenueId, 92);
+      const approved = await createApprovedBooking(
+        legacyVenueId,
+        users.clientAgent,
+        users.ownerAgent,
+        93,
+      );
+      const remindersFor = async () => {
+        const due: BookingEntity[] = await app
+          .get<IBookingRepository>(BOOKING_REPOSITORY)
+          .findBookingsDueForReminder(new Date(futureDate(93)), 'reminder7SentAt');
+        return due.map((booking) => booking.id);
+      };
+      expect(await remindersFor()).toContain(approved.bookingId);
+
+      await app
+        .get(PrismaService)
+        .venue.update({ where: { id: legacyVenueId }, data: { deletedAt: new Date() } });
+
+      expect(await remindersFor()).not.toContain(approved.bookingId);
+
+      await users.clientAgent
+        .post(`/api/v1/payments/bookings/${approved.bookingId}`)
+        .send({ paymentType: 'DEPOSIT', method: 'BANK_TRANSFER', amount: approved.depositAmount })
+        .expect(400);
+      await users.ownerAgent.put(`/api/v1/bookings/${pending.body.booking.id}/approve`).expect(404);
+      await users.ownerAgent
+        .put(`/api/v1/bookings/${pending.body.booking.id}/reject`)
+        .send({ reason: 'El local ya no esta disponible' })
+        .expect(200);
+      await users.clientAgent.get(`/api/v1/bookings/${approved.bookingId}`).expect(200);
     });
   });
 

@@ -393,6 +393,7 @@ export class BookingRepository implements IBookingRepository {
         eventDate,
         status: { in: CONFIRMED_BOOKING_STATUSES },
         [reminderField]: null,
+        venue: { deletedAt: null },
       },
       include: BOOKING_INCLUDE,
     });

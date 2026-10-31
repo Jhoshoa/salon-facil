@@ -103,7 +103,11 @@ describe('PaymentService', () => {
   let service: PaymentService;
   let paymentRepository: jest.Mocked<IPaymentRepository>;
   let bookingRepository: jest.Mocked<IBookingRepository>;
-  let venueService: { getVenueById: jest.Mock; getOwnerContact: jest.Mock };
+  let venueService: {
+    getVenueById: jest.Mock;
+    getVenueIncludingDeleted: jest.Mock;
+    getOwnerContact: jest.Mock;
+  };
   let cloudinaryService: { uploadImage: jest.Mock };
   let notificationService: { enqueue: jest.Mock };
   let paymentGateway: { refund: jest.Mock };
@@ -156,6 +160,9 @@ describe('PaymentService', () => {
 
     venueService = {
       getVenueById: jest.fn(),
+      getVenueIncludingDeleted: jest.fn(
+        async (id: string) => (await venueService.getVenueById(id)) ?? makeVenue(),
+      ),
       getOwnerContact: jest.fn().mockResolvedValue(null),
     };
 
@@ -187,6 +194,20 @@ describe('PaymentService', () => {
   });
 
   describe('createPayment', () => {
+    it('rejects a new payment when the venue was deleted', async () => {
+      bookingRepository.findById.mockResolvedValue(makeBooking());
+      venueService.getVenueById.mockResolvedValue(makeVenue({ deletedAt: new Date() }));
+
+      await expect(
+        service.createPayment('booking-1', 'client-1', {
+          paymentType: PaymentType.DEPOSIT,
+          method: PaymentMethod.BANK_TRANSFER,
+          amount: 1500,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(paymentRepository.create).not.toHaveBeenCalled();
+    });
+
     it('creates a deposit payment for the booking client', async () => {
       bookingRepository.findById.mockResolvedValue(makeBooking());
       paymentRepository.create.mockResolvedValue(makePayment());
