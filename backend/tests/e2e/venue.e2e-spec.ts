@@ -1021,6 +1021,183 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  describe('Season price dates', () => {
+    const season = (dates: object) =>
+      JSON.stringify([
+        { priceType: 'BASE', price: 300 },
+        { priceType: 'SEASON_HIGH', price: 500, discountLabel: 'Fin de ano', ...dates },
+      ]);
+
+    const create = (prices: string, name: string) =>
+      ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `${name} ${uniqueId}`)
+        .field('description', 'Local para probar las fechas de una temporada.')
+        .field('address', 'Av. de Prueba 123')
+        .field('district', 'Distrito')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .field('prices', prices);
+
+    it('creates a venue with a season, including one that crosses the year or lasts one day', async () => {
+      const res = await create(
+        JSON.stringify([
+          { priceType: 'BASE', price: 300 },
+          { priceType: 'SEASON_HIGH', price: 500, startDate: '2027-12-15', endDate: '2028-01-05' },
+          { priceType: 'SEASON_HIGH', price: 600, startDate: '2027-03-01', endDate: '2027-03-01' },
+        ]),
+        'Temporadas validas',
+      ).expect(201);
+
+      const seasons = res.body.prices.filter(
+        (price: { priceType: string }) => price.priceType === 'SEASON_HIGH',
+      );
+      expect(seasons).toHaveLength(2);
+    });
+
+    it.each([
+      ['ends before it starts', { startDate: '2028-01-05', endDate: '2027-12-15' }],
+      ['has no end date', { startDate: '2027-12-15' }],
+      ['has no start date', { endDate: '2027-12-15' }],
+      ['has no dates', {}],
+      ['has a date that is not valid', { startDate: 'abc', endDate: '2027-12-15' }],
+    ])('rejects creating a venue with a season that %s', async (_label, dates) => {
+      const name = `Temporada invalida ${JSON.stringify(dates).length}`;
+
+      await create(season(dates), name).expect(400);
+
+      const mine = await ownerAgent.get('/api/v1/venues/my/venues').expect(200);
+      const venues = mine.body.data ?? mine.body;
+      expect(venues.map((venue: { name: string }) => venue.name)).not.toContain(
+        `${name} ${uniqueId}`,
+      );
+    });
+
+    it('also rejects it when updating, keeping the previous prices', async () => {
+      const venueId = await createVerifiedVenue(ownerAgent, adminAgent, uniqueId);
+
+      const rejected = await ownerAgent
+        .put(`/api/v1/venues/${venueId}`)
+        .field('prices', season({ startDate: '2028-01-05', endDate: '2027-12-15' }))
+        .expect(400);
+      expect(JSON.stringify(rejected.body.message)).toContain('igual o posterior');
+
+      const stored = await ownerAgent.get(`/api/v1/venues/by-id/${venueId}`).expect(200);
+      expect(
+        stored.body.prices.map((price: { priceType: string }) => price.priceType),
+      ).not.toContain('SEASON_HIGH');
+    });
+  });
+
+  describe('PUT /api/v1/venues/:id/features', () => {
+    let featuresVenueId: string;
+    let amenityA: string;
+    let amenityB: string;
+
+    const url = () => `/api/v1/venues/${featuresVenueId}/features`;
+    const feature = { name: 'Pista de madera', category: 'FACILITY' };
+
+    beforeAll(async () => {
+      featuresVenueId = await createVerifiedVenue(ownerAgent, adminAgent, uniqueId);
+      const catalog = await request(app.getHttpServer())
+        .get('/api/v1/venues/catalog/amenities')
+        .expect(200);
+      const all = Object.values(catalog.body).flat() as { id: string }[];
+      amenityA = all[0].id;
+      amenityB = all[1].id;
+    }, 30000);
+
+    it('saves both kinds, always as included, and shows them publicly', async () => {
+      const saved = await ownerAgent
+        .put(url())
+        .send({
+          amenityIds: [amenityA],
+          customFeatures: [{ ...feature, name: '  Pista de madera ' }],
+        })
+        .expect(200);
+
+      expect(saved.body.amenities).toEqual([
+        expect.objectContaining({
+          isIncluded: true,
+          amenity: expect.objectContaining({ id: amenityA }),
+        }),
+      ]);
+      expect(saved.body.customFeatures).toEqual([
+        expect.objectContaining({ name: 'Pista de madera', category: 'FACILITY' }),
+      ]);
+
+      const venue = await request(app.getHttpServer())
+        .get(`/api/v1/venues/${saved.body.slug}`)
+        .expect(200);
+      expect(venue.body.customFeatures[0].name).toBe('Pista de madera');
+    });
+
+    it('replaces the previous selection, and can clear it', async () => {
+      const replaced = await ownerAgent
+        .put(url())
+        .send({ amenityIds: [amenityB], customFeatures: [] })
+        .expect(200);
+      expect(
+        replaced.body.amenities.map((item: { amenity: { id: string } }) => item.amenity.id),
+      ).toEqual([amenityB]);
+      expect(replaced.body.customFeatures).toEqual([]);
+
+      const cleared = await ownerAgent
+        .put(url())
+        .send({ amenityIds: [], customFeatures: [] })
+        .expect(200);
+      expect(cleared.body.amenities).toEqual([]);
+    });
+
+    it('keeps them when the rest of the venue is saved', async () => {
+      await ownerAgent
+        .put(url())
+        .send({ amenityIds: [amenityA], customFeatures: [feature] })
+        .expect(200);
+
+      const res = await ownerAgent
+        .put(`/api/v1/venues/${featuresVenueId}`)
+        .field('rules', 'No fumar')
+        .expect(200);
+
+      expect(res.body.amenities).toHaveLength(1);
+      expect(res.body.customFeatures).toHaveLength(1);
+    });
+
+    it.each([
+      ['repeated ignoring case and accents', [feature, { ...feature, name: 'PISTA-DE MÁDERA' }]],
+      ['too short after trimming', [{ ...feature, name: '  a ' }]],
+      ['too long', [{ ...feature, name: 'x'.repeat(61) }]],
+      ['without a valid category', [{ ...feature, category: 'INVENTADA' }]],
+      ['without a category', [{ name: 'Sin categoria' }]],
+      [
+        'more than the limit',
+        Array.from({ length: 21 }, (_, index) => ({ ...feature, name: `Propia ${index}` })),
+      ],
+    ])('rejects custom features that are %s', (_label, customFeatures) => {
+      return ownerAgent.put(url()).send({ amenityIds: [], customFeatures }).expect(400);
+    });
+
+    it('rejects amenity ids that are not valid, unknown or repeated', async () => {
+      const send = (amenityIds: unknown) =>
+        ownerAgent.put(url()).send({ amenityIds, customFeatures: [] }).expect(400);
+
+      await send(['abc']);
+      await send(['00000000-0000-4000-8000-000000000000']);
+      await send([amenityA, amenityA]);
+      await send('abc');
+    });
+
+    it('only lets the owner or an admin change them', async () => {
+      const body = { amenityIds: [], customFeatures: [feature] };
+
+      await request(app.getHttpServer()).put(url()).send(body).expect(401);
+      await clientAgent.put(url()).send(body).expect(403);
+      await owner2Agent.put(url()).send(body).expect(403);
+      await adminAgent.put(url()).send(body).expect(200);
+    });
+  });
+
   describe('Venue rental item categories (e2e)', () => {
     let categoryVenueId: string;
 

@@ -99,7 +99,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0 p-3 sm:p-5">
         <div>
           <CardTitle>Fotos</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -157,13 +157,15 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
           onChange={(event) => handleFilesSelected(event.target.files, cameraInputRef.current)}
         />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 pt-0 sm:p-5 sm:pt-0">
         {media.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Todavia no agregaste fotos. Sube al menos una para poder publicar el local.
           </p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          // By available width, not screen width: this column changes size with the side panels, so
+          // a breakpoint would give the same photos very different sizes across screens.
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-3">
             {media.map((item, index) => (
               <div key={item.id} className="overflow-hidden rounded-[var(--radius)] border">
                 <div className="relative aspect-[4/3] bg-muted">
@@ -173,7 +175,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
                     fill
                     className="object-cover"
                     loader={cloudinaryImageLoader}
-                    sizes="(min-width: 1024px) 33vw, 50vw"
+                    sizes="(min-width: 640px) 240px, 50vw"
                   />
                   {item.isCover ? (
                     <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
@@ -182,14 +184,17 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
                     </span>
                   ) : null}
                 </div>
-                <div className="flex items-center justify-between gap-1 p-2">
-                  <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center justify-between p-1">
+                  <div className="flex items-center">
                     <Button
                       type="button"
                       size="icon-sm"
                       variant="ghost"
+                      className="h-8 w-8"
                       onClick={() => move(index, -1)}
                       disabled={index === 0 || reorderMutation.isPending}
+                      title="Mover antes"
+                      aria-label="Mover antes"
                     >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
@@ -197,18 +202,22 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
                       type="button"
                       size="icon-sm"
                       variant="ghost"
+                      className="h-8 w-8"
                       onClick={() => move(index, 1)}
                       disabled={index === media.length - 1 || reorderMutation.isPending}
+                      title="Mover despues"
+                      aria-label="Mover despues"
                     >
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center">
                     {!item.isCover ? (
                       <Button
                         type="button"
                         size="icon-sm"
                         variant="ghost"
+                        className="h-8 w-8"
                         onClick={() => setCover(item.id)}
                         disabled={reorderMutation.isPending}
                         title="Usar como portada"
@@ -221,6 +230,7 @@ export const VenueMediaManager = ({ venue }: VenueMediaManagerProps) => {
                       type="button"
                       size="icon-sm"
                       variant="ghost"
+                      className="h-8 w-8"
                       onClick={() => setPhotoToDelete(item.id)}
                       disabled={deleteMutation.isPending}
                       title="Eliminar foto"

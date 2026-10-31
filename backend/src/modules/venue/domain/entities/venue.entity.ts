@@ -81,6 +81,7 @@ export class VenueEntity {
   services?: VenueServiceEntity[];
   prices?: VenuePriceEntity[];
   amenities?: VenueAmenityEntity[];
+  customFeatures?: VenueCustomFeatureEntity[];
   uses?: VenueUseEntity[];
   spaceType?: CatalogItemEntity | null;
   openingHours?: VenueOpeningHourEntity[];
@@ -126,6 +127,12 @@ export class VenueEntity {
   getMainPhoto(): string | null {
     return this.photos.length > 0 ? this.photos[0] : null;
   }
+}
+
+export interface VenueCustomFeatureEntity {
+  id: string;
+  name: string;
+  category: AmenityCategory;
 }
 
 export interface VenueAmenityEntity {

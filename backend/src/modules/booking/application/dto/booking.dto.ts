@@ -65,18 +65,6 @@ function parseSelectedRentalItems(value: unknown): unknown {
   return parsedValue.map((item) => Object.assign(new SelectedRentalItemDto(), item));
 }
 
-/** `selectedAmenityIds` arrives as a real array in a JSON POST body, but as a single
- * comma-separated string in GET query params (preview-price). */
-function parseIdArray(value: unknown): unknown {
-  if (typeof value === 'string') {
-    return value
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean);
-  }
-  return value;
-}
-
 /** Horario para un dia especifico del rango cuya unidad efectiva resulto ser HOUR. */
 export class DailyScheduleEntryDto {
   @IsDateString({}, { message: 'La fecha del horario debe ser valida' })
@@ -146,12 +134,6 @@ export class CreateBookingDto {
   dailySchedule?: DailyScheduleEntryDto[];
 
   @IsOptional()
-  @Transform(({ value }) => parseIdArray(value))
-  @IsArray()
-  @IsUUID('4', { each: true })
-  selectedAmenityIds?: string[];
-
-  @IsOptional()
   @Transform(({ value }) => parseSelectedRentalItems(value))
   @IsArray()
   @ArrayMaxSize(MAX_SELECTED_RENTAL_ITEMS, {
@@ -209,12 +191,6 @@ export class PreviewPriceDto {
   @ValidateNested({ each: true })
   @Type(() => DailyScheduleEntryDto)
   dailySchedule?: DailyScheduleEntryDto[];
-
-  @IsOptional()
-  @Transform(({ value }) => parseIdArray(value))
-  @IsArray()
-  @IsUUID('4', { each: true })
-  selectedAmenityIds?: string[];
 
   @IsOptional()
   @Transform(({ value }) => parseSelectedRentalItems(value))

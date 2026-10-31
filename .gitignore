@@ -33,5 +33,10 @@ backend/prisma/dev.db-journal
 
 # Lead-gen contact data scraped for outreach campaigns -- valuable but not project source,
 # and contains third-party contact info that shouldn't sit in git history.
-research_notes/Locales Bolivia/*.csv
-research_notes/Locales Bolivia/*.html
+research_notes/
+
+# Local competitor research notes, not part of the app.
+reports/
+
+# Personal Claude Code permissions, specific to each machine.
+.claude/settings.local.json

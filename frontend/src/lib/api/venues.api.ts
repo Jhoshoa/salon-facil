@@ -16,6 +16,7 @@ import type {
   VenueCompletion,
   VenueFormPayload,
   VenueMedia,
+  VenueFeaturesInput,
   VenueRentalItem,
   VenueRentalItemCategory,
   VenueRentalItemInput,
@@ -184,6 +185,16 @@ export const reorderVenueMedia = async (
 };
 
 // ========== RENTAL ITEM CATALOG (Fase 1) ==========
+
+export const updateVenueFeatures = async (
+  venueId: string,
+  payload: VenueFeaturesInput,
+): Promise<Venue> => {
+  return apiRequest<Venue>(`/venues/${venueId}/features`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+};
 
 export const getPublicRentalItems = async (venueId: string): Promise<VenueRentalItem[]> => {
   return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items`, { auth: false });

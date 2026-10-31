@@ -14,7 +14,6 @@ import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import { chargeBasisLabels, groupRentalItemsByCategory } from '@/lib/rental-items';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { VenueRentalItem } from '@/types/api';
@@ -44,7 +43,9 @@ export const VenueRentalItemCatalog = ({
     queryFn: () => getPublicRentalItems(venueId),
   });
 
-  const items = useMemo(() => query.data ?? [], [query.data]);
+  // Included items are listed with the rest of what the rental price covers: here only what the
+  // client can add to their quote.
+  const items = useMemo(() => (query.data ?? []).filter((item) => !item.isIncluded), [query.data]);
 
   const categories = useMemo(() => {
     const byId = new Map(items.map((item) => [item.category.id, item.category]));
@@ -102,19 +103,13 @@ export const VenueRentalItemCatalog = ({
           ) : null}
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
             <div className="min-w-0">
-              {item.pricePerUnit === null ? (
-                <Badge variant="secondary">Incluido con el local</Badge>
-              ) : (
-                <p className="font-serif text-sm italic text-accent-foreground">
-                  {formatCurrency(item.pricePerUnit)} / {item.unitLabel}
-                  {showChargeBasis ? ` · ${chargeBasisLabels[item.chargeBasis]}` : ''}
-                </p>
-              )}
+              <p className="font-serif text-sm italic text-accent-foreground">
+                {formatCurrency(item.pricePerUnit ?? 0)} / {item.unitLabel}
+                {showChargeBasis ? ` · ${chargeBasisLabels[item.chargeBasis]}` : ''}
+              </p>
               <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                 {item.stockQty === 0 ? <span>Sin stock</span> : null}
-                {item.stockQty === null && !item.isIncluded ? (
-                  <span>Consultar disponibilidad</span>
-                ) : null}
+                {item.stockQty === null ? <span>Consultar disponibilidad</span> : null}
                 {item.stockQty ? <span>Stock: {item.stockQty}</span> : null}
                 {isAdded ? (
                   <span className="inline-flex items-center gap-0.5 font-medium text-primary">
@@ -151,10 +146,10 @@ export const VenueRentalItemCatalog = ({
 
   return (
     <section className="sf-detail-section">
-      <h2 className="sf-detail-title">Catalogo de alquiler</h2>
+      <h2 className="sf-detail-title">Agrega a tu reserva</h2>
       <p className="mb-4 text-sm text-muted-foreground">
-        Lo que ofrece el local. Agrega a tu cotizacion lo que se cobra aparte: el propietario
-        confirma que lo tenga disponible para tu fecha al revisar tu solicitud.
+        Se suma a tu cotizacion. El propietario confirma que lo tenga disponible para tu fecha al
+        revisar tu solicitud.
       </p>
 
       {categories.length > 1 || items.length > 4 ? (

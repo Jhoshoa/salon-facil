@@ -331,6 +331,7 @@ model Venue {
   verifiedBy           User?                     @relation("VenueVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
   spaceType            SpaceType?                @relation(fields: [spaceTypeId], references: [id], onDelete: SetNull)
   services             VenueService[]
+  customFeatures       VenueCustomFeature[]
   amenities            VenueAmenity[]
   uses                 VenueUse[]
   openingHours         VenueOpeningHour[]
@@ -555,6 +556,22 @@ model VenuePrice {
 // registre primero. Fase 1 (ver docs/brainstorm/catalogo-alquiler-items.md): catalogo
 // informativo, sin carrito ni reserva real de stock -- stockQty es solo un numero mostrado,
 // nunca se descuenta automaticamente.
+// A feature the owner adds for what the shared Amenity list doesn't cover. Shown on the listing, but
+// never used by the search filters: free text can't be matched reliably across venues.
+model VenueCustomFeature {
+  id        String          @id @default(uuid())
+  venueId   String          @map("venue_id")
+  name      String
+  category  AmenityCategory
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, name])
+  @@index([venueId])
+  @@map("venue_custom_features")
+}
+
 enum RentalItemChargeBasis {
   PER_DAY
   PER_EVENT

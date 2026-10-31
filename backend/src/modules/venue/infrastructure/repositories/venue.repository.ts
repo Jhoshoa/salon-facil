@@ -33,6 +33,12 @@ import {
   VenueMediaType,
 } from '@prisma/client';
 
+interface RawVenueCustomFeature {
+  id: string;
+  name: string;
+  category: AmenityCategory;
+}
+
 interface RawVenueAmenity {
   id: string;
   isIncluded: boolean;
@@ -97,6 +103,7 @@ export class VenueRepository implements IVenueRepository {
       include: { amenity: true },
       orderBy: { amenity: { sortOrder: 'asc' as const } },
     },
+    customFeatures: { orderBy: { createdAt: 'asc' as const } },
     uses: {
       include: { useType: true },
       orderBy: [{ isPrimary: 'desc' as const }, { useType: { name: 'asc' as const } }],
@@ -715,8 +722,7 @@ export class VenueRepository implements IVenueRepository {
       createData.amenities = {
         create: rawAmenities.map((a) => ({
           amenity: { connect: { id: a.amenityId as string } },
-          isIncluded: (a.isIncluded as boolean) ?? true,
-          extraCost: a.extraCost != null ? new Prisma.Decimal(a.extraCost as number) : undefined,
+          isIncluded: true,
           notes: a.notes as string | undefined,
         })),
       };
@@ -808,8 +814,7 @@ export class VenueRepository implements IVenueRepository {
         deleteMany: {},
         create: rawAmenities.map((a: Record<string, unknown>) => ({
           amenity: { connect: { id: a.amenityId as string } },
-          isIncluded: (a.isIncluded as boolean) ?? true,
-          extraCost: a.extraCost != null ? new Prisma.Decimal(a.extraCost as number) : undefined,
+          isIncluded: true,
           notes: a.notes as string | undefined,
         })),
       };
@@ -1232,6 +1237,40 @@ export class VenueRepository implements IVenueRepository {
     return this.listRentalItemCategories(venueId);
   }
 
+  async updateVenueFeatures(
+    venueId: string,
+    data: {
+      amenityIds: string[];
+      customFeatures: { name: string; category: AmenityCategory }[];
+    },
+  ): Promise<VenueEntity | 'invalid_amenity'> {
+    // One the admin deactivated after the venue picked it stays valid: the owner hasn't changed
+    // anything about it, and the list they saved from can't even show it.
+    const allowed = await this.prisma.amenity.count({
+      where: {
+        id: { in: data.amenityIds },
+        OR: [{ isActive: true }, { venues: { some: { venueId } } }],
+      },
+    });
+    if (allowed !== data.amenityIds.length) return 'invalid_amenity';
+
+    await this.prisma.$transaction([
+      this.prisma.venueAmenity.deleteMany({
+        where: { venueId, isIncluded: true, amenityId: { notIn: data.amenityIds } },
+      }),
+      this.prisma.venueAmenity.createMany({
+        data: data.amenityIds.map((amenityId) => ({ venueId, amenityId, isIncluded: true })),
+        skipDuplicates: true,
+      }),
+      this.prisma.venueCustomFeature.deleteMany({ where: { venueId } }),
+      this.prisma.venueCustomFeature.createMany({
+        data: data.customFeatures.map((feature) => ({ venueId, ...feature })),
+      }),
+    ]);
+
+    return (await this.findById(venueId)) as VenueEntity;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private toRentalItemEntity(raw: any): VenueRentalItemEntity {
     return {
@@ -1503,6 +1542,11 @@ export class VenueRepository implements IVenueRepository {
         : null,
       minimumHours: raw.minimumHours,
       priceUnit: raw.priceUnit,
+      customFeatures: raw.customFeatures?.map((feature: RawVenueCustomFeature) => ({
+        id: feature.id,
+        name: feature.name,
+        category: feature.category,
+      })),
       instantBooking: raw.instantBooking,
       allowsMultipleDays: raw.allowsMultipleDays,
       paymentPolicy: raw.paymentPolicy,

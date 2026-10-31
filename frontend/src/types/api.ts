@@ -268,6 +268,7 @@ export interface Venue {
   priceUnit: PriceUnit;
   instantBooking: boolean;
   allowsMultipleDays: boolean;
+  customFeatures?: VenueCustomFeature[];
   paymentPolicy: PaymentPolicy;
   /** Ignorado cuando paymentPolicy es FULL_UPFRONT. */
   depositPercentage: number;
@@ -341,11 +342,20 @@ export interface UpdateSeasonalEventPayload {
   isActive?: boolean;
 }
 
-export interface VenueAmenityInput {
-  amenityId: string;
-  isIncluded?: boolean;
-  extraCost?: number;
-  notes?: string;
+export interface VenueCustomFeature {
+  id: string;
+  name: string;
+  category: AmenityCategory;
+}
+
+export interface VenueCustomFeatureInput {
+  name: string;
+  category: AmenityCategory;
+}
+
+export interface VenueFeaturesInput {
+  amenityIds: string[];
+  customFeatures: VenueCustomFeatureInput[];
 }
 
 export interface VenueUseInput {
@@ -386,7 +396,6 @@ export interface VenueFormPayload {
   rules?: string;
   cancellationPolicy?: string;
   prices?: VenuePriceInput[];
-  amenities?: VenueAmenityInput[];
   useTypes?: VenueUseInput[];
   openingHours?: VenueOpeningHourInput[];
 }
@@ -452,6 +461,7 @@ export type BookingStatus =
   | 'COMPLETED'
   | 'NO_SHOW';
 
+/** Extras de reservas anteriores: hoy lo que se cobra aparte son items del catalogo. */
 export interface SelectedExtra {
   amenityId: string;
   name: string;
@@ -541,8 +551,6 @@ export interface CreateBookingPayload {
   specialRequests?: string;
   /** Horario por dia solo para los dias cuya unidad efectiva resulta HOUR. */
   dailySchedule?: DailyScheduleEntry[];
-  /** IDs de comodidades con costo extra elegidas por el cliente. */
-  selectedAmenityIds?: string[];
   /** Items del catalogo elegidos por el cliente, con su cantidad. */
   selectedRentalItems?: RentalItemSelectionEntry[];
 }
@@ -560,8 +568,6 @@ export interface RangePriceCalculation {
   totalPrice: number;
   depositAmount: number;
   days: DailyPriceBreakdown[];
-  extras?: SelectedExtra[];
-  extrasTotal?: number;
   rentalItems?: SelectedRentalItem[];
   rentalItemsTotal?: number;
 }

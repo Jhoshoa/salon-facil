@@ -71,6 +71,21 @@ describe('useRentalItemSelection', () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 
+  it('entrega aparte los items incluidos, que nunca entran en la cotizacion', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ id: 'cobrado' }),
+      makeItem({ id: 'incluido', pricePerUnit: null, isIncluded: true }),
+    ]);
+    const { result } = await setup();
+
+    act(() => result.current.setQuantity('incluido', 2));
+
+    await waitFor(() =>
+      expect(result.current.includedItems.map((item) => item.id)).toEqual(['incluido']),
+    );
+    expect(result.current.lines).toEqual([]);
+  });
+
   it('multiplica por los dias solo los items que se cobran por dia', async () => {
     mockGetPublicRentalItems.mockResolvedValue([
       makeItem({ id: 'por-dia', pricePerUnit: 10, chargeBasis: 'PER_DAY' }),

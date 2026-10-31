@@ -77,15 +77,26 @@ describe('VenueRentalItemCatalog', () => {
     expect(screen.getByText('Mantel blanco')).toBeInTheDocument();
   });
 
-  it('muestra "Incluido con el local" en vez de un precio, y conserva el stock', async () => {
+  it('deja fuera los items incluidos, que se muestran con el resto de lo incluido', async () => {
     mockGetPublicRentalItems.mockResolvedValue([
-      makeItem({ name: 'Silla tiffany', pricePerUnit: null, isIncluded: true, stockQty: 80 }),
+      makeItem({ id: 'item-1', name: 'Silla tiffany', pricePerUnit: null, isIncluded: true }),
+      makeItem({ id: 'item-2', name: 'Mesa redonda' }),
     ]);
     renderCatalog();
 
-    expect(await screen.findByText('Incluido con el local')).toBeInTheDocument();
-    expect(screen.getByText('Stock: 80')).toBeInTheDocument();
-    expect(screen.queryByText(/\/ unidad/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Agrega a tu reserva' })).toBeInTheDocument();
+    expect(screen.getByText('Mesa redonda')).toBeInTheDocument();
+    expect(screen.queryByText('Silla tiffany')).not.toBeInTheDocument();
+  });
+
+  it('no se muestra si todos los items son incluidos', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([
+      makeItem({ name: 'Silla tiffany', pricePerUnit: null, isIncluded: true }),
+    ]);
+    const { container } = renderCatalog();
+
+    await waitFor(() => expect(mockGetPublicRentalItems).toHaveBeenCalled());
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
   it('muestra la foto del item o, si no tiene, solo el icono', async () => {
@@ -178,11 +189,8 @@ describe('VenueRentalItemCatalog', () => {
     expect(screen.queryByRole('button', { name: /^Agregar/ })).not.toBeInTheDocument();
   });
 
-  it('no ofrece agregar un item incluido ni uno sin stock', async () => {
-    mockGetPublicRentalItems.mockResolvedValue([
-      makeItem({ id: 'item-1', name: 'Silla', pricePerUnit: null, isIncluded: true }),
-      makeItem({ id: 'item-2', name: 'Toldo', stockQty: 0 }),
-    ]);
+  it('no ofrece agregar un item sin stock', async () => {
+    mockGetPublicRentalItems.mockResolvedValue([makeItem({ name: 'Toldo', stockQty: 0 })]);
     renderCatalog();
 
     expect(await screen.findByText('Sin stock')).toBeInTheDocument();
