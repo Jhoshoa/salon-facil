@@ -7,9 +7,9 @@ import { Check, Package, Search } from 'lucide-react';
 import {
   canAddRentalItemToQuote,
   maxRentalItemQuantity,
-  rentalItemsQueryKey,
+  rentalItemsQueryOptions,
 } from '@/hooks/use-rental-item-selection';
-import { getPublicRentalItems } from '@/lib/api/venues.api';
+import type { PricePreviewAccess } from '@/lib/api/bookings.api';
 import { cloudinaryImageLoader } from '@/lib/cloudinary-image-loader';
 import { formatCurrency } from '@/lib/formatters';
 import { chargeBasisLabels, groupRentalItemsByCategory } from '@/lib/rental-items';
@@ -25,6 +25,8 @@ interface VenueRentalItemCatalogProps {
   showChargeBasis?: boolean;
   quantities: Record<string, number>;
   onQuantityChange: (itemId: string, quantity: number) => void;
+  /** Set when this catalog is shown in a preview, where the venue may not be public yet. */
+  access?: PricePreviewAccess;
 }
 
 const ALL_CATEGORIES = '__all__';
@@ -34,14 +36,12 @@ export const VenueRentalItemCatalog = ({
   showChargeBasis = false,
   quantities,
   onQuantityChange,
+  access,
 }: VenueRentalItemCatalogProps) => {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [search, setSearch] = useState('');
 
-  const query = useQuery({
-    queryKey: rentalItemsQueryKey(venueId),
-    queryFn: () => getPublicRentalItems(venueId),
-  });
+  const query = useQuery(rentalItemsQueryOptions(venueId, access));
 
   // Included items are listed with the rest of what the rental price covers: here only what the
   // client can add to their quote.

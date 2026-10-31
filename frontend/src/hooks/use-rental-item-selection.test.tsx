@@ -2,12 +2,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
-import { getPublicRentalItems } from '@/lib/api/venues.api';
+import {
+  getOwnerRentalItems,
+  getPublicRentalItems,
+  getSharedRentalItems,
+} from '@/lib/api/venues.api';
 import type { VenueRentalItem } from '@/types/api';
 import { rentalItemsQueryKey, useRentalItemSelection } from './use-rental-item-selection';
 
 jest.mock('@/lib/api/venues.api', () => ({
   getPublicRentalItems: jest.fn(),
+  getSharedRentalItems: jest.fn(),
+  getOwnerRentalItems: jest.fn(),
 }));
 jest.mock('sonner', () => ({
   toast: { info: jest.fn() },
@@ -15,6 +21,13 @@ jest.mock('sonner', () => ({
 
 const mockGetPublicRentalItems = getPublicRentalItems as jest.MockedFunction<
   typeof getPublicRentalItems
+>;
+
+const mockGetSharedRentalItems = getSharedRentalItems as jest.MockedFunction<
+  typeof getSharedRentalItems
+>;
+const mockGetOwnerRentalItems = getOwnerRentalItems as jest.MockedFunction<
+  typeof getOwnerRentalItems
 >;
 
 const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
@@ -49,6 +62,54 @@ const setup = async () => {
 
 afterEach(() => {
   jest.clearAllMocks();
+});
+
+describe('useRentalItemSelection en vistas previas', () => {
+  const renderWithAccess = (access: Parameters<typeof useRentalItemSelection>[2]) => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    return renderHook(() => useRentalItemSelection('venue-1', 1, access), { wrapper });
+  };
+
+  it('pide el catalogo con el token del enlace compartido y cotiza con el', async () => {
+    mockGetSharedRentalItems.mockResolvedValue([makeItem({ id: 'item-1' })]);
+    const { result } = renderWithAccess({ mode: 'share', token: 'link-token' });
+
+    await waitFor(() =>
+      expect(mockGetSharedRentalItems).toHaveBeenCalledWith('venue-1', 'link-token'),
+    );
+    expect(mockGetPublicRentalItems).not.toHaveBeenCalled();
+    act(() => result.current.setQuantity('item-1', 2));
+    await waitFor(() => expect(result.current.total).toBe(25));
+  });
+
+  it('el dueno o admin usa su ruta, y no ve ni cotiza lo inactivo', async () => {
+    mockGetOwnerRentalItems.mockResolvedValue([
+      makeItem({ id: 'item-1' }),
+      makeItem({ id: 'item-2', isActive: false }),
+      makeItem({ id: 'item-3', isActive: false, isIncluded: true, pricePerUnit: null }),
+    ]);
+    const { result } = renderWithAccess({ mode: 'manage' });
+
+    await waitFor(() => expect(mockGetOwnerRentalItems).toHaveBeenCalledWith('venue-1'));
+    expect(mockGetPublicRentalItems).not.toHaveBeenCalled();
+    act(() => {
+      result.current.setQuantity('item-1', 1);
+      result.current.setQuantity('item-2', 1);
+    });
+    await waitFor(() => expect(result.current.lines).toHaveLength(1));
+    expect(result.current.lines[0].item.id).toBe('item-1');
+    expect(result.current.includedItems).toEqual([]);
+  });
+
+  it('en modo manage comparte cache con la pestana del catalogo del dueno', () => {
+    expect(rentalItemsQueryKey('venue-1', { mode: 'manage' })).toEqual([
+      'venue-rental-items',
+      'venue-1',
+    ]);
+  });
 });
 
 describe('useRentalItemSelection', () => {

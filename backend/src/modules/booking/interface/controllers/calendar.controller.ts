@@ -26,7 +26,7 @@ export class CalendarController {
   @Get()
   @Public()
   @ApiOperation({ summary: 'Obtener calendario publico de un local' })
-  @ApiResponse({ status: 200, description: 'Calendario con reservas y bloqueos' })
+  @ApiResponse({ status: 200, description: 'Dias ocupados, sin datos de reservas ni bloqueos' })
   async getCalendar(
     @Param('venueId') venueId: string,
     @Query('month') month: string,
@@ -34,7 +34,24 @@ export class CalendarController {
     @Query('endDate') endDate: string,
   ) {
     const { start, end } = this.resolveCalendarRange(month, startDate, endDate);
-    return this.bookingService.getCalendar(venueId, start, end);
+    return this.bookingService.getPublicCalendar(venueId, start, end);
+  }
+
+  @Get('manage')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener calendario completo de un local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Calendario con reservas y bloqueos' })
+  @ApiResponse({ status: 403, description: 'No es propietario ni admin' })
+  async getCalendarForManager(
+    @Param('venueId') venueId: string,
+    @Query('month') month: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    const { start, end } = this.resolveCalendarRange(month, startDate, endDate);
+    return this.bookingService.getCalendarForManager(venueId, start, end, user.id, user.role);
   }
 
   @Post()
@@ -121,7 +138,7 @@ export class CalendarPublicController {
   @Get(':venueId')
   @Public()
   @ApiOperation({ summary: 'Obtener calendario publico de un local' })
-  @ApiResponse({ status: 200, description: 'Calendario con reservas y bloqueos' })
+  @ApiResponse({ status: 200, description: 'Dias ocupados, sin datos de reservas ni bloqueos' })
   async getCalendar(
     @Param('venueId') venueId: string,
     @Query('month') month: string,
@@ -129,7 +146,7 @@ export class CalendarPublicController {
     @Query('endDate') endDate: string,
   ) {
     const { start, end } = resolveCalendarRange(month, startDate, endDate);
-    return this.bookingService.getCalendar(venueId, start, end);
+    return this.bookingService.getPublicCalendar(venueId, start, end);
   }
 }
 

@@ -512,12 +512,24 @@ export class VenueService {
 
   /** Public, read-only catalog -- only active items, and only for a venue a random visitor
    * could actually reach (same isPublic() gate as getVenueBySlug, so this can't be used to peek
-   * at a draft/unverified venue's items via a guessed id). */
-  async listPublicRentalItems(venueId: string): Promise<VenueRentalItemEntity[]> {
+   * at a draft/unverified venue's items via a guessed id). A venue that isn't public also answers
+   * to a share-preview link of its own, which already shows everything else about it. */
+  async listPublicRentalItems(
+    venueId: string,
+    previewToken?: string,
+  ): Promise<VenueRentalItemEntity[]> {
     const venue = await this.getVenueById(venueId);
     if (!venue.isPublic()) {
-      throw new NotFoundException(`Local con ID '${venueId}' no encontrado`);
+      const sharedVenue = previewToken ? await this.getVenueByPreviewToken(previewToken) : null;
+      if (sharedVenue?.id !== venue.id) {
+        throw new NotFoundException(`Local con ID '${venueId}' no encontrado`);
+      }
     }
+    return this.listActiveRentalItems(venueId);
+  }
+
+  /** No access check: for callers that have already decided this venue can be seen. */
+  async listActiveRentalItems(venueId: string): Promise<VenueRentalItemEntity[]> {
     return this.venueRepository.listRentalItems(venueId, { activeOnly: true });
   }
 

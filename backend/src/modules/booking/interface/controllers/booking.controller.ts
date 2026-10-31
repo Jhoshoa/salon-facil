@@ -67,6 +67,20 @@ export class BookingController {
     return this.bookingService.previewPrice(venueId, query);
   }
 
+  @Get('preview-price/manage')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Calcular el precio en la vista previa de un local (OWNER/ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Desglose de precio por dia y total' })
+  @ApiResponse({ status: 403, description: 'No es propietario ni admin' })
+  async previewPriceForManager(
+    @Param('venueId') venueId: string,
+    @Query() query: PreviewPriceDto,
+    @CurrentUser() user: UserEntity,
+  ) {
+    return this.bookingService.previewPriceForManager(venueId, query, user.id, user.role);
+  }
+
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()

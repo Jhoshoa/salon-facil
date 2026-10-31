@@ -723,6 +723,102 @@ describe('Venues (e2e)', () => {
     });
   });
 
+  describe('Rental catalog of an unpublished venue, in its previews', () => {
+    let draftId: string;
+    let shareToken: string;
+    let activeItemId: string;
+    const catalogPath = () => `/api/v1/venues/${draftId}/rental-items`;
+
+    beforeAll(async () => {
+      const draft = await ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Draft Preview Catalog ${uniqueId}`)
+        .field('description', 'Local sin publicar para probar el catalogo en sus vistas previas.')
+        .field('address', 'Draft Address 12345')
+        .field('district', 'Draft District')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '50')
+        .expect(201);
+      draftId = draft.body.id;
+
+      const category = await ownerAgent
+        .post(`/api/v1/venues/${draftId}/rental-item-categories`)
+        .send({ name: 'Mobiliario' })
+        .expect(201);
+      const createItem = (name: string) =>
+        ownerAgent
+          .post(catalogPath())
+          .field('name', name)
+          .field('categoryId', category.body.id)
+          .field('pricePerUnit', '10')
+          .field('stockQty', '100')
+          .expect(201);
+      activeItemId = (await createItem('Silla activa')).body.id;
+      const inactive = await createItem('Silla inactiva');
+      await ownerAgent
+        .put(`${catalogPath()}/${inactive.body.id}`)
+        .field('isActive', 'false')
+        .expect(200);
+
+      const link = await adminAgent
+        .post(`/api/v1/venues/${draftId}/preview-link`)
+        .expect((res) => expect(res.status).toBeLessThan(300));
+      shareToken = link.body.token;
+    }, 30000);
+
+    it('answers 404 to someone who only has the ID', () => {
+      return request(app.getHttpServer()).get(catalogPath()).expect(404);
+    });
+
+    it('answers 404 to a logged-in user sending no link, even its owner', async () => {
+      await ownerAgent.get(catalogPath()).expect(404);
+      await clientAgent.get(catalogPath()).expect(404);
+    });
+
+    it('shows only active items, without internal fields, through its share-preview link', async () => {
+      const res = await request(app.getHttpServer())
+        .get(catalogPath())
+        .query({ previewToken: shareToken })
+        .expect(200);
+
+      expect(res.body.map((item: { id: string }) => item.id)).toEqual([activeItemId]);
+      expect(res.body[0]).not.toHaveProperty('photoPublicId');
+    });
+
+    it('answers 404 to a made-up link or the link of another venue', async () => {
+      await request(app.getHttpServer())
+        .get(catalogPath())
+        .query({ previewToken: 'token-inventado' })
+        .expect(404);
+
+      const otherVenue = await createVerifiedVenue(ownerAgent, adminAgent, uniqueId);
+      const otherLink = await adminAgent
+        .post(`/api/v1/venues/${otherVenue}/preview-link`)
+        .expect((res) => expect(res.status).toBeLessThan(300));
+      await request(app.getHttpServer())
+        .get(catalogPath())
+        .query({ previewToken: otherLink.body.token })
+        .expect(404);
+    });
+
+    it('opens the manage route for the owner and the admin, and for nobody else', async () => {
+      const path = `${catalogPath()}/manage`;
+      const owner = await ownerAgent.get(path).expect(200);
+      expect(owner.body).toHaveLength(2);
+      await adminAgent.get(path).expect(200);
+      await owner2Agent.get(path).expect(403);
+      await clientAgent.get(path).expect(403);
+      await request(app.getHttpServer()).get(path).expect(401);
+    });
+
+    it('rejects a preview token that is too long instead of looking it up', () => {
+      return request(app.getHttpServer())
+        .get(catalogPath())
+        .query({ previewToken: 'x'.repeat(129) })
+        .expect(400);
+    });
+  });
+
   describe('Rental catalog: access control and input validation', () => {
     let venueA: string;
     let venueB: string;

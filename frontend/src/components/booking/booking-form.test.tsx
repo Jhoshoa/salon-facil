@@ -91,6 +91,7 @@ describe('BookingForm con items del catalogo', () => {
       expect.objectContaining({
         selectedRentalItems: [{ rentalItemId: 'item-1', quantity: 4 }],
       }),
+      undefined,
     );
   });
 

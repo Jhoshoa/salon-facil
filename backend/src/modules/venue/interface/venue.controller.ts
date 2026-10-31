@@ -38,6 +38,7 @@ import {
 import { UpdateVenueFeaturesDto } from '../application/dto/venue-features.dto';
 import {
   CreateRentalItemDto,
+  ListRentalItemsQueryDto,
   ReorderRentalItemsDto,
   UpdateRentalItemDto,
 } from '../application/dto/rental-item.dto';
@@ -450,8 +451,9 @@ export class VenueController {
   @Public()
   @ApiOperation({ summary: 'Catalogo de items de alquiler de un local (publico)' })
   @ApiResponse({ status: 200, description: 'Items activos del catalogo' })
-  async getRentalItems(@Param('id') id: string) {
-    const items = await this.venueService.listPublicRentalItems(id);
+  @ApiResponse({ status: 404, description: 'Local sin publicar y sin un link valido de ese local' })
+  async getRentalItems(@Param('id') id: string, @Query() query: ListRentalItemsQueryDto) {
+    const items = await this.venueService.listPublicRentalItems(id, query.previewToken);
     return items.map(({ photoPublicId: _photoPublicId, ...item }) => item);
   }
 

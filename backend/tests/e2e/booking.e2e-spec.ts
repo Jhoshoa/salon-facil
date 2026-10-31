@@ -161,6 +161,157 @@ describe('Bookings (e2e)', () => {
     });
   });
 
+  describe('Previews and calendar of a venue', () => {
+    let draftVenueId: string;
+    let shareToken: string;
+    let adminAgent: Awaited<ReturnType<typeof loginAdmin>>;
+    const month = futureDate(50).slice(0, 7);
+    const quote = { eventDate: futureDate(50), startTime: '14:00', endTime: '20:00' };
+
+    beforeAll(async () => {
+      adminAgent = await loginAdmin(app);
+      const created = await users.ownerAgent
+        .post('/api/v1/venues')
+        .field('name', `Venue Borrador ${uniqueId}`)
+        .field('description', 'Local sin publicar para probar las vistas previas.')
+        .field('address', 'Av. de Prueba #123')
+        .field('district', 'Distrito Fixture')
+        .field('departamento', 'LA_PAZ')
+        .field('capacityMax', '100')
+        .field('prices', JSON.stringify([{ priceType: 'BASE', price: 1000 }]))
+        .expect(201);
+      draftVenueId = created.body.id;
+
+      const link = await adminAgent
+        .post(`/api/v1/venues/${draftVenueId}/preview-link`)
+        .expect((res) => expect(res.status).toBeLessThan(300));
+      shareToken = link.body.token;
+
+      await users.clientAgent
+        .post(`/api/v1/venues/${venueId}/bookings`)
+        .send({ ...quote, eventType: 'Boda privada', guestCount: 10 })
+        .expect(201);
+      await users.ownerAgent
+        .post(`/api/v1/venues/${venueId}/calendar`)
+        .send({ date: futureDate(52), status: 'BLOCKED' })
+        .expect(201);
+    });
+
+    const publicPreview = (id: string, extra: Record<string, string> = {}) =>
+      request(app.getHttpServer())
+        .get(`/api/v1/venues/${id}/bookings/preview-price`)
+        .query({ ...quote, ...extra });
+
+    it('the public calendar has no IDs, event types or reasons, on either public route', async () => {
+      for (const path of [`/api/v1/venues/${venueId}/calendar`, `/api/v1/calendar/${venueId}`]) {
+        const res = await request(app.getHttpServer()).get(path).query({ month }).expect(200);
+        expect(res.body.bookings.length).toBeGreaterThan(0);
+        expect(res.body.blocks.length).toBeGreaterThan(0);
+        for (const entry of [...res.body.bookings, ...res.body.blocks]) {
+          expect(Object.keys(entry).sort()).toEqual(['date', 'status', 'type']);
+        }
+      }
+    });
+
+    it('the owner still gets what the calendar screen needs', async () => {
+      const res = await users.ownerAgent
+        .get(`/api/v1/venues/${venueId}/calendar/manage`)
+        .query({ month })
+        .expect(200);
+      const booking = res.body.bookings.find(
+        (entry: { eventType: string }) => entry.eventType === 'Boda privada',
+      );
+      expect(booking.id).toEqual(expect.any(String));
+      expect(res.body.blocks[0].id).toEqual(expect.any(String));
+    });
+
+    it('the full calendar is closed to visitors, clients and other owners', async () => {
+      const path = `/api/v1/venues/${venueId}/calendar/manage`;
+      await request(app.getHttpServer()).get(path).query({ month }).expect(401);
+      await users.clientAgent.get(path).query({ month }).expect(403);
+      await adminAgent.get(path).query({ month }).expect(200);
+    });
+
+    it('the calendar of an unpublished venue still opens for a share-preview link', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/venues/${draftVenueId}/calendar`)
+        .query({ month })
+        .expect(200);
+    });
+
+    it('an unpublished venue gives no price to someone with only its ID', () => {
+      return publicPreview(draftVenueId).expect(404);
+    });
+
+    it('its share-preview link keeps showing the estimate', async () => {
+      const res = await publicPreview(draftVenueId, { previewToken: shareToken }).expect(200);
+      expect(res.body.totalPrice).toBe(1000);
+    });
+
+    it('a link from another venue or a made-up one does not work', async () => {
+      await publicPreview(draftVenueId, { previewToken: 'token-inventado' }).expect(404);
+
+      const otherVenue = await createVerifiedVenue(users.ownerAgent, adminAgent, uniqueId);
+      const otherLink = await adminAgent
+        .post(`/api/v1/venues/${otherVenue}/preview-link`)
+        .expect((res) => expect(res.status).toBeLessThan(300));
+      await publicPreview(draftVenueId, { previewToken: otherLink.body.token }).expect(404);
+    });
+
+    it('the owner and the admin keep seeing the estimate in their own preview', async () => {
+      const path = `/api/v1/venues/${draftVenueId}/bookings/preview-price/manage`;
+      const owner = await users.ownerAgent.get(path).query(quote).expect(200);
+      expect(owner.body.totalPrice).toBe(1000);
+      await adminAgent.get(path).query(quote).expect(200);
+      await users.clientAgent.get(path).query(quote).expect(403);
+    });
+
+    it('a published venue keeps answering without any of this', () => {
+      return publicPreview(venueId).expect(200);
+    });
+
+    describe('with catalog items in the quote', () => {
+      let selectedRentalItems: string;
+
+      beforeAll(async () => {
+        const category = await users.ownerAgent
+          .post(`/api/v1/venues/${draftVenueId}/rental-item-categories`)
+          .send({ name: 'Mobiliario' })
+          .expect(201);
+        const item = await users.ownerAgent
+          .post(`/api/v1/venues/${draftVenueId}/rental-items`)
+          .field('name', 'Silla')
+          .field('categoryId', category.body.id)
+          .field('pricePerUnit', '10')
+          .field('stockQty', '20')
+          .expect(201);
+        selectedRentalItems = JSON.stringify([{ rentalItemId: item.body.id, quantity: 2 }]);
+      });
+
+      it('the share-preview link adds them to the estimate', async () => {
+        const res = await publicPreview(draftVenueId, {
+          previewToken: shareToken,
+          selectedRentalItems,
+        }).expect(200);
+        expect(res.body.rentalItemsTotal).toBe(20);
+        expect(res.body.totalPrice).toBe(1020);
+      });
+
+      it('the owner and the admin see them added in their own preview', async () => {
+        const path = `/api/v1/venues/${draftVenueId}/bookings/preview-price/manage`;
+        const query = { ...quote, selectedRentalItems };
+        const owner = await users.ownerAgent.get(path).query(query).expect(200);
+        expect(owner.body.totalPrice).toBe(1020);
+        const admin = await adminAgent.get(path).query(query).expect(200);
+        expect(admin.body.totalPrice).toBe(1020);
+      });
+
+      it('someone with only the ID still gets a 404', () => {
+        return publicPreview(draftVenueId, { selectedRentalItems }).expect(404);
+      });
+    });
+  });
+
   describe('Catalog items in the quote', () => {
     let itemsVenueId: string;
     let chargedItemId: string;
