@@ -618,6 +618,16 @@ export interface VenueCalendar {
   blocks: CalendarDayBlock[];
 }
 
+/** What anyone can see of a venue's calendar: which days are taken and how firmly, without who
+ * booked, what event, or why the owner closed a day -- those are only in VenueCalendar. */
+export interface PublicVenueCalendar {
+  venueId: string;
+  startDate: string;
+  endDate: string;
+  bookings: { date: string; type: 'booking'; status: 'PENDING' | 'CONFIRMED' }[];
+  blocks: { date: string; type: 'block'; status: CalendarBlockStatus }[];
+}
+
 export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'PARTIAL';
 export type PaymentType = 'DEPOSIT' | 'FULL' | 'REMAINING';
 export type PaymentMethod = 'QR_BANK' | 'BANK_TRANSFER' | 'TIGO_MONEY' | 'CARD' | 'CASH';

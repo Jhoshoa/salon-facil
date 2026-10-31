@@ -63,6 +63,15 @@ interface RentalItemSelectionEntry {
   quantity: number;
 }
 
+interface PricePreviewInput {
+  eventDate: string;
+  endDate?: string;
+  startTime: string;
+  endTime: string;
+  dailySchedule?: DailyScheduleEntry[];
+  selectedRentalItems?: RentalItemSelectionEntry[];
+}
+
 /** The date-based price calculation plus the catalog items the client picked —
  * `totalPrice`/`depositAmount` here already include `rentalItemsTotal`, unlike the raw calculator
  * result. */
@@ -283,20 +292,47 @@ export class BookingService {
     return { booking, priceCalculation };
   }
 
-  /** Read-only price preview (no availability check, no write) so the client can see the total before submitting. */
+  /** Read-only price preview (no availability check, no write) so the client can see the total
+   * before submitting. A venue that isn't public only answers to a share-preview link of its own:
+   * same 404 as the public venue lookup otherwise, so its ID alone reveals nothing. */
   async previewPrice(
     venueId: string,
-    dto: {
-      eventDate: string;
-      endDate?: string;
-      startTime: string;
-      endTime: string;
-      dailySchedule?: DailyScheduleEntry[];
-      selectedRentalItems?: RentalItemSelectionEntry[];
-    },
+    dto: PricePreviewInput & { previewToken?: string },
   ): Promise<BookingPriceResult> {
     const venue = await this.venueService.getVenueById(venueId);
 
+    if (!venue.isPublic()) {
+      const sharedVenue = dto.previewToken
+        ? await this.venueService.getVenueByPreviewToken(dto.previewToken)
+        : null;
+      if (sharedVenue?.id !== venue.id) {
+        throw new NotFoundException(`Local con ID '${venueId}' no encontrado`);
+      }
+    }
+
+    return this.calculatePricePreview(venue, dto);
+  }
+
+  /** Same preview for the owner/admin looking at their own venue in any status, from
+   * /dashboard/venues/:id/preview and its admin counterpart. */
+  async previewPriceForManager(
+    venueId: string,
+    dto: PricePreviewInput,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<BookingPriceResult> {
+    const venue = await this.venueService.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para ver este local');
+    }
+
+    return this.calculatePricePreview(venue, dto);
+  }
+
+  private async calculatePricePreview(
+    venue: VenueEntity,
+    dto: PricePreviewInput,
+  ): Promise<BookingPriceResult> {
     if (this.timeToMinutes(dto.startTime) >= this.endTimeToMinutes(dto.endTime)) {
       throw new BadRequestException('La hora de inicio debe ser anterior a la hora de fin');
     }
@@ -327,7 +363,7 @@ export class BookingService {
       venue.depositPercentage,
     );
     const rentalItems = await this.resolveSelectedRentalItems(
-      venueId,
+      venue.id,
       dto.selectedRentalItems,
       dates.length,
     );
@@ -872,7 +908,53 @@ export class BookingService {
     return this.bookingRepository.getCalendarBlocks(venueId, startDate, endDate);
   }
 
-  async getCalendar(
+  /** What a renter can see: which days are taken and how firmly, never who booked or why. Open to
+   * anyone and for a venue in any status, because share-preview links render it without a login. */
+  async getPublicCalendar(
+    venueId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<{
+    venueId: string;
+    startDate: string;
+    endDate: string;
+    bookings: { date: string; type: 'booking'; status: 'PENDING' | 'CONFIRMED' }[];
+    blocks: { date: string; type: 'block'; status: CalendarBlockStatus }[];
+  }> {
+    const calendar = await this.loadCalendar(venueId, startDate, endDate);
+
+    return {
+      ...calendar,
+      bookings: calendar.bookings.map((entry) => ({
+        date: entry.date,
+        type: entry.type,
+        status: entry.status === BookingStatus.PENDING ? 'PENDING' : 'CONFIRMED',
+      })),
+      blocks: calendar.blocks.map((block) => ({
+        date: block.date,
+        type: block.type,
+        status: block.status,
+      })),
+    };
+  }
+
+  /** The owner's working view, with what they need to identify and edit each entry. */
+  async getCalendarForManager(
+    venueId: string,
+    startDate: Date,
+    endDate: Date,
+    userId: string,
+    userRole: UserRole,
+  ) {
+    const venue = await this.venueService.getVenueById(venueId);
+    if (!venue.canBeEditedBy(userId, userRole)) {
+      throw new ForbiddenException('No tienes permiso para ver este calendario');
+    }
+
+    return this.loadCalendar(venueId, startDate, endDate);
+  }
+
+  private async loadCalendar(
     venueId: string,
     startDate: Date,
     endDate: Date,
