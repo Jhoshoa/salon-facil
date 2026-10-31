@@ -151,7 +151,7 @@ ya tienen datos agregados.
 2. **Respalda la base.** Esta accion no se puede deshacer de otra forma:
 
    ```bash
-   docker compose -f docker-compose.prod.yml exec postgres pg_dump -U salonfacil salonfacil > backup-antes-de-borrar-$(date +%F).sql
+   docker exec salonfacil-postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup-antes-de-borrar-$(date +%F).sql
    ```
 
 3. **Revisa la simulacion.** No borra nada y muestra la base de datos a la que apunta, que se
