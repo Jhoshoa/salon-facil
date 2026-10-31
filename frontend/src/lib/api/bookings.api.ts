@@ -32,8 +32,9 @@ export const checkAvailabilityRange = async (
   );
 };
 
-/** How a venue that isn't public yet gets a quote: the owner/admin through their session, a visitor
- * through the share-preview link they opened. Without it, only a public venue answers. */
+/** How a venue that isn't public yet gets a quote and shows its catalog: the owner/admin through
+ * their session, a visitor through the share-preview link they opened. Without it, only a public
+ * venue answers. */
 export type PricePreviewAccess = { mode: 'manage' } | { mode: 'share'; token: string };
 
 export const previewBookingPrice = async (

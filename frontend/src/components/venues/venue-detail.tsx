@@ -174,6 +174,7 @@ export const VenueDetail = ({
   const rentalSelection = useRentalItemSelection(
     query.data?.id,
     countBookingDays(selectedRange?.start, selectedRange?.end),
+    pricePreviewAccess,
   );
 
   const handleRentalItemQuantityChange = (itemId: string, quantity: number) => {
@@ -551,6 +552,7 @@ export const VenueDetail = ({
             showChargeBasis={venue.allowsMultipleDays}
             quantities={rentalSelection.quantities}
             onQuantityChange={handleRentalItemQuantityChange}
+            access={pricePreviewAccess}
           />
 
           {/* Opening Hours */}

@@ -633,6 +633,46 @@ describe('VenueService', () => {
         await expect(service.listPublicRentalItems('venue-1')).rejects.toThrow(NotFoundException);
         expect(mockRepository.listRentalItems).not.toHaveBeenCalled();
       });
+
+      describe('with a share-preview link, for a venue that is not public', () => {
+        beforeEach(() => {
+          mockRepository.findById.mockImplementation(async (id: string) =>
+            id === 'venue-1' ? mockVenue : { ...mockVenue, id },
+          );
+          mockVenue.isPublic.mockReturnValue(false);
+        });
+
+        it('returns only active items for the link of that same venue', async () => {
+          mockRepository.findVenueIdByPreviewToken.mockResolvedValue('venue-1');
+          mockRepository.listRentalItems.mockResolvedValue([rentalItem]);
+
+          const result = await service.listPublicRentalItems('venue-1', 'raw-token');
+
+          expect(result).toEqual([rentalItem]);
+          expect(mockRepository.findVenueIdByPreviewToken).toHaveBeenCalledWith('hashed-token');
+          expect(mockRepository.listRentalItems).toHaveBeenCalledWith('venue-1', {
+            activeOnly: true,
+          });
+        });
+
+        it('throws NotFoundException for the link of another venue', async () => {
+          mockRepository.findVenueIdByPreviewToken.mockResolvedValue('venue-2');
+
+          await expect(service.listPublicRentalItems('venue-1', 'raw-token')).rejects.toThrow(
+            NotFoundException,
+          );
+          expect(mockRepository.listRentalItems).not.toHaveBeenCalled();
+        });
+
+        it('throws NotFoundException for an invalid or expired link', async () => {
+          mockRepository.findVenueIdByPreviewToken.mockResolvedValue(null);
+
+          await expect(service.listPublicRentalItems('venue-1', 'bad-token')).rejects.toThrow(
+            NotFoundException,
+          );
+          expect(mockRepository.listRentalItems).not.toHaveBeenCalled();
+        });
+      });
     });
 
     describe('listRentalItemsForOwner', () => {

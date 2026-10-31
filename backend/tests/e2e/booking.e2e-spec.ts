@@ -269,6 +269,47 @@ describe('Bookings (e2e)', () => {
     it('a published venue keeps answering without any of this', () => {
       return publicPreview(venueId).expect(200);
     });
+
+    describe('with catalog items in the quote', () => {
+      let selectedRentalItems: string;
+
+      beforeAll(async () => {
+        const category = await users.ownerAgent
+          .post(`/api/v1/venues/${draftVenueId}/rental-item-categories`)
+          .send({ name: 'Mobiliario' })
+          .expect(201);
+        const item = await users.ownerAgent
+          .post(`/api/v1/venues/${draftVenueId}/rental-items`)
+          .field('name', 'Silla')
+          .field('categoryId', category.body.id)
+          .field('pricePerUnit', '10')
+          .field('stockQty', '20')
+          .expect(201);
+        selectedRentalItems = JSON.stringify([{ rentalItemId: item.body.id, quantity: 2 }]);
+      });
+
+      it('the share-preview link adds them to the estimate', async () => {
+        const res = await publicPreview(draftVenueId, {
+          previewToken: shareToken,
+          selectedRentalItems,
+        }).expect(200);
+        expect(res.body.rentalItemsTotal).toBe(20);
+        expect(res.body.totalPrice).toBe(1020);
+      });
+
+      it('the owner and the admin see them added in their own preview', async () => {
+        const path = `/api/v1/venues/${draftVenueId}/bookings/preview-price/manage`;
+        const query = { ...quote, selectedRentalItems };
+        const owner = await users.ownerAgent.get(path).query(query).expect(200);
+        expect(owner.body.totalPrice).toBe(1020);
+        const admin = await adminAgent.get(path).query(query).expect(200);
+        expect(admin.body.totalPrice).toBe(1020);
+      });
+
+      it('someone with only the ID still gets a 404', () => {
+        return publicPreview(draftVenueId, { selectedRentalItems }).expect(404);
+      });
+    });
   });
 
   describe('Catalog items in the quote', () => {

@@ -146,7 +146,9 @@ export const BookingForm = ({
   // lets the derived selection correct itself instead of leaving the client stuck on the error.
   const refreshRentalItems = () => {
     if (!hasRentalItems) return;
-    void queryClient.invalidateQueries({ queryKey: rentalItemsQueryKey(venue.id) });
+    void queryClient.invalidateQueries({
+      queryKey: rentalItemsQueryKey(venue.id, pricePreviewAccess),
+    });
   };
 
   const mutation = useMutation({

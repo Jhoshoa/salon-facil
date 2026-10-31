@@ -1,14 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { getPublicRentalItems } from '@/lib/api/venues.api';
+import type { PricePreviewAccess } from '@/lib/api/bookings.api';
+import {
+  getOwnerRentalItems,
+  getPublicRentalItems,
+  getSharedRentalItems,
+} from '@/lib/api/venues.api';
 import type { VenueRentalItem } from '@/types/api';
 
-export const rentalItemsQueryKey = (venueId: string | undefined) => [
-  'venue-rental-items',
-  'public',
-  venueId,
-];
+/** In `manage` mode this is the same cache entry as the owner's catalog tab, so an item edited
+ * there shows up in the preview right away. */
+export const rentalItemsQueryKey = (venueId: string | undefined, access?: PricePreviewAccess) => {
+  if (access?.mode === 'manage') return ['venue-rental-items', venueId];
+  if (access?.mode === 'share') return ['venue-rental-items', 'share', venueId, access.token];
+  return ['venue-rental-items', 'public', venueId];
+};
+
+const fetchRentalItems = (venueId: string, access?: PricePreviewAccess) => {
+  if (access?.mode === 'manage') return getOwnerRentalItems(venueId);
+  if (access?.mode === 'share') return getSharedRentalItems(venueId, access.token);
+  return getPublicRentalItems(venueId);
+};
+
+// `manage` also returns what the owner has turned off, which a visitor would never see.
+const keepActiveItems = (items: VenueRentalItem[]) => items.filter((item) => item.isActive);
+
+export const rentalItemsQueryOptions = (venueId: string, access?: PricePreviewAccess) => ({
+  queryKey: rentalItemsQueryKey(venueId, access),
+  queryFn: () => fetchRentalItems(venueId, access),
+  select: keepActiveItems,
+});
 
 export interface RentalItemLine {
   item: VenueRentalItem;
@@ -28,12 +50,15 @@ export const maxRentalItemQuantity = (item: VenueRentalItem): number => item.sto
  * they're siblings, and the mobile form is unmounted whenever its sheet is closed. Lines are
  * derived from the current catalog, so an item the owner deleted or whose stock dropped corrects
  * itself as soon as the catalog refetches. */
-export const useRentalItemSelection = (venueId: string | undefined, bookingDays = 1) => {
+export const useRentalItemSelection = (
+  venueId: string | undefined,
+  bookingDays = 1,
+  access?: PricePreviewAccess,
+) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const { data: items } = useQuery({
-    queryKey: rentalItemsQueryKey(venueId),
-    queryFn: () => getPublicRentalItems(venueId as string),
+    ...rentalItemsQueryOptions(venueId as string, access),
     enabled: Boolean(venueId),
   });
 
