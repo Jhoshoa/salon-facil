@@ -133,6 +133,44 @@ rm /tmp/locales.csv
 
 (El del contenedor se pierde solo en el proximo redeploy, pero el del servidor no.)
 
+## Deshacer la importacion (borrado definitivo)
+
+`backend/prisma/delete-imported-venues.ts` borra **de verdad** los locales que creo este script,
+con todo lo que dependa de ellos (fotos en la base, precios, catalogo, tokens). Por defecto solo
+muestra lo que haria.
+
+Un local cuenta como importado si es de la cuenta de `ADMIN_EMAIL` y, ademas, su nombre esta en
+el CSV o sigue con la direccion `calle` y el distrito `Zona` que puso el script.
+
+**Nunca borra** un local de otro dueno, ni uno con reservas o resenas. Un local publicado o en
+revision tampoco, salvo con `--include-published`. Con `--keep-edited` conserva tambien los que
+ya tienen datos agregados.
+
+1. **Copia el CSV al contenedor** (pasos 2 y 3).
+
+2. **Respalda la base.** Esta accion no se puede deshacer de otra forma:
+
+   ```bash
+   docker exec salonfacil-postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup-antes-de-borrar-$(date +%F).sql
+   ```
+
+3. **Revisa la simulacion.** No borra nada y muestra la base de datos a la que apunta, que se
+   borraria, que se conserva y por que:
+
+   ```bash
+   docker exec -u root -it salonfacil-backend node dist/prisma/delete-imported-venues.js /tmp/locales.csv
+   ```
+
+4. **Borra**, indicando la cantidad que mostro la simulacion. Si no coincide, no borra nada:
+
+   ```bash
+   docker exec -u root -it salonfacil-backend node dist/prisma/delete-imported-venues.js /tmp/locales.csv --execute --expected=<cantidad>
+   ```
+
+5. **Limpia el CSV** (paso 6).
+
+Las imagenes que ya se hayan subido a Cloudinary no se borran: el script informa cuantas son.
+
 ## Problemas ya encontrados
 
 | Sintoma | Causa | Solucion |
