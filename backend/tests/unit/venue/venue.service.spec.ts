@@ -63,6 +63,10 @@ describe('VenueService', () => {
       updateStatus: jest.fn(),
       incrementViewCount: jest.fn().mockResolvedValue(undefined),
       softDelete: jest.fn(),
+      countUnresolvedActivity: jest
+        .fn()
+        .mockResolvedValue({ activeBookings: 0, paymentsToReview: 0 }),
+      findByIdIncludingDeleted: jest.fn(),
       findAllForAdmin: jest.fn(),
       countByStatus: jest.fn(),
       existsBySlug: jest.fn(),
@@ -435,6 +439,23 @@ describe('VenueService', () => {
       await service.deleteVenue('venue-1', 'owner-1', UserRole.OWNER);
 
       expect(mockRepository.softDelete).toHaveBeenCalledWith('venue-1');
+    });
+
+    it.each([
+      [{ activeBookings: 3, paymentsToReview: 0 }, '3 reservas activas'],
+      [{ activeBookings: 1, paymentsToReview: 0 }, '1 reserva activa'],
+      [{ activeBookings: 0, paymentsToReview: 2 }, '2 pagos por revisar'],
+      [{ activeBookings: 1, paymentsToReview: 1 }, '1 reserva activa y 1 pago por revisar'],
+    ])('should refuse to delete a venue with open activity: %j', async (activity, message) => {
+      mockRepository.findById.mockResolvedValue(mockVenue);
+      mockVenue.canBeEditedBy.mockReturnValue(true);
+      mockRepository.countUnresolvedActivity.mockResolvedValueOnce(activity);
+
+      const attempt = service.deleteVenue('venue-1', 'owner-1', UserRole.OWNER);
+
+      await expect(attempt).rejects.toThrow(ConflictException);
+      await expect(attempt).rejects.toThrow(message);
+      expect(mockRepository.softDelete).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException if not owner', async () => {

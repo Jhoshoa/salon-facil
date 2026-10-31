@@ -584,7 +584,7 @@ export class BookingService {
 
     if (userId && userRole) {
       const isClient = booking.clientId === userId;
-      const venue = await this.venueService.getVenueById(booking.venueId);
+      const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
 
       if (!isClient && !venue.canBeEditedBy(userId, userRole)) {
         throw new ForbiddenException('No tienes permiso para ver esta reserva');
@@ -637,7 +637,7 @@ export class BookingService {
     userId: string,
     userRole: UserRole,
   ): Promise<BookingEntity[]> {
-    const venue = await this.venueService.getVenueById(venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(venueId);
 
     if (!venue.canBeEditedBy(userId, userRole)) {
       throw new ForbiddenException('No tienes permiso para ver las reservas de este local');
@@ -705,7 +705,7 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    const venue = await this.venueService.getVenueById(booking.venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para rechazar esta reserva');
     }
@@ -793,7 +793,7 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    const venue = await this.venueService.getVenueById(booking.venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para registrar el anticipo de esta reserva');
     }
@@ -815,7 +815,7 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    const venue = await this.venueService.getVenueById(booking.venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para completar esta reserva');
     }
@@ -853,7 +853,7 @@ export class BookingService {
       throw new NotFoundException(`Reserva con ID '${bookingId}' no encontrada`);
     }
 
-    const venue = await this.venueService.getVenueById(booking.venueId);
+    const venue = await this.venueService.getVenueIncludingDeleted(booking.venueId);
     if (!venue.canBeEditedBy(venueOwnerId, userRole)) {
       throw new ForbiddenException('No tienes permiso para marcar esta reserva como no show');
     }

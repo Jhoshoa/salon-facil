@@ -96,6 +96,7 @@ export interface UpdateRentalItemCategoryInput {
 
 export interface IVenueRepository {
   findById(id: string): Promise<VenueEntity | null>;
+  findByIdIncludingDeleted(id: string): Promise<VenueEntity | null>;
   findBySlug(slug: string): Promise<VenueEntity | null>;
   findByOwner(ownerId: string): Promise<VenueEntity[]>;
   findByStatus(status: string): Promise<VenueEntity[]>;
@@ -215,6 +216,9 @@ export interface IVenueRepository {
   ): Promise<VenueRentalItemCategoryEntity[] | 'invalid_order'>;
   incrementViewCount(id: string): Promise<void>;
   softDelete(id: string): Promise<void>;
+  countUnresolvedActivity(
+    id: string,
+  ): Promise<{ activeBookings: number; paymentsToReview: number }>;
   /** Only for the admin "attach a real owner" flow -- not exposed through the generic update(),
    * which never touches ownerId on purpose (an owner editing their own venue has no business
    * changing who owns it). */

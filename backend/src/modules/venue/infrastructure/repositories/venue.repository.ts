@@ -25,8 +25,10 @@ import { VenueFilterDto, SortField } from '../../application/dto/venue-filter.dt
 import { PriceCalculatorService } from '../../application/services/price-calculator.service';
 import {
   AmenityCategory,
+  BookingStatus,
   Departamento,
   PaymentPolicy,
+  PaymentStatus,
   Prisma,
   PriceType,
   PriceUnit,
@@ -129,6 +131,14 @@ export class VenueRepository implements IVenueRepository {
   async findById(id: string): Promise<VenueEntity | null> {
     const venue = await this.prisma.venue.findUnique({
       where: { id, deletedAt: null },
+      include: this.venueInclude,
+    });
+    return venue ? this.toEntity(venue) : null;
+  }
+
+  async findByIdIncludingDeleted(id: string): Promise<VenueEntity | null> {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id },
       include: this.venueInclude,
     });
     return venue ? this.toEntity(venue) : null;
@@ -1356,6 +1366,35 @@ export class VenueRepository implements IVenueRepository {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async countUnresolvedActivity(
+    id: string,
+  ): Promise<{ activeBookings: number; paymentsToReview: number }> {
+    const [activeBookings, paymentsToReview] = await Promise.all([
+      this.prisma.booking.count({
+        where: {
+          venueId: id,
+          status: {
+            in: [
+              BookingStatus.PENDING,
+              BookingStatus.APPROVED,
+              BookingStatus.DEPOSIT_PAID,
+              BookingStatus.FULLY_PAID,
+            ],
+          },
+        },
+      }),
+      // A pending payment without a receipt is only an intent to pay; with one, money may have moved.
+      this.prisma.payment.count({
+        where: {
+          status: PaymentStatus.PENDING,
+          comprobanteUrl: { not: null },
+          booking: { venueId: id },
+        },
+      }),
+    ]);
+    return { activeBookings, paymentsToReview };
   }
 
   async reassignOwner(id: string, ownerId: string): Promise<void> {
