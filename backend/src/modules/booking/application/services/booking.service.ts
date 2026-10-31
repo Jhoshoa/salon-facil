@@ -376,7 +376,8 @@ export class BookingService {
    * something the owner never sees, so a stale selection is an error the form can show. Stock is
    * the venue's total, not what's free on that date, so going over it can never be fulfilled;
    * staying under it is still only an estimate the owner has to confirm. The owner decides per item
-   * whether a booking of several days pays for each day or once for the whole event. */
+   * whether a booking of several days pays for each day or once for the whole event. Every caller
+   * has already checked who can see this venue, previews of an unpublished one included. */
   private async resolveSelectedRentalItems(
     venueId: string,
     selection: RentalItemSelectionEntry[] | undefined,
@@ -390,7 +391,7 @@ export class BookingService {
     }
 
     const available = new Map(
-      (await this.venueService.listPublicRentalItems(venueId)).map((item) => [item.id, item]),
+      (await this.venueService.listActiveRentalItems(venueId)).map((item) => [item.id, item]),
     );
 
     return selection.map(({ rentalItemId, quantity }) => {

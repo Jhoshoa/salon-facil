@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { ApiError, Venue } from '@/types/api';
 import { VenueDetail } from './venue-detail';
 import {
+  getOwnerRentalItems,
+  getPublicRentalItems,
+  getSharedRentalItems,
   getSimilarVenues,
   getVenueById,
   getVenueBySharePreviewToken,
@@ -15,6 +18,8 @@ jest.mock('@/lib/api/venues.api', () => ({
   getVenueBySharePreviewToken: jest.fn(),
   getSimilarVenues: jest.fn(),
   getPublicRentalItems: jest.fn().mockResolvedValue([]),
+  getSharedRentalItems: jest.fn().mockResolvedValue([]),
+  getOwnerRentalItems: jest.fn().mockResolvedValue([]),
 }));
 
 // Heavy/unrelated child components stubbed out -- this test is about which sections VenueDetail
@@ -118,6 +123,35 @@ const renderDetail = (props: Partial<React.ComponentProps<typeof VenueDetail>>) 
 
 afterEach(() => {
   jest.clearAllMocks();
+});
+
+describe('VenueDetail - de donde sale el catalogo de items', () => {
+  it('con un enlace compartido usa el token de ese enlace', async () => {
+    mockGetVenueBySharePreviewToken.mockResolvedValue(venue);
+    renderDetail({ shareToken: 'abc123' });
+
+    await waitFor(() => expect(getSharedRentalItems).toHaveBeenCalledWith(venue.id, 'abc123'));
+    expect(getPublicRentalItems).not.toHaveBeenCalled();
+    expect(getOwnerRentalItems).not.toHaveBeenCalled();
+  });
+
+  it('en la vista previa del dueno o admin usa su sesion', async () => {
+    mockGetVenueById.mockResolvedValue(venue);
+    renderDetail({ venueId: venue.id });
+
+    await waitFor(() => expect(getOwnerRentalItems).toHaveBeenCalledWith(venue.id));
+    expect(getPublicRentalItems).not.toHaveBeenCalled();
+    expect(getSharedRentalItems).not.toHaveBeenCalled();
+  });
+
+  it('en la pagina publica usa la ruta publica', async () => {
+    mockGetVenueBySlug.mockResolvedValue(venue);
+    renderDetail({ slug: 'salon-de-prueba' });
+
+    await waitFor(() => expect(getPublicRentalItems).toHaveBeenCalledWith(venue.id));
+    expect(getSharedRentalItems).not.toHaveBeenCalled();
+    expect(getOwnerRentalItems).not.toHaveBeenCalled();
+  });
 });
 
 describe('VenueDetail - modo shareToken (link de "Compartir preview")', () => {

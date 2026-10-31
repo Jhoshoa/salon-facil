@@ -1,16 +1,30 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { PricePreviewAccess } from '@/lib/api/bookings.api';
 import type { VenueRentalItem } from '@/types/api';
 import { VenueRentalItemCatalog } from './venue-rental-item-catalog';
-import { getPublicRentalItems } from '@/lib/api/venues.api';
+import {
+  getOwnerRentalItems,
+  getPublicRentalItems,
+  getSharedRentalItems,
+} from '@/lib/api/venues.api';
 
 jest.mock('@/lib/api/venues.api', () => ({
   getPublicRentalItems: jest.fn(),
+  getSharedRentalItems: jest.fn(),
+  getOwnerRentalItems: jest.fn(),
 }));
 
 const mockGetPublicRentalItems = getPublicRentalItems as jest.MockedFunction<
   typeof getPublicRentalItems
+>;
+
+const mockGetSharedRentalItems = getSharedRentalItems as jest.MockedFunction<
+  typeof getSharedRentalItems
+>;
+const mockGetOwnerRentalItems = getOwnerRentalItems as jest.MockedFunction<
+  typeof getOwnerRentalItems
 >;
 
 const makeItem = (overrides: Partial<VenueRentalItem>): VenueRentalItem => ({
@@ -34,6 +48,7 @@ const renderCatalog = (
   quantities: Record<string, number> = {},
   onQuantityChange: (itemId: string, quantity: number) => void = jest.fn(),
   showChargeBasis = false,
+  access?: PricePreviewAccess,
 ) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -43,6 +58,7 @@ const renderCatalog = (
         showChargeBasis={showChargeBasis}
         quantities={quantities}
         onQuantityChange={onQuantityChange}
+        access={access}
       />
     </QueryClientProvider>,
   );
@@ -53,6 +69,27 @@ afterEach(() => {
 });
 
 describe('VenueRentalItemCatalog', () => {
+  it('muestra el catalogo de un enlace compartido con su token', async () => {
+    mockGetSharedRentalItems.mockResolvedValue([makeItem({ name: 'Mesa' })]);
+    renderCatalog({}, jest.fn(), false, { mode: 'share', token: 'link-token' });
+
+    expect(await screen.findByText('Mesa')).toBeInTheDocument();
+    expect(mockGetSharedRentalItems).toHaveBeenCalledWith('venue-1', 'link-token');
+    expect(mockGetPublicRentalItems).not.toHaveBeenCalled();
+  });
+
+  it('en la vista previa del dueno o admin oculta los items inactivos', async () => {
+    mockGetOwnerRentalItems.mockResolvedValue([
+      makeItem({ id: 'item-1', name: 'Mesa' }),
+      makeItem({ id: 'item-2', name: 'Silla apagada', isActive: false }),
+    ]);
+    renderCatalog({}, jest.fn(), false, { mode: 'manage' });
+
+    expect(await screen.findByText('Mesa')).toBeInTheDocument();
+    expect(screen.queryByText('Silla apagada')).not.toBeInTheDocument();
+    expect(mockGetPublicRentalItems).not.toHaveBeenCalled();
+  });
+
   it('no renderiza nada si el local no tiene items', async () => {
     mockGetPublicRentalItems.mockResolvedValue([]);
     const { container } = renderCatalog();

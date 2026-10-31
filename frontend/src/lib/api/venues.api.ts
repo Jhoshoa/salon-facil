@@ -200,6 +200,17 @@ export const getPublicRentalItems = async (venueId: string): Promise<VenueRental
   return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items`, { auth: false });
 };
 
+/** The catalog as seen through a share-preview link, for a venue that may not be public yet. */
+export const getSharedRentalItems = async (
+  venueId: string,
+  token: string,
+): Promise<VenueRentalItem[]> => {
+  const search = new URLSearchParams({ previewToken: token });
+  return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items?${search.toString()}`, {
+    auth: false,
+  });
+};
+
 export const getOwnerRentalItems = async (venueId: string): Promise<VenueRentalItem[]> => {
   return apiRequest<VenueRentalItem[]>(`/venues/${venueId}/rental-items/manage`);
 };

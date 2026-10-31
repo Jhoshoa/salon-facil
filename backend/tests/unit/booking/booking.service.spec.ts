@@ -126,7 +126,7 @@ describe('BookingService', () => {
     getVenueById: jest.Mock;
     getVenueByPreviewToken: jest.Mock;
     getOwnerContact: jest.Mock;
-    listPublicRentalItems: jest.Mock;
+    listActiveRentalItems: jest.Mock;
   };
   let mockPriceCalculator: {
     calculate: jest.Mock;
@@ -173,7 +173,7 @@ describe('BookingService', () => {
       getVenueById: jest.fn(),
       getVenueByPreviewToken: jest.fn(),
       getOwnerContact: jest.fn().mockResolvedValue(null),
-      listPublicRentalItems: jest.fn().mockResolvedValue([]),
+      listActiveRentalItems: jest.fn().mockResolvedValue([]),
     };
 
     mockPriceCalculator = {
@@ -517,7 +517,7 @@ describe('BookingService', () => {
 
     beforeEach(() => {
       mockVenueService.getVenueById.mockResolvedValue(makeVenue());
-      mockVenueService.listPublicRentalItems.mockResolvedValue([
+      mockVenueService.listActiveRentalItems.mockResolvedValue([
         silla,
         toldo,
         mesaIncluida,
@@ -591,7 +591,7 @@ describe('BookingService', () => {
     it('does not query the catalog when nothing was selected', async () => {
       const result = await service.previewPrice('venue-1', previewDto);
 
-      expect(mockVenueService.listPublicRentalItems).not.toHaveBeenCalled();
+      expect(mockVenueService.listActiveRentalItems).not.toHaveBeenCalled();
       expect(result.rentalItems).toEqual([]);
       expect(result.rentalItemsTotal).toBe(0);
       expect(result.totalPrice).toBe(5000);
@@ -1457,6 +1457,54 @@ describe('BookingService', () => {
       await expect(
         service.previewPriceForManager('venue-1', dto, 'other-owner', UserRole.OWNER),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    describe('with catalog items in the quote', () => {
+      const selection = {
+        ...dto,
+        selectedRentalItems: [{ rentalItemId: 'silla', quantity: 2 }],
+      };
+
+      beforeEach(() => {
+        mockVenueService.listActiveRentalItems.mockResolvedValue([
+          {
+            id: 'silla',
+            name: 'Silla',
+            unitLabel: 'unidad',
+            pricePerUnit: 10,
+            isIncluded: false,
+            stockQty: 5,
+            chargeBasis: 'PER_EVENT',
+          },
+        ]);
+      });
+
+      it('should add them through the share-preview link of that venue', async () => {
+        mockVenueService.getVenueByPreviewToken.mockResolvedValue(makeVenue());
+
+        const result = await service.previewPrice('venue-1', {
+          ...selection,
+          previewToken: 'link-token',
+        });
+
+        expect(result.rentalItemsTotal).toBe(20);
+      });
+
+      it('should add them for its owner', async () => {
+        const result = await service.previewPriceForManager(
+          'venue-1',
+          selection,
+          'owner-1',
+          UserRole.OWNER,
+        );
+
+        expect(result.rentalItemsTotal).toBe(20);
+      });
+
+      it('should still answer 404 to someone who only has the ID', async () => {
+        await expect(service.previewPrice('venue-1', selection)).rejects.toThrow(NotFoundException);
+        expect(mockVenueService.listActiveRentalItems).not.toHaveBeenCalled();
+      });
     });
   });
 

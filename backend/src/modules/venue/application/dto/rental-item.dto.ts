@@ -27,6 +27,15 @@ import { parseBoolean, parseIntOrNull, trimString, trimStringOrNull } from './cr
 // instead, since implicit conversion's `Boolean(value)` would make the literal string "false"
 // coerce to `true`.
 
+export class ListRentalItemsQueryDto {
+  // The share-preview link being viewed: the only way to read the catalog of a venue that isn't
+  // public without being its owner or an admin.
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  previewToken?: string;
+}
+
 // Keeps the value inside the database's 32-bit integer column.
 export const MAX_RENTAL_SORT_ORDER = 100000;
 export const MAX_REORDER_IDS = 1000;
