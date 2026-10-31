@@ -1,9 +1,9 @@
-import { readFileSync } from 'fs';
 import { NestFactory } from '@nestjs/core';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { VenueService } from '../src/modules/venue/application/services/venue.service';
 import { CreateVenueDto } from '../src/modules/venue/application/dto/create-venue.dto';
+import { readVenueRows, tieneWebPropia } from './seed-data/venue-csv';
 
 // Bulk-imports venues scraped into a CSV (nombre_local,departamento,ciudad,telefono,facebook,
 // tiktok,otra_referencia,fuente,notas -- see research_notes/Locales Bolivia/*.csv, never
@@ -22,17 +22,6 @@ import { CreateVenueDto } from '../src/modules/venue/application/dto/create-venu
 //   node dist/prisma/seed-bolivia-venues.js <csv-path> --all   # every eligible row in the file
 //
 // Dev (ts-node): npx ts-node prisma/seed-bolivia-venues.ts <csv-path> 1
-
-// Venues whose own website we found while researching (docs/research -- see the yellow-highlighted
-// rows in the companion locales_bolivia.html viewer) are deliberately excluded: those get
-// contacted separately, not auto-created with placeholder data that would undersell a local that
-// already has a real page.
-const SITIOS_PROPIOS = [
-  'ledome.com.bo',
-  'losjardines.com',
-  'emperador.com.bo',
-  'curichidelcocodrilo',
-];
 
 const DEPARTAMENTO_MAP: Record<string, string> = {
   'la paz': 'LA_PAZ',
@@ -56,101 +45,6 @@ const AMENITY_KEY = 'bathrooms';
 const GENERIC_CAPACITY_MIN = 20;
 const GENERIC_CAPACITY_MAX = 150;
 const GENERIC_BASE_PRICE = 1500;
-
-interface VenueRow {
-  nombre_local: string;
-  departamento: string;
-  ciudad: string;
-  telefono: string;
-  facebook: string;
-  tiktok: string;
-  otra_referencia: string;
-  fuente: string;
-  notas: string;
-}
-
-/** Small RFC4180-aware CSV parser (quoted fields, embedded commas/newlines, "" as an escaped
- * quote) -- the file was written by Python's csv module with QUOTE_MINIMAL, so this only needs
- * to handle that shape, not a general-purpose CSV dialect. */
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let inQuotes = false;
-  let i = 0;
-
-  while (i < text.length) {
-    const char = text[i];
-
-    if (inQuotes) {
-      if (char === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        i += 1;
-        continue;
-      }
-      field += char;
-      i += 1;
-      continue;
-    }
-
-    if (char === '"') {
-      inQuotes = true;
-      i += 1;
-      continue;
-    }
-    if (char === ',') {
-      row.push(field);
-      field = '';
-      i += 1;
-      continue;
-    }
-    if (char === '\r') {
-      i += 1;
-      continue;
-    }
-    if (char === '\n') {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-      i += 1;
-      continue;
-    }
-    field += char;
-    i += 1;
-  }
-
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  return rows.filter((r) => r.length > 1 || r[0] !== '');
-}
-
-function readVenueRows(csvPath: string): VenueRow[] {
-  const raw = readFileSync(csvPath, 'utf-8').replace(/^﻿/, '');
-  const rows = parseCsv(raw);
-  const [header, ...dataRows] = rows;
-
-  return dataRows.map((cols) => {
-    const record: Record<string, string> = {};
-    header.forEach((key, index) => {
-      record[key.trim()] = (cols[index] ?? '').trim();
-    });
-    return record as unknown as VenueRow;
-  });
-}
-
-function tieneWebPropia(row: VenueRow): boolean {
-  const texto = [row.facebook, row.tiktok, row.otra_referencia, row.fuente].join(' ').toLowerCase();
-  return SITIOS_PROPIOS.some((dominio) => texto.includes(dominio));
-}
 
 /** Keeps only the first number when a cell has more than one ("71467697 / 71940412"), strips
  * everything but digits, drops a leading 591 country code if it's already there, and accepts the

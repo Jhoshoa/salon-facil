@@ -30,7 +30,9 @@
     "prisma:seed:catalog:prod": "node dist/prisma/seed-catalog.js",
     "prisma:seed:admin:prod": "node dist/prisma/seed-admin.js",
     "prisma:seed:bolivia-venues": "ts-node prisma/seed-bolivia-venues.ts",
-    "prisma:seed:bolivia-venues:prod": "node dist/prisma/seed-bolivia-venues.js"
+    "prisma:seed:bolivia-venues:prod": "node dist/prisma/seed-bolivia-venues.js",
+    "prisma:delete-imported-venues": "ts-node prisma/delete-imported-venues.ts",
+    "prisma:delete-imported-venues:prod": "node dist/prisma/delete-imported-venues.js"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
